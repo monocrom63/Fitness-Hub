@@ -675,7 +675,8 @@ export const CreatePulseMessageResponse = zod.object({
 
 
 /**
- * @summary Correct the author's published Pulse message
+ * Title, body and priority can change; audience and studio remain fixed. Prior read receipts are reset.
+ * @summary Correct a published Pulse message as its manager-author or a district manager
  */
 export const UpdatePulseMessageParams = zod.object({
   "id": zod.coerce.number().int()
@@ -712,7 +713,7 @@ export const UpdatePulseMessageResponse = zod.object({
 
 
 /**
- * @summary Retract the author's published Pulse message without deleting its audit record
+ * @summary Retract a message as its manager-author or a district manager without deleting its audit record
  */
 export const RetractPulseMessageParams = zod.object({
   "id": zod.coerce.number().int()

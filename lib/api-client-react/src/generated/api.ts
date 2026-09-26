@@ -2378,7 +2378,8 @@ export const getUpdatePulseMessageUrl = (id: number,) => {
 }
 
 /**
- * @summary Correct the author's published Pulse message
+ * Title, body and priority can change; audience and studio remain fixed. Prior read receipts are reset.
+ * @summary Correct a published Pulse message as its manager-author or a district manager
  */
 export const updatePulseMessage = async (id: number,
     pulseCorrection: PulseCorrection, options?: Parameters<typeof customFetch>[1]): Promise<PulseMessage> => {
@@ -2445,7 +2446,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdatePulseMessageMutationVariables = {id: number;data: BodyType<PulseCorrection>}
 
     /**
- * @summary Correct the author's published Pulse message
+ * @summary Correct a published Pulse message as its manager-author or a district manager
  */
 export const useUpdatePulseMessage = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePulseMessage>>, TError,UpdatePulseMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2467,7 +2468,7 @@ export const getRetractPulseMessageUrl = (id: number,) => {
 }
 
 /**
- * @summary Retract the author's published Pulse message without deleting its audit record
+ * @summary Retract a message as its manager-author or a district manager without deleting its audit record
  */
 export const retractPulseMessage = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
@@ -2519,7 +2520,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RetractPulseMessageMutationVariables = {id: number}
 
     /**
- * @summary Retract the author's published Pulse message without deleting its audit record
+ * @summary Retract a message as its manager-author or a district manager without deleting its audit record
  */
 export const useRetractPulseMessage = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retractPulseMessage>>, TError,RetractPulseMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

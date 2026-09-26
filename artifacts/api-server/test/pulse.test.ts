@@ -86,7 +86,7 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
     const list = async (staff: typeof district) => {
       const result = await api(user(staff), "GET", "/pulse");
       assert.equal(result.status, 200, JSON.stringify(result.body));
-      return result.body as Array<{ id: number; isRead: boolean; readCount: number }>;
+      return result.body as Array<{ id: number; isRead: boolean; readCount: number; canManage: boolean }>;
     };
 
     await t.test("unauthenticated and employee publishing is denied", async () => {
@@ -181,17 +181,24 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.ok(!second.body.some((message: { id: number }) => message.id === other || message.id === studioBAll));
     });
 
-    await t.test("only the author can correct or retract; corrections reset old receipts", async () => {
+    await t.test("manager-authors and district managers can correct or retract without changing the audience", async () => {
       const correction = { title: "Korrigierter Plan", body: "Neuer Termin", priority: "important" };
       assert.equal((await api(user(employeeA), "PATCH", `/pulse/${studioAAll}`, correction)).status, 403);
       assert.equal((await api(user(managerB), "PATCH", `/pulse/${studioAAll}`, correction)).status, 403);
       assert.equal((await api(user(otherDistrict), "PATCH", `/pulse/${studioAAll}`, correction)).status, 404);
       assert.equal((await api(user(managerB), "DELETE", `/pulse/${studioAAll}`)).status, 403);
       assert.equal((await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, body: " " })).status, 400);
+      assert.equal((await api(user(district), "PATCH", `/pulse/${studioAAll}`, { ...correction, audience: "managers" })).status, 400);
+      assert.equal((await api(user(district), "PATCH", `/pulse/${studioAAll}`, { ...correction, studioId: studioB.id })).status, 400);
       assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`)).status, 200);
-      const updated = await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, correction);
+      const districtOlder = await api(user(district), "GET", `/pulse?beforeId=${studioAAll + 1}`);
+      assert.equal(districtOlder.body.find((m: { id: number }) => m.id === studioAAll)?.canManage, true);
+      const updated = await api(user(district), "PATCH", `/pulse/${studioAAll}`, correction);
       assert.equal(updated.status, 200);
       assert.equal(updated.body.title, correction.title);
+      assert.equal(updated.body.authorName, "Manager A");
+      assert.equal(updated.body.studioId, studioA.id);
+      assert.equal(updated.body.audience, "all");
       assert.ok(updated.body.editedAt);
       assert.equal(updated.body.readCount, 1);
       const employeePage = await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`);
@@ -199,12 +206,23 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal(corrected?.title, correction.title);
       assert.equal(corrected?.isRead, false);
       assert.equal(corrected?.canManage, false);
-      assert.equal((await api(user(managerA), "DELETE", `/pulse/${studioAAll}`)).status, 204);
+      assert.equal((await api(user(district), "DELETE", `/pulse/${studioAAll}`)).status, 204);
       assert.equal((await api(user(managerA), "DELETE", `/pulse/${studioAAll}`)).status, 404);
       assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`)).status, 404);
       assert.ok(!(await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`)).body.some((message: { id: number }) => message.id === studioAAll));
       const [record] = await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.id, studioAAll));
       assert.ok(record.retractedAt);
+
+      // A staff-only notice from a studio manager is still manageable by the district.
+      const staffOnly = await publish(managerA, studioA.id, "employees", "Staff-only correction");
+      assert.equal((await list(district)).find(m => m.id === staffOnly)?.canManage, true);
+      assert.equal((await api(user(managerB), "DELETE", `/pulse/${staffOnly}`)).status, 403);
+      assert.equal((await api(user(district), "DELETE", `/pulse/${staffOnly}`)).status, 204);
+      assert.equal((await list(employeeA)).some(m => m.id === staffOnly), false);
+
+      const authored = await publish(managerA, studioA.id, "all", "Author correction");
+      assert.equal((await api(user(managerA), "PATCH", `/pulse/${authored}`, correction)).status, 200);
+      assert.equal((await api(user(managerA), "DELETE", `/pulse/${authored}`)).status, 204);
     });
 
     assert.equal((await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.organizationId, orgB.id))).length, 1);

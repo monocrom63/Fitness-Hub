@@ -45,6 +45,10 @@ function visibleMessages(staff: StaffContext, studioIds: number[]) {
       eq(pulseMessagesTable.audience, "all"),
       eq(pulseMessagesTable.audience, roleAudience),
       eq(pulseMessagesTable.authorStaffId, staff.id),
+      // District managers oversee every announcement in their organization.
+      staff.role === "district_manager"
+        ? eq(pulseMessagesTable.audience, "employees")
+        : undefined,
     ),
   );
 }
@@ -89,10 +93,11 @@ export function createPulseRouter(
       res.status(404).json({ error: "Meldung nicht gefunden." });
       return null;
     }
-    if (!canManageTeam(staff) || message.authorStaffId !== staff.id ||
+    if (!canManageTeam(staff) ||
+        (staff.role !== "district_manager" && message.authorStaffId !== staff.id) ||
         (message.studioId === null && staff.role !== "district_manager") ||
         (message.studioId !== null && !(await canAccessStudio(staff, message.studioId, database)))) {
-      res.status(403).json({ error: "Nur die zuständige Verfasserin oder der zuständige Verfasser kann diese Meldung ändern." });
+      res.status(403).json({ error: "Nur die zuständige Verfasserin, der zuständige Verfasser oder die Bezirksleitung kann diese Meldung ändern." });
       return null;
     }
     return message;
@@ -172,7 +177,7 @@ router.get("/pulse", async (req, res): Promise<void> => {
         ...message,
         createdAt: message.createdAt.toISOString(),
         editedAt: message.editedAt?.toISOString() ?? null,
-        canManage: canManageTeam(staff) && message.authorStaffId === staff.id &&
+        canManage: canManageTeam(staff) && (staff.role === "district_manager" || message.authorStaffId === staff.id) &&
           (message.studioId !== null || staff.role === "district_manager"),
         isRead: readIds.has(message.id),
         readCount: totals.get(message.id) ?? 0,
@@ -260,7 +265,8 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
   if (!staff) return;
   const params = UpdatePulseMessageParams.safeParse(req.params);
   const body = UpdatePulseMessageBody.safeParse(req.body);
-  if (!params.success || !body.success || body.data.title.trim().length < 2 || !body.data.body.trim()) {
+  if (!params.success || !body.success || body.data.title.trim().length < 2 || !body.data.body.trim() ||
+      !req.body || Object.keys(req.body).some(key => !["title", "body", "priority"].includes(key))) {
     res.status(400).json({ error: "Titel oder Nachricht sind ungültig." });
     return;
   }
@@ -275,6 +281,8 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
     }).where(and(eq(pulseMessagesTable.id, original.id), isNull(pulseMessagesTable.retractedAt))).returning();
     if (!message) return null;
     await tx.delete(pulseReadsTable).where(eq(pulseReadsTable.messageId, message.id));
+    // A correction invalidates every receipt for the previous text. The correcting
+    // manager has seen the new version even when someone else wrote the original.
     await tx.insert(pulseReadsTable).values({ messageId: message.id, staffId: staff.id });
     return message;
   });
@@ -285,11 +293,13 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
   const [studio] = updated.studioId === null ? [null] : await database
     .select({ name: studiosTable.name }).from(studiosTable)
     .where(eq(studiosTable.id, updated.studioId)).limit(1);
+  const [author] = await database.select({ fullName: staffTable.fullName })
+    .from(staffTable).where(eq(staffTable.id, updated.authorStaffId)).limit(1);
   res.json(UpdatePulseMessageResponse.parse({
     id: updated.id, title: updated.title, body: updated.body,
     priority: updated.priority, audience: updated.audience,
     studioId: updated.studioId, studioName: studio?.name ?? null,
-    authorName: staff.fullName, createdAt: updated.createdAt.toISOString(),
+    authorName: author.fullName, createdAt: updated.createdAt.toISOString(),
     editedAt: updated.editedAt?.toISOString() ?? null,
     isRead: true, readCount: 1, canManage: true,
   }));

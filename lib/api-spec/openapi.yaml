@@ -578,7 +578,8 @@ paths:
     patch:
       operationId: updatePulseMessage
       tags: [pulse]
-      summary: Correct the author's published Pulse message
+      summary: Correct a published Pulse message as its manager-author or a district manager
+      description: Title, body and priority can change; audience and studio remain fixed. Prior read receipts are reset.
       parameters:
         - name: id
           in: path
@@ -604,7 +605,7 @@ paths:
     delete:
       operationId: retractPulseMessage
       tags: [pulse]
-      summary: Retract the author's published Pulse message without deleting its audit record
+      summary: Retract a message as its manager-author or a district manager without deleting its audit record
       parameters:
         - name: id
           in: path
