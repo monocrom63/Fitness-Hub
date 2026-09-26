@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Fiudia"
+description = "Ein browserbasiertes Fitnessstudio-Portal für Bezirksleitungen, Studioleitungen und Mitarbeitende mit rollenbasierten Ansichten sowie Mitglieder-, Check-in- und Kursverwaltung."
+version = "1.0.0"
+id = "artifacts/fiudia"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22766
+
+[services.development]
+run = "pnpm --filter @workspace/fiudia run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fiudia", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fiudia/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22766"
+BASE_PATH = "/"

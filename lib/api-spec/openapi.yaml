@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: portal
+    description: Fiudia studio operations and member management
+  - name: team
+    description: Staff roles and invitations
 paths:
   /healthz:
     get:
@@ -24,6 +28,274 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getMe
+      tags: [portal]
+      summary: Get the signed-in user's Fiudia access profile
+      responses:
+        "200":
+          description: Current user profile and assigned role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          description: Sign-in required
+  /onboarding:
+    post:
+      operationId: completeOnboarding
+      tags: [portal]
+      summary: Create an organization and its first studio for a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingInput"
+      responses:
+        "201":
+          description: Organization created and initial district-manager access assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          description: Invalid onboarding details
+        "401":
+          description: Sign-in required
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [portal]
+      summary: Get metrics and activity tailored to the signed-in user's role
+      responses:
+        "200":
+          description: Role-specific studio or district overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Fiudia access has not been assigned
+  /members:
+    get:
+      operationId: listMembers
+      tags: [portal]
+      summary: Search members visible to the signed-in user
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/MemberStatus"
+        - name: studioId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Matching members within the user's permitted scope
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Fiudia access has not been assigned
+    post:
+      operationId: createMember
+      tags: [portal]
+      summary: Add a member to a studio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberInput"
+      responses:
+        "201":
+          description: Member created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Invalid member details
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role or studio access
+  /members/{id}:
+    patch:
+      operationId: updateMember
+      tags: [portal]
+      summary: Update member contact or membership status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberUpdate"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Invalid member details
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role or studio access
+        "404":
+          description: Member not found
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [portal]
+      summary: List upcoming courses visible to the signed-in user
+      responses:
+        "200":
+          description: Upcoming courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Fiudia access has not been assigned
+    post:
+      operationId: createCourse
+      tags: [portal]
+      summary: Schedule a course at an accessible studio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "201":
+          description: Course created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        "400":
+          description: Invalid course details
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role or studio access
+  /check-ins:
+    post:
+      operationId: createCheckIn
+      tags: [portal]
+      summary: Record a member check-in at an accessible studio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInInput"
+      responses:
+        "201":
+          description: Check-in recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckIn"
+        "400":
+          description: Invalid check-in details
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role or studio access
+  /team/invitations:
+    get:
+      operationId: listInvitations
+      tags: [team]
+      summary: List invitations available to the signed-in manager
+      responses:
+        "200":
+          description: Pending and recently accepted invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invitation"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role
+    post:
+      operationId: createInvitation
+      tags: [team]
+      summary: Invite a colleague with a manager-assigned role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationInput"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "400":
+          description: Invalid invitation details
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role or studio access
+  /team/invitations/{token}/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [team]
+      summary: Accept a role invitation for the signed-in account
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invitation accepted and role assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Invitation does not match the signed-in account
+        "404":
+          description: Invitation not found or expired
 components:
   schemas:
     HealthStatus:
@@ -33,4 +305,155 @@ components:
           type: string
       required:
         - status
+    Role:
+      type: string
+      enum: [district_manager, studio_manager, studio_employee]
+    MemberStatus:
+      type: string
+      enum: [active, trial, paused]
+    Me:
+      type: object
+      required: [userId, userName, email, isOnboarded]
+      properties:
+        userId: { type: string }
+        userName: { type: string }
+        email: { type: string, format: email }
+        isOnboarded: { type: boolean }
+        role: { allOf: [{ $ref: "#/components/schemas/Role" }], nullable: true }
+        organizationId: { type: ["integer", "null"] }
+        organizationName: { type: ["string", "null"] }
+        studioId: { type: ["integer", "null"] }
+        studioName: { type: ["string", "null"] }
+    OnboardingInput:
+      type: object
+      required: [organizationName, studioName, city]
+      properties:
+        organizationName: { type: string, minLength: 2, maxLength: 120 }
+        studioName: { type: string, minLength: 2, maxLength: 120 }
+        city: { type: string, minLength: 2, maxLength: 120 }
+    DashboardMetric:
+      type: object
+      required: [label, value, delta, tone]
+      properties:
+        label: { type: string }
+        value: { type: string }
+        delta: { type: string }
+        tone: { type: string, enum: [positive, neutral, warning] }
+    DashboardActivity:
+      type: object
+      required: [id, title, description, happenedAt, category]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        happenedAt: { type: string, format: date-time }
+        category: { type: string, enum: [member, course, team, check_in] }
+    Dashboard:
+      type: object
+      required: [role, userName, studioName, metrics, activities, courses]
+      properties:
+        role: { $ref: "#/components/schemas/Role" }
+        userName: { type: string }
+        studioName: { type: string }
+        metrics:
+          type: array
+          items: { $ref: "#/components/schemas/DashboardMetric" }
+        activities:
+          type: array
+          items: { $ref: "#/components/schemas/DashboardActivity" }
+        courses:
+          type: array
+          items: { $ref: "#/components/schemas/Course" }
+    Member:
+      type: object
+      required: [id, fullName, email, phone, membershipType, status, studioId, studioName, joinedAt, lastCheckIn]
+      properties:
+        id: { type: integer }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        phone: { type: ["string", "null"] }
+        membershipType: { type: string }
+        status: { $ref: "#/components/schemas/MemberStatus" }
+        studioId: { type: integer }
+        studioName: { type: string }
+        joinedAt: { type: string, format: date-time }
+        lastCheckIn: { type: ["string", "null"], format: date-time }
+    MemberInput:
+      type: object
+      required: [fullName, email, membershipType, studioId]
+      properties:
+        fullName: { type: string, minLength: 2, maxLength: 160 }
+        email: { type: string, format: email, maxLength: 320 }
+        phone: { type: string, maxLength: 40 }
+        membershipType: { type: string, minLength: 2, maxLength: 80 }
+        status: { $ref: "#/components/schemas/MemberStatus" }
+        studioId: { type: integer }
+    MemberUpdate:
+      type: object
+      properties:
+        fullName: { type: string, minLength: 2, maxLength: 160 }
+        email: { type: string, format: email, maxLength: 320 }
+        phone: { type: ["string", "null"], maxLength: 40 }
+        membershipType: { type: string, minLength: 2, maxLength: 80 }
+        status: { $ref: "#/components/schemas/MemberStatus" }
+    Course:
+      type: object
+      required: [id, title, instructor, studioId, studioName, startsAt, endsAt, capacity, enrolled, room, status]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        instructor: { type: string }
+        studioId: { type: integer }
+        studioName: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer }
+        enrolled: { type: integer }
+        room: { type: string }
+        status: { type: string, enum: [scheduled, full, cancelled] }
+    CourseInput:
+      type: object
+      required: [title, instructor, studioId, startsAt, endsAt, capacity, room]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 120 }
+        instructor: { type: string, minLength: 2, maxLength: 120 }
+        studioId: { type: integer }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1, maximum: 200 }
+        room: { type: string, minLength: 1, maxLength: 80 }
+    CheckInInput:
+      type: object
+      required: [memberId, studioId]
+      properties:
+        memberId: { type: integer }
+        studioId: { type: integer }
+    CheckIn:
+      type: object
+      required: [id, memberId, memberName, studioId, checkedInAt]
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        studioId: { type: integer }
+        checkedInAt: { type: string, format: date-time }
+    Invitation:
+      type: object
+      required: [id, email, role, studioId, studioName, status, inviteUrl, expiresAt]
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/Role" }
+        studioId: { type: integer }
+        studioName: { type: string }
+        status: { type: string, enum: [pending, accepted, expired] }
+        inviteUrl: { type: string }
+        expiresAt: { type: string, format: date-time }
+    InvitationInput:
+      type: object
+      required: [email, role, studioId]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        role: { $ref: "#/components/schemas/Role" }
+        studioId: { type: integer }
 
