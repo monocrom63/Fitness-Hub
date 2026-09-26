@@ -52,7 +52,6 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         guestA2: `team-guest-a2-${run}`,
         guestB: `team-guest-b-${run}`,
         foreignStudio: `team-foreign-studio-${run}`,
-        expiredGuest: `team-expired-${run}`,
         wrongEmail: `team-wrong-email-${run}`,
         unverified: `team-unverified-${run}`,
       };
@@ -68,7 +67,6 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         a2: `invite-a2-${run}@example.com`,
         b: `invite-b-${run}@example.com`,
         foreignStudio: `invite-foreign-studio-${run}@example.com`,
-        expired: `invite-expired-${run}@example.com`,
       };
       const identities = new Map([
         [users.guestA1, { fullName: "New A1", email: emails.a1, emailVerified: true }],
@@ -76,7 +74,6 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         [users.guestA2, { fullName: "New A2", email: emails.a2, emailVerified: true }],
         [users.guestB, { fullName: "New B", email: emails.b, emailVerified: true }],
         [users.foreignStudio, { fullName: "Wrong studio", email: emails.foreignStudio, emailVerified: true }],
-        [users.expiredGuest, { fullName: "Expired invitee", email: emails.expired, emailVerified: true }],
         [users.wrongEmail, { fullName: "Wrong address", email: `wrong-${run}@example.com`, emailVerified: true }],
         [users.unverified, { fullName: "Unverified", email: emails.a1, emailVerified: false }],
       ]);
@@ -182,7 +179,8 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
             organizationId: invitationsTable.organizationId,
             studioId: invitationsTable.studioId,
           }).from(invitationsTable).where(inArray(invitationsTable.id, [a1.id, a2.id, b.id]));
-          assert.deepEqual(rows.map(({ organizationId, studioId }) => [organizationId, studioId]),
+          assert.deepEqual(rows.map(({ organizationId, studioId }) => [organizationId, studioId])
+            .sort((left, right) => left[1] - right[1]),
             [[orgA.id, studioA1.id], [orgA.id, studioA2.id], [orgB.id, studioB.id]]);
         });
 
@@ -244,34 +242,100 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
           assert.ok((await list(users.districtA)).every((invitation) => invitation.status === "accepted"));
         });
 
-        await t.test("expired invitations never grant access and do not block a fresh invitation", async () => {
-          const oldToken = randomUUID();
-          const [expired] = await tx.insert(invitationsTable).values({
-            organizationId: orgA.id,
-            studioId: studioA1.id,
-            invitedByStaffId: managerA1.id,
-            email: emails.expired,
-            role: "studio_employee",
-            tokenHash: createHash("sha256").update(oldToken).digest("hex"),
-            expiresAt: new Date(Date.now() - 60_000),
-          }).returning();
-          const displayed = (await list(users.managerA1)).find((item) => item.id === expired.id);
-          assert.equal(displayed?.status, "expired");
-          assert.equal((await api(users.expiredGuest, "POST", `/team/invitations/${oldToken}/accept`)).status, 404);
-          const [stillPending] = await tx.select({ status: invitationsTable.status })
-            .from(invitationsTable).where(eq(invitationsTable.id, expired.id));
-          assert.equal(stillPending.status, "pending");
-          assert.deepEqual(await tx.select({ id: staffTable.id }).from(staffTable)
-            .where(eq(staffTable.clerkUserId, users.expiredGuest)), []);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => error ? reject(error) : resolve()));
+      }
+      throw rollback;
+    });
+  } catch (error) {
+    if (error !== rollback) throw error;
+  }
+});
 
-          const fresh = await invite(users.managerA1, studioA1.id, "studio_employee", emails.expired);
-          assert.equal((await api(users.expiredGuest, "POST", `/team/invitations/${oldToken}/accept`)).status, 404);
-          const accepted = await api<{ studioId: number; role: string }>(
-            users.expiredGuest, "POST", `/team/invitations/${fresh.inviteUrl.split("/").at(-1)}/accept`);
-          assert.equal(accepted.status, 200);
-          assert.equal(accepted.body.studioId, studioA1.id);
-          assert.equal(accepted.body.role, "studio_employee");
+test("expired team invitations are listed but cannot grant access or block a replacement", async () => {
+  try {
+    await db.transaction(async (tx) => {
+      const run = randomUUID();
+      const managerId = `team-expiry-manager-${run}`;
+      const guestId = `team-expiry-guest-${run}`;
+      const email = `team-expiry-${run}@example.com`;
+      const [organization] = await tx.insert(organizationsTable)
+        .values({ name: `Team expiry test ${run}` }).returning();
+      const [studio] = await tx.insert(studiosTable)
+        .values({ organizationId: organization.id, name: "Expiry studio", city: "Berlin" }).returning();
+      const [manager] = await tx.insert(staffTable).values({
+        clerkUserId: managerId,
+        organizationId: organization.id,
+        studioId: studio.id,
+        fullName: "Expiry manager",
+        email: `team-expiry-manager-${run}@example.com`,
+        role: "studio_manager",
+      }).returning();
+      const oldToken = randomUUID();
+      const [expired] = await tx.insert(invitationsTable).values({
+        organizationId: organization.id,
+        studioId: studio.id,
+        invitedByStaffId: manager.id,
+        email,
+        role: "studio_employee",
+        tokenHash: createHash("sha256").update(oldToken).digest("hex"),
+        expiresAt: new Date(Date.now() - 60_000),
+      }).returning();
+
+      const app = express();
+      app.use(express.json());
+      app.use("/api", createTeamRouter({
+        database: tx as unknown as typeof db,
+        userIdFromRequest: (req) => req.get("x-test-user") ?? null,
+        identityForUser: async (userId) => {
+          assert.equal(userId, guestId);
+          return { userId, fullName: "Expired invitee", email, emailVerified: true };
+        },
+      }));
+      const server = app.listen(0, "127.0.0.1");
+      await new Promise<void>((resolve) => server.once("listening", resolve));
+      const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+      async function api<T>(user: string, method: "GET" | "POST", path: string, data?: unknown) {
+        const response = await fetch(`${origin}${path}`, {
+          method,
+          headers: {
+            "x-test-user": user,
+            ...(data === undefined ? {} : { "content-type": "application/json" }),
+          },
+          ...(data === undefined ? {} : { body: JSON.stringify(data) }),
         });
+        return { status: response.status, body: await response.json() as T };
+      }
+
+      try {
+        const listed = await api<Invitation[]>(managerId, "GET", "/team/invitations");
+        assert.equal(listed.status, 200);
+        assert.equal(listed.body.length, 1);
+        assert.equal(listed.body[0].id, expired.id);
+        assert.equal(listed.body[0].status, "expired");
+
+        const oldPath = `/team/invitations/${oldToken}/accept`;
+        assert.equal((await api(guestId, "POST", oldPath)).status, 404);
+        assert.deepEqual(await tx.select({ id: staffTable.id }).from(staffTable)
+          .where(eq(staffTable.clerkUserId, guestId)), []);
+        const [unchanged] = await tx.select({ status: invitationsTable.status })
+          .from(invitationsTable).where(eq(invitationsTable.id, expired.id));
+        assert.equal(unchanged.status, "pending");
+
+        const replacement = await api<Invitation>(managerId, "POST", "/team/invitations", {
+          studioId: studio.id, role: "studio_employee", email,
+        });
+        assert.equal(replacement.status, 201);
+        assert.notEqual(replacement.body.id, expired.id);
+        assert.equal(replacement.body.email, email);
+        assert.equal(replacement.body.status, "pending");
+        assert.equal((await api(guestId, "POST", oldPath)).status, 404);
+        const [stillPending] = await tx.select({ status: invitationsTable.status })
+          .from(invitationsTable).where(eq(invitationsTable.id, expired.id));
+        assert.equal(stillPending.status, "pending");
+        assert.deepEqual(await tx.select({ id: staffTable.id }).from(staffTable)
+          .where(eq(staffTable.clerkUserId, guestId)), []);
       } finally {
         await new Promise<void>((resolve, reject) =>
           server.close((error) => error ? reject(error) : resolve()));
