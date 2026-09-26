@@ -7,6 +7,18 @@ export class BookingError extends Error {
   }
 }
 
+function courseDateTime(date: Date) {
+  return new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export async function bookCourse(
   courseId: number,
   memberId: number,
@@ -139,7 +151,7 @@ export async function cancelCourseBooking(
           memberId: candidate.memberId,
           courseId,
           title: "Dein Kursplatz ist bestätigt",
-          body: `Du bist für „${course.title}“ von der Warteliste nachgerückt. Deinen Platz findest du unter „Meine Plätze“.`,
+          body: `Du bist für „${course.title}“ am ${courseDateTime(course.startsAt)} Uhr von der Warteliste nachgerückt. Deinen Platz findest du unter „Meine Plätze“.`,
         });
         promoted = true;
         break;

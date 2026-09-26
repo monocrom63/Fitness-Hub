@@ -20,11 +20,12 @@ test("capacity, duplicate prevention, waitlist promotion and studio isolation", 
         { organizationId: org.id, name: "Teststudio", city: "Berlin" },
         { organizationId: org.id, name: "Fremdstudio", city: "Berlin" },
       ]).returning();
-      const [first, second, third, elsewhere] = await tx.insert(membersTable).values([
+       const [first, second, third, elsewhere, cancelledCandidate] = await tx.insert(membersTable).values([
         { studioId: studio.id, fullName: "First", email: `first-${suffix}@example.invalid`, membershipType: "Basic" },
         { studioId: studio.id, fullName: "Second", email: `second-${suffix}@example.invalid`, membershipType: "Basic" },
         { studioId: studio.id, fullName: "Third", email: `third-${suffix}@example.invalid`, membershipType: "Basic" },
         { studioId: otherStudio.id, fullName: "Elsewhere", email: `else-${suffix}@example.invalid`, membershipType: "Basic" },
+         { studioId: studio.id, fullName: "Cancelled", email: `cancelled-${suffix}@example.invalid`, membershipType: "Basic" },
       ]).returning();
       const [course] = await tx.insert(coursesTable).values({
         studioId: studio.id, title: "Test", instructor: "Trainer",
@@ -39,14 +40,16 @@ test("capacity, duplicate prevention, waitlist promotion and studio isolation", 
       const waiting = await bookCourse(course.id, second.id, database);
       assert.equal(waiting.status, "waitlisted");
       assert.equal(waiting.waitlistPosition, 1);
+       await bookCourse(course.id, cancelledCandidate.id, database);
       const eligibleWaiting = await bookCourse(course.id, third.id, database);
-      assert.equal(eligibleWaiting.waitlistPosition, 2);
+       assert.equal(eligibleWaiting.waitlistPosition, 3);
       await assert.rejects(bookCourse(course.id, second.id, database),
         (error) => error instanceof BookingError && error.status === 409);
       await assert.rejects(bookCourse(course.id, elsewhere.id, database),
         (error) => error instanceof BookingError && error.status === 404);
 
-      await tx.update(membersTable).set({ status: "paused" })
+       await cancelCourseBooking(course.id, cancelledCandidate.id, database);
+       await tx.update(membersTable).set({ status: "paused" })
         .where(eq(membersTable.id, second.id));
       await cancelCourseBooking(course.id, first.id, database);
       const [skipped] = await tx.select().from(courseBookingsTable)
@@ -66,6 +69,9 @@ test("capacity, duplicate prevention, waitlist promotion and studio isolation", 
       const skippedNotifications = await tx.select().from(memberNotificationsTable)
         .where(eq(memberNotificationsTable.memberId, second.id));
       assert.equal(skippedNotifications.length, 0);
+       const cancelledNotifications = await tx.select().from(memberNotificationsTable)
+         .where(eq(memberNotificationsTable.memberId, cancelledCandidate.id));
+       assert.equal(cancelledNotifications.length, 0);
       const [full] = await tx.select().from(coursesTable).where(eq(coursesTable.id, course.id));
       assert.equal(full.enrolled, 1);
       await cancelCourseBooking(course.id, third.id, database);

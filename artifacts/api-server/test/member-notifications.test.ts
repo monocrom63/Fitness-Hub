@@ -9,6 +9,7 @@ import {
   membersTable, organizationsTable, pool, studiosTable,
 } from "@workspace/db";
 import memberAppRouter from "../src/routes/member-app";
+import { BookingError, cancelCourseBooking } from "../src/lib/course-bookings";
 
 test("members can read and acknowledge only their own course notifications", async () => {
   const suffix = randomUUID();
@@ -18,11 +19,13 @@ test("members can read and acknowledge only their own course notifications", asy
   try {
     const [studio] = await db.insert(studiosTable)
       .values({ organizationId: organization.id, name: "Teststudio", city: "Berlin" }).returning();
-    const [own, other] = await db.insert(membersTable).values([
+    const [own, other, waiting] = await db.insert(membersTable).values([
       { studioId: studio.id, fullName: "First", email: `first-${suffix}@example.invalid`,
         membershipType: "Basic", clerkUserId: `notice-first-${suffix}` },
       { studioId: studio.id, fullName: "Second", email: `second-${suffix}@example.invalid`,
         membershipType: "Basic", clerkUserId: `notice-second-${suffix}` },
+      { studioId: studio.id, fullName: "Waiting", email: `waiting-${suffix}@example.invalid`,
+        membershipType: "Basic", clerkUserId: `notice-waiting-${suffix}` },
     ]).returning();
     const [course] = await db.insert(coursesTable).values({
       studioId: studio.id, title: "Testkurs", instructor: "Trainer",
@@ -33,6 +36,9 @@ test("members can read and acknowledge only their own course notifications", asy
       { courseId: course.id, memberId: own.id, status: "confirmed" },
       { courseId: course.id, memberId: other.id, status: "confirmed" },
     ]).returning();
+    const [waitingBooking] = await db.insert(courseBookingsTable)
+      .values({ courseId: course.id, memberId: waiting.id, status: "waitlisted" }).returning();
+    await db.update(coursesTable).set({ enrolled: 2, status: "full" }).where(eq(coursesTable.id, course.id));
     const [ownNotice, otherNotice] = await db.insert(memberNotificationsTable).values([
       { bookingId: ownBooking.id, memberId: own.id, courseId: course.id, title: "Dein Platz", body: "Bestätigt" },
       { bookingId: otherBooking.id, memberId: other.id, courseId: course.id, title: "Fremder Platz", body: "Bestätigt" },
@@ -72,6 +78,25 @@ test("members can read and acknowledge only their own course notifications", asy
     assert.equal(marked.status, 200);
     assert.ok((marked.body as { readAt: string }).readAt);
     assert.equal((await request(other.clerkUserId, "GET", "/member/notifications")).status, 200);
+
+    await cancelCourseBooking(course.id, own.id);
+    const promotion = await request(waiting.clerkUserId, "GET", "/member/notifications");
+    assert.equal(promotion.status, 200);
+    const messages = promotion.body as Array<{ id: number; courseId: number; title: string; body: string; readAt: string | null }>;
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].courseId, course.id);
+    assert.match(messages[0].body, /Testkurs.*\d{4}.*Uhr/);
+    assert.equal(messages[0].readAt, null);
+    assert.equal((await db.select().from(courseBookingsTable)
+      .where(eq(courseBookingsTable.id, waitingBooking.id)))[0].status, "confirmed");
+    await assert.rejects(cancelCourseBooking(course.id, own.id),
+      (error) => error instanceof BookingError && error.status === 404);
+    const afterReload = await request(waiting.clerkUserId, "GET", "/member/notifications");
+    assert.deepEqual(afterReload.body, promotion.body, "the notice remains in the database after another request");
+    assert.deepEqual(
+      ((await request(other.clerkUserId, "GET", "/member/notifications")).body as Array<{ id: number }>).map(item => item.id),
+      [otherNotice.id],
+    );
   } finally {
     if (server?.listening) {
       await new Promise<void>((resolve, reject) =>
