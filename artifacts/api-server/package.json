@@ -8,6 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "test:pulse": "node ./test/run-pulse.mjs && tsx --test test/pulse.test.ts",
+    "test:members": "tsx --test test/member-access.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
