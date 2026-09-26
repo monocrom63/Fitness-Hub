@@ -67,6 +67,17 @@ export const CompleteOnboardingResponse = zod.object({
 
 
 /**
+ * @summary List studios visible to the signed-in staff member
+ */
+export const ListStudiosResponseItem = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "city": zod.string()
+})
+export const ListStudiosResponse = zod.array(ListStudiosResponseItem)
+
+
+/**
  * @summary Get metrics and activity tailored to the signed-in user's role
  */
 export const GetDashboardResponse = zod.object({

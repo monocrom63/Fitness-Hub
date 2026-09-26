@@ -1,0 +1,1 @@
+- [Authentik transition](auth-transition.md) — keep Fiudia sign-in working until a real Authentik issuer and OIDC app are ready; the product concept alone is not setup.

@@ -66,6 +66,24 @@ paths:
           description: Invalid onboarding details
         "401":
           description: Sign-in required
+  /studios:
+    get:
+      operationId: listStudios
+      tags: [portal]
+      summary: List studios visible to the signed-in staff member
+      responses:
+        "200":
+          description: Accessible studios within the organization
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudioSummary"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Fiudia access has not been assigned
   /dashboard:
     get:
       operationId: getDashboard
@@ -398,6 +416,13 @@ components:
         organizationName: { type: string, minLength: 2, maxLength: 120 }
         studioName: { type: string, minLength: 2, maxLength: 120 }
         city: { type: string, minLength: 2, maxLength: 120 }
+    StudioSummary:
+      type: object
+      required: [id, name, city]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        city: { type: string }
     DashboardMetric:
       type: object
       required: [label, value, delta, tone]

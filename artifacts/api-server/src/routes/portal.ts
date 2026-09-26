@@ -26,6 +26,7 @@ import {
   ListCoursesResponse,
   ListMembersQueryParams,
   ListMembersResponse,
+  ListStudiosResponse,
   UpdateMemberBody,
   UpdateMemberParams,
   UpdateMemberResponse,
@@ -225,6 +226,32 @@ router.post("/onboarding", async (req, res): Promise<void> => {
   );
 });
 
+router.get("/studios", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const studioIds = await getAccessibleStudioIds(staff);
+  if (!studioIds.length) {
+    res.json(ListStudiosResponse.parse([]));
+    return;
+  }
+
+  const studios = await db
+    .select({
+      id: studiosTable.id,
+      name: studiosTable.name,
+      city: studiosTable.city,
+    })
+    .from(studiosTable)
+    .where(
+      and(
+        eq(studiosTable.organizationId, staff.organizationId),
+        inArray(studiosTable.id, studioIds),
+      ),
+    )
+    .orderBy(asc(studiosTable.name));
+  res.json(ListStudiosResponse.parse(studios));
+});
+
 router.get("/dashboard", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
@@ -326,12 +353,12 @@ router.get("/dashboard", async (req, res): Promise<void> => {
         .where(
           and(
             inArray(coursesTable.studioId, studioIds),
-            gte(coursesTable.startsAt, new Date()),
+            gte(coursesTable.startsAt, start),
             eq(coursesTable.status, "scheduled"),
           ),
         )
         .orderBy(asc(coursesTable.startsAt))
-        .limit(4)
+        .limit(40)
     : [];
 
   res.json(

@@ -19,6 +19,7 @@ import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, use
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { ActionStrip, PulsePage, TodayPage } from './TodayPulse';
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -131,7 +132,8 @@ function AppShell({ children, me }: { children: React.ReactNode; me: Me }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useClerk();
   const nav = [
-    { href: '/dashboard', label: 'Übersicht', icon: LayoutDashboard },
+    { href: '/dashboard', label: 'Today', icon: LayoutDashboard },
+    { href: '/pulse', label: 'Pulse', icon: Activity },
     { href: '/members', label: 'Mitglieder', icon: Users },
     { href: '/courses', label: 'Kurse', icon: CalendarDays },
     ...(me.role !== 'studio_employee' ? [{ href: '/team', label: 'Team', icon: UserRound }] : []),
@@ -144,7 +146,7 @@ function AppShell({ children, me }: { children: React.ReactNode; me: Me }) {
       <div className="sidebar-note"><Sparkles size={16} /><span>Ein guter Tag beginnt mit Übersicht.</span></div>
       <div className="sidebar-bottom"><Link href="/settings" className="nav-link" data-testid="link-nav-settings"><Settings2 size={18} /><span>Einstellungen</span></Link><button className="profile-row" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out"><span className="avatar avatar-small">{initials(me.userName)}</span><span className="profile-copy"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></span><LogOut size={16} /></button></div>
     </aside>
-    <div className="main-wrap"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} data-testid="button-open-navigation"><Menu size={20} /></button><div className="top-search"><Search size={17} /><span>Suche nach Mitgliedern, Kursen, Check-ins …</span><kbd>⌘ K</kbd></div><div className="top-actions"><span className="status-chip"><span className="status-dot" />Alles aktuell</span><button className="icon-button" data-testid="button-help"><CircleHelp size={18} /></button><span className="avatar">{initials(me.userName)}</span></div></header><main className="main-content">{children}</main></div>
+     <div className="main-wrap"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} data-testid="button-open-navigation"><Menu size={20} /></button><div className="top-search"><Search size={17} /><span>Suche nach Mitgliedern, Kursen, Check-ins …</span><kbd>⌘ K</kbd></div><div className="top-actions"><span className="status-chip"><span className="status-dot" />Alles aktuell</span><button className="icon-button" data-testid="button-help"><CircleHelp size={18} /></button><span className="avatar">{initials(me.userName)}</span></div></header><main className="main-content">{children}</main></div><ActionStrip me={me} />
   </div>;
 }
 
@@ -184,12 +186,15 @@ function OnboardingPage() {
 }
 
 function DashboardPage({ me }: { me: Me }) {
+  return <TodayPage me={me} />;
+  /*
   const query = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey() } });
   if (query.isLoading) return <LoadingBlock label="Deine Übersicht wird geladen" />;
   if (query.isError || !query.data) return <ErrorBlock retry={() => query.refetch()} />;
   const dashboard = query.data as Dashboard;
   const role = roleLabel(dashboard.role);
   return <><PageHeader eyebrow={`${role} / ${dashboard.studioName || me.studioName || 'Workspace'}`} title={`Guten Morgen, ${dashboard.userName || me.userName}.`} description={dashboard.role === 'district_manager' ? 'Hier ist dein Netzwerk auf einen Blick.' : 'Schön, dass du da bist. Hier ist dein Studio-Tag.'} action={<button className="button button-dark" data-testid="button-quick-action"><Plus size={17} /> Schnellaktion</button>} /><div className="dashboard-hero"><div><span className="hero-status"><span className="status-dot" /> Heute, {new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span><h2>{dashboard.role === 'district_manager' ? 'Dein Netzwerk wächst.' : 'Kleine Schritte. Große Wirkung.'}</h2><p>{dashboard.role === 'district_manager' ? 'Vergleiche Standorte, finde Muster und gib deinen Teams Rückenwind.' : 'Du machst den Unterschied im Studio — Tag für Tag.'}</p></div><div className="hero-abstract"><div className="abstract-ring ring-a" /><div className="abstract-ring ring-b" /><span>{dashboard.role === 'district_manager' ? '5' : '1'}<small> Standorte</small></span></div></div><section className="metric-grid">{dashboard.metrics.map((metric, index) => <div className={`metric-card metric-${metric.tone}`} key={`${metric.label}-${index}`} data-testid={`metric-card-${index}`}><div className="metric-label">{metric.label}</div><strong>{metric.value}</strong><span className="metric-delta">{metric.delta}</span><div className="metric-spark"><i /><i /><i /><i /><i /></div></div>)}</section><div className="dashboard-grid"><div className="panel timeline-panel"><div className="panel-head"><div><div className="eyebrow">Dein Tag</div><h3>Heute im Studio</h3></div><Link href="/courses" className="panel-link" data-testid="link-dashboard-courses">Alle Kurse <ArrowRight size={14} /></Link></div>{dashboard.courses.length ? <div className="course-timeline">{dashboard.courses.slice(0, 5).map((course) => <div className="timeline-row" key={course.id} data-testid={`course-row-${course.id}`}><span className="timeline-time">{formatTime(course.startsAt)}</span><span className="timeline-line" /><span className="timeline-info"><strong>{course.title}</strong><small>{course.instructor} · {course.room}</small></span><span className={`pill pill-${course.status}`}>{course.enrolled}/{course.capacity}</span></div>)}</div> : <div className="empty-inline"><CalendarDays size={18} /> Keine Kurse für heute.</div>}</div><div className="panel activity-panel"><div className="panel-head"><div><div className="eyebrow">Aus dem Workspace</div><h3>Letzte Aktivität</h3></div><Activity size={18} className="muted-icon" /></div>{dashboard.activities.length ? <div className="activity-list">{dashboard.activities.slice(0, 5).map((item) => <div className="activity-row" key={item.id} data-testid={`activity-row-${item.id}`}><span className={`activity-icon activity-${item.category}`}><Activity size={15} /></span><div><strong>{item.title}</strong><p>{item.description}</p><small>{timeAgo(item.happenedAt)}</small></div></div>)}</div> : <div className="empty-inline">Noch keine Aktivitäten.</div>}</div></div></>;
+  */
 }
 
 function MembersPage({ me }: { me: Me }) {
@@ -248,8 +253,8 @@ function SettingsPage() {
   return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Deine persönlichen Details und die Sprache deines Workspace." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div></>;
 }
 
-function ProtectedRoute({ page }: { page: 'dashboard' | 'members' | 'courses' | 'team' | 'settings' }) {
-  return <AuthenticatedData>{(me) => page === 'dashboard' ? <DashboardPage me={me} /> : page === 'members' ? <MembersPage me={me} /> : page === 'courses' ? <CoursesPage me={me} /> : page === 'team' ? <TeamPage me={me} /> : <SettingsPage />}</AuthenticatedData>;
+function ProtectedRoute({ page }: { page: 'dashboard' | 'pulse' | 'members' | 'courses' | 'team' | 'settings' }) {
+  return <AuthenticatedData>{(me) => page === 'dashboard' ? <DashboardPage me={me} /> : page === 'pulse' ? <PulsePage me={me} /> : page === 'members' ? <MembersPage me={me} /> : page === 'courses' ? <CoursesPage me={me} /> : page === 'team' ? me.role === 'studio_employee' ? <Redirect to="/dashboard" /> : <TeamPage me={me} /> : <SettingsPage />}</AuthenticatedData>;
 }
 
 function NotFoundPage() {
@@ -257,7 +262,7 @@ function NotFoundPage() {
 }
 
 function Router() {
-  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route component={NotFoundPage} /></Switch>;
+  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route component={NotFoundPage} /></Switch>;
 }
 
 function ClerkQueryClientCacheInvalidator() {

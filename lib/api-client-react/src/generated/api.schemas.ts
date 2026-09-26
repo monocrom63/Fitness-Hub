@@ -61,6 +61,12 @@ export interface OnboardingInput {
   city: string;
 }
 
+export interface StudioSummary {
+  id: number;
+  name: string;
+  city: string;
+}
+
 export type DashboardMetricTone = typeof DashboardMetricTone[keyof typeof DashboardMetricTone];
 
 

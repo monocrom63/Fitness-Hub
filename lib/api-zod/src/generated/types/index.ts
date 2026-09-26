@@ -33,3 +33,4 @@ export * from './pulseMessage';
 export * from './pulsePriority';
 export * from './pulseRead';
 export * from './role';
+export * from './studioSummary';

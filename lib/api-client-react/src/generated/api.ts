@@ -36,7 +36,8 @@ import type {
   OnboardingInput,
   PulseInput,
   PulseMessage,
-  PulseRead
+  PulseRead,
+  StudioSummary
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -308,6 +309,83 @@ export const useCompleteOnboarding = <TError = ErrorType<void>,
       > => {
       return useMutation(getCompleteOnboardingMutationOptions(options));
     }
+
+export const getListStudiosUrl = () => {
+
+
+
+
+  return `/api/studios`
+}
+
+/**
+ * @summary List studios visible to the signed-in staff member
+ */
+export const listStudios = async ( options?: Parameters<typeof customFetch>[1]): Promise<StudioSummary[]> => {
+
+  return customFetch<StudioSummary[]>(getListStudiosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStudiosQueryKey = () => {
+    return [
+    `/api/studios`
+    ] as const;
+    }
+
+
+export const getListStudiosQueryOptions = <TData = Awaited<ReturnType<typeof listStudios>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStudios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStudiosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStudios>>> = ({ signal }) => listStudios({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStudios>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStudiosQueryResult = NonNullable<Awaited<ReturnType<typeof listStudios>>>
+export type ListStudiosQueryError = ErrorType<void>
+
+
+/**
+ * @summary List studios visible to the signed-in staff member
+ */
+
+export function useListStudios<TData = Awaited<ReturnType<typeof listStudios>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStudios>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStudiosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetDashboardUrl = () => {
 
