@@ -1,0 +1,683 @@
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lt,
+  or,
+  type SQL,
+} from "drizzle-orm";
+import { Router, type IRouter, type Request, type Response } from "express";
+import {
+  CreateCheckInBody,
+  CreateCheckInResponse,
+  CreateCourseBody,
+  CreateCourseResponse,
+  CreateMemberBody,
+  CreateMemberResponse,
+  CompleteOnboardingBody,
+  CompleteOnboardingResponse,
+  GetDashboardResponse,
+  GetMeResponse,
+  ListCoursesResponse,
+  ListMembersQueryParams,
+  ListMembersResponse,
+  UpdateMemberBody,
+  UpdateMemberParams,
+  UpdateMemberResponse,
+} from "@workspace/api-zod";
+import {
+  checkInsTable,
+  coursesTable,
+  db,
+  membersTable,
+  organizationsTable,
+  staffTable,
+  studiosTable,
+} from "@workspace/db";
+import {
+  canAccessStudio,
+  canManageCourses,
+  getAccessibleStudioIds,
+  getClerkIdentity,
+  getRequestUserId,
+  getStaffContext,
+  type StaffContext,
+} from "../lib/fiudia-access";
+
+const router: IRouter = Router();
+
+async function requireStaff(
+  req: Request,
+  res: Response,
+): Promise<StaffContext | null> {
+  const userId = getRequestUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Bitte melde dich an." });
+    return null;
+  }
+
+  const staff = await getStaffContext(userId);
+  if (!staff) {
+    res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
+    return null;
+  }
+  return staff;
+}
+
+function serializeCourse(course: {
+  id: number;
+  title: string;
+  instructor: string;
+  studioId: number;
+  studioName: string;
+  startsAt: Date;
+  endsAt: Date;
+  capacity: number;
+  enrolled: number;
+  room: string;
+  status: string;
+}) {
+  return {
+    ...course,
+    startsAt: course.startsAt.toISOString(),
+    endsAt: course.endsAt.toISOString(),
+  };
+}
+
+function berlinDayRange(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(now);
+  const part = (type: string) => Number(parts.find((item) => item.type === type)?.value);
+  const year = part("year");
+  const month = part("month");
+  const day = part("day");
+
+  const offsetAt = (utcGuess: number) => {
+    const instant = new Date(utcGuess);
+    const local = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(instant)
+      .reduce<Record<string, number>>((values, item) => {
+        if (item.type !== "literal") values[item.type] = Number(item.value);
+        return values;
+      }, {});
+
+    return (
+      Date.UTC(
+        local.year,
+        local.month - 1,
+        local.day,
+        local.hour,
+        local.minute,
+        local.second,
+      ) - utcGuess
+    );
+  };
+
+  const startGuess = Date.UTC(year, month - 1, day);
+  const nextDayGuess = Date.UTC(year, month - 1, day + 1);
+  return {
+    start: new Date(startGuess - offsetAt(startGuess)),
+    end: new Date(nextDayGuess - offsetAt(nextDayGuess)),
+  };
+}
+
+router.get("/me", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Bitte melde dich an." });
+    return;
+  }
+
+  const identity = await getClerkIdentity(userId);
+  const staff = await getStaffContext(userId);
+  res.json(
+    GetMeResponse.parse({
+      userId,
+      userName: staff?.fullName ?? identity.fullName,
+      email: staff?.email ?? identity.email,
+      isOnboarded: !!staff,
+      role: staff?.role ?? null,
+      organizationId: staff?.organizationId ?? null,
+      organizationName: staff?.organizationName ?? null,
+      studioId: staff?.studioId ?? null,
+      studioName: staff?.studioName ?? null,
+    }),
+  );
+});
+
+router.post("/onboarding", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Bitte melde dich an." });
+    return;
+  }
+
+  const body = CompleteOnboardingBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  if (await getStaffContext(userId)) {
+    res.status(409).json({ error: "Für dieses Konto besteht bereits ein Fiudia-Zugang." });
+    return;
+  }
+
+  const identity = await getClerkIdentity(userId);
+  const created = await db.transaction(async (tx) => {
+    const [organization] = await tx
+      .insert(organizationsTable)
+      .values({ name: body.data.organizationName.trim() })
+      .returning();
+    const [studio] = await tx
+      .insert(studiosTable)
+      .values({
+        organizationId: organization.id,
+        name: body.data.studioName.trim(),
+        city: body.data.city.trim(),
+      })
+      .returning();
+    const [staff] = await tx
+      .insert(staffTable)
+      .values({
+        clerkUserId: userId,
+        organizationId: organization.id,
+        studioId: studio.id,
+        fullName: identity.fullName,
+        email: identity.email,
+        role: "district_manager",
+      })
+      .returning();
+    return { organization, studio, staff };
+  });
+
+  res.status(201).json(
+    CompleteOnboardingResponse.parse({
+      userId,
+      userName: created.staff.fullName,
+      email: created.staff.email,
+      isOnboarded: true,
+      role: created.staff.role,
+      organizationId: created.organization.id,
+      organizationName: created.organization.name,
+      studioId: created.studio.id,
+      studioName: created.studio.name,
+    }),
+  );
+});
+
+router.get("/dashboard", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const studioIds = await getAccessibleStudioIds(staff);
+  const { start, end } = berlinDayRange();
+
+  const [activeMembers] = studioIds.length
+    ? await db
+        .select({ total: count() })
+        .from(membersTable)
+        .where(
+          and(
+            inArray(membersTable.studioId, studioIds),
+            eq(membersTable.status, "active"),
+          ),
+        )
+    : [{ total: 0 }];
+  const todayCheckIns = studioIds.length
+    ? await db
+        .select({ id: checkInsTable.id })
+        .from(checkInsTable)
+        .where(
+          and(
+            inArray(checkInsTable.studioId, studioIds),
+            gte(checkInsTable.checkedInAt, start),
+            lt(checkInsTable.checkedInAt, end),
+          ),
+        )
+    : [];
+  const courseRows = studioIds.length
+    ? await db
+        .select({
+          id: coursesTable.id,
+          title: coursesTable.title,
+          instructor: coursesTable.instructor,
+          studioId: coursesTable.studioId,
+          studioName: studiosTable.name,
+          startsAt: coursesTable.startsAt,
+          endsAt: coursesTable.endsAt,
+          capacity: coursesTable.capacity,
+          enrolled: coursesTable.enrolled,
+          room: coursesTable.room,
+          status: coursesTable.status,
+        })
+        .from(coursesTable)
+        .innerJoin(studiosTable, eq(coursesTable.studioId, studiosTable.id))
+        .where(
+          and(
+            inArray(coursesTable.studioId, studioIds),
+            gte(coursesTable.startsAt, start),
+            lt(coursesTable.startsAt, end),
+            eq(coursesTable.status, "scheduled"),
+          ),
+        )
+        .orderBy(asc(coursesTable.startsAt))
+    : [];
+  const recentCheckIns = studioIds.length
+    ? await db
+        .select({
+          id: checkInsTable.id,
+          memberName: membersTable.fullName,
+          checkedInAt: checkInsTable.checkedInAt,
+        })
+        .from(checkInsTable)
+        .innerJoin(membersTable, eq(checkInsTable.memberId, membersTable.id))
+        .where(inArray(checkInsTable.studioId, studioIds))
+        .orderBy(desc(checkInsTable.checkedInAt))
+        .limit(5)
+    : [];
+
+  const courseCapacity = courseRows.reduce((total, course) => total + course.capacity, 0);
+  const enrolled = courseRows.reduce((total, course) => total + course.enrolled, 0);
+  const utilization =
+    courseCapacity > 0 ? Math.round((enrolled / courseCapacity) * 100) : 0;
+  const activities = recentCheckIns.map((checkIn) => ({
+    id: checkIn.id,
+    title: "Mitglied eingecheckt",
+    description: checkIn.memberName,
+    happenedAt: checkIn.checkedInAt.toISOString(),
+    category: "check_in" as const,
+  }));
+  const nextCourses = studioIds.length
+    ? await db
+        .select({
+          id: coursesTable.id,
+          title: coursesTable.title,
+          instructor: coursesTable.instructor,
+          studioId: coursesTable.studioId,
+          studioName: studiosTable.name,
+          startsAt: coursesTable.startsAt,
+          endsAt: coursesTable.endsAt,
+          capacity: coursesTable.capacity,
+          enrolled: coursesTable.enrolled,
+          room: coursesTable.room,
+          status: coursesTable.status,
+        })
+        .from(coursesTable)
+        .innerJoin(studiosTable, eq(coursesTable.studioId, studiosTable.id))
+        .where(
+          and(
+            inArray(coursesTable.studioId, studioIds),
+            gte(coursesTable.startsAt, new Date()),
+            eq(coursesTable.status, "scheduled"),
+          ),
+        )
+        .orderBy(asc(coursesTable.startsAt))
+        .limit(4)
+    : [];
+
+  res.json(
+    GetDashboardResponse.parse({
+      role: staff.role,
+      userName: staff.fullName,
+      studioName:
+        staff.role === "district_manager"
+          ? staff.organizationName
+          : staff.studioName ?? staff.organizationName,
+      metrics: [
+        {
+          label: "Aktive Mitglieder",
+          value: String(activeMembers.total),
+          delta: "im Bestand",
+          tone: "neutral",
+        },
+        {
+          label: "Check-ins heute",
+          value: String(todayCheckIns.length),
+          delta: "live erfasst",
+          tone: "positive",
+        },
+        {
+          label: "Kursauslastung",
+          value: `${utilization} %`,
+          delta: `${courseRows.length} Kurse heute`,
+          tone: utilization >= 90 ? "warning" : "positive",
+        },
+      ],
+      activities,
+      courses: nextCourses.map(serializeCourse),
+    }),
+  );
+});
+
+router.get("/members", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const query = ListMembersQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const studioIds = await getAccessibleStudioIds(staff);
+  if (studioIds.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const conditions: SQL[] = [inArray(membersTable.studioId, studioIds)];
+  if (query.data.studioId !== undefined) {
+    if (!(await canAccessStudio(staff, query.data.studioId))) {
+      res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+      return;
+    }
+    conditions.push(eq(membersTable.studioId, query.data.studioId));
+  }
+  if (query.data.status) {
+    conditions.push(eq(membersTable.status, query.data.status));
+  }
+  if (query.data.search?.trim()) {
+    const term = `%${query.data.search.trim()}%`;
+    const searchFilter = or(
+      ilike(membersTable.fullName, term),
+      ilike(membersTable.email, term),
+    );
+    if (searchFilter) conditions.push(searchFilter);
+  }
+
+  const rows = await db
+    .select({
+      id: membersTable.id,
+      fullName: membersTable.fullName,
+      email: membersTable.email,
+      phone: membersTable.phone,
+      membershipType: membersTable.membershipType,
+      status: membersTable.status,
+      studioId: membersTable.studioId,
+      studioName: studiosTable.name,
+      joinedAt: membersTable.joinedAt,
+    })
+    .from(membersTable)
+    .innerJoin(studiosTable, eq(membersTable.studioId, studiosTable.id))
+    .where(and(...conditions))
+    .orderBy(desc(membersTable.joinedAt))
+    .limit(200);
+
+  const memberIds = rows.map((row) => row.id);
+  const recentCheckIns = memberIds.length
+    ? await db
+        .select({
+          memberId: checkInsTable.memberId,
+          checkedInAt: checkInsTable.checkedInAt,
+        })
+        .from(checkInsTable)
+        .where(inArray(checkInsTable.memberId, memberIds))
+        .orderBy(desc(checkInsTable.checkedInAt))
+    : [];
+  const latestCheckIn = new Map<number, Date>();
+  for (const checkIn of recentCheckIns) {
+    if (!latestCheckIn.has(checkIn.memberId)) {
+      latestCheckIn.set(checkIn.memberId, checkIn.checkedInAt);
+    }
+  }
+
+  res.json(
+    ListMembersResponse.parse(
+      rows.map((member) => ({
+        ...member,
+        joinedAt: member.joinedAt.toISOString(),
+        lastCheckIn: latestCheckIn.get(member.id)?.toISOString() ?? null,
+      })),
+    ),
+  );
+});
+
+router.post("/members", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const body = CreateMemberBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  if (!(await canAccessStudio(staff, body.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+
+  const [member] = await db
+    .insert(membersTable)
+    .values({
+      ...body.data,
+      fullName: body.data.fullName.trim(),
+      email: body.data.email.trim().toLowerCase(),
+      phone: body.data.phone?.trim() || null,
+      membershipType: body.data.membershipType.trim(),
+      status: body.data.status ?? "active",
+    })
+    .returning();
+  const [studio] = await db
+    .select({ name: studiosTable.name })
+    .from(studiosTable)
+    .where(eq(studiosTable.id, member.studioId))
+    .limit(1);
+
+  res.status(201).json(
+    CreateMemberResponse.parse({
+      ...member,
+      studioName: studio.name,
+      joinedAt: member.joinedAt.toISOString(),
+      lastCheckIn: null,
+    }),
+  );
+});
+
+router.patch("/members/:id", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const params = UpdateMemberParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = UpdateMemberBody.safeParse(req.body);
+  if (!body.success || Object.keys(body.data ?? {}).length === 0) {
+    res.status(400).json({ error: body.success ? "Keine Änderungen angegeben." : body.error.message });
+    return;
+  }
+  const [existing] = await db
+    .select()
+    .from(membersTable)
+    .where(eq(membersTable.id, params.data.id))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Mitglied nicht gefunden." });
+    return;
+  }
+  if (!(await canAccessStudio(staff, existing.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Mitglied." });
+    return;
+  }
+
+  const values = {
+    ...body.data,
+    ...(body.data.email !== undefined
+      ? { email: body.data.email.trim().toLowerCase() }
+      : {}),
+    ...(body.data.fullName !== undefined
+      ? { fullName: body.data.fullName.trim() }
+      : {}),
+    ...(body.data.membershipType !== undefined
+      ? { membershipType: body.data.membershipType.trim() }
+      : {}),
+    ...(body.data.phone !== undefined
+      ? { phone: body.data.phone?.trim() || null }
+      : {}),
+  };
+  const [updated] = await db
+    .update(membersTable)
+    .set(values)
+    .where(eq(membersTable.id, params.data.id))
+    .returning();
+  const [studio] = await db
+    .select({ name: studiosTable.name })
+    .from(studiosTable)
+    .where(eq(studiosTable.id, updated.studioId))
+    .limit(1);
+  const [latest] = await db
+    .select({ checkedInAt: checkInsTable.checkedInAt })
+    .from(checkInsTable)
+    .where(eq(checkInsTable.memberId, updated.id))
+    .orderBy(desc(checkInsTable.checkedInAt))
+    .limit(1);
+
+  res.json(
+    UpdateMemberResponse.parse({
+      ...updated,
+      studioName: studio.name,
+      joinedAt: updated.joinedAt.toISOString(),
+      lastCheckIn: latest?.checkedInAt.toISOString() ?? null,
+    }),
+  );
+});
+
+router.get("/courses", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const studioIds = await getAccessibleStudioIds(staff);
+  const rows = studioIds.length
+    ? await db
+        .select({
+          id: coursesTable.id,
+          title: coursesTable.title,
+          instructor: coursesTable.instructor,
+          studioId: coursesTable.studioId,
+          studioName: studiosTable.name,
+          startsAt: coursesTable.startsAt,
+          endsAt: coursesTable.endsAt,
+          capacity: coursesTable.capacity,
+          enrolled: coursesTable.enrolled,
+          room: coursesTable.room,
+          status: coursesTable.status,
+        })
+        .from(coursesTable)
+        .innerJoin(studiosTable, eq(coursesTable.studioId, studiosTable.id))
+        .where(
+          and(
+            inArray(coursesTable.studioId, studioIds),
+            gte(coursesTable.startsAt, new Date()),
+          ),
+        )
+        .orderBy(asc(coursesTable.startsAt))
+        .limit(100)
+    : [];
+
+  res.json(ListCoursesResponse.parse(rows.map(serializeCourse)));
+});
+
+router.post("/courses", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  if (!canManageCourses(staff)) {
+    res.status(403).json({ error: "Nur Studio- und Bezirksleitungen können Kurse anlegen." });
+    return;
+  }
+  const body = CreateCourseBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  if (!(await canAccessStudio(staff, body.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+  const startsAt = new Date(body.data.startsAt);
+  const endsAt = new Date(body.data.endsAt);
+  if (
+    Number.isNaN(startsAt.getTime()) ||
+    Number.isNaN(endsAt.getTime()) ||
+    endsAt <= startsAt
+  ) {
+    res.status(400).json({ error: "Das Kursende muss nach dem Kursstart liegen." });
+    return;
+  }
+
+  const [course] = await db
+    .insert(coursesTable)
+    .values({ ...body.data, startsAt, endsAt })
+    .returning();
+  const [studio] = await db
+    .select({ name: studiosTable.name })
+    .from(studiosTable)
+    .where(eq(studiosTable.id, course.studioId))
+    .limit(1);
+  res.status(201).json(
+    CreateCourseResponse.parse(serializeCourse({ ...course, studioName: studio.name })),
+  );
+});
+
+router.post("/check-ins", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const body = CreateCheckInBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  if (!(await canAccessStudio(staff, body.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+  const [member] = await db
+    .select({ id: membersTable.id, fullName: membersTable.fullName })
+    .from(membersTable)
+    .where(
+      and(
+        eq(membersTable.id, body.data.memberId),
+        eq(membersTable.studioId, body.data.studioId),
+        eq(membersTable.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    res.status(404).json({ error: "Aktives Mitglied nicht gefunden." });
+    return;
+  }
+
+  const [checkIn] = await db
+    .insert(checkInsTable)
+    .values({
+      memberId: member.id,
+      studioId: body.data.studioId,
+      checkedInByStaffId: staff.id,
+    })
+    .returning();
+  res.status(201).json(
+    CreateCheckInResponse.parse({
+      id: checkIn.id,
+      memberId: member.id,
+      memberName: member.fullName,
+      studioId: checkIn.studioId,
+      checkedInAt: checkIn.checkedInAt.toISOString(),
+    }),
+  );
+});
+
+export default router;

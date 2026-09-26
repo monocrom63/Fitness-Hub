@@ -1,0 +1,295 @@
+import { createHash, randomBytes } from "node:crypto";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { Router, type IRouter, type Request, type Response } from "express";
+import {
+  AcceptInvitationParams,
+  AcceptInvitationResponse,
+  CreateInvitationBody,
+  CreateInvitationResponse,
+  ListInvitationsResponse,
+} from "@workspace/api-zod";
+import {
+  db,
+  invitationsTable,
+  organizationsTable,
+  staffTable,
+  studiosTable,
+} from "@workspace/db";
+import {
+  canAccessStudio,
+  canManageTeam,
+  getAccessibleStudioIds,
+  getClerkIdentity,
+  getRequestUserId,
+  getStaffContext,
+  type FiudiaRole,
+  type StaffContext,
+} from "../lib/fiudia-access";
+
+const router: IRouter = Router();
+
+async function requireManager(
+  req: Request,
+  res: Response,
+): Promise<StaffContext | null> {
+  const userId = getRequestUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Bitte melde dich an." });
+    return null;
+  }
+  const staff = await getStaffContext(userId);
+  if (!staff) {
+    res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
+    return null;
+  }
+  if (!canManageTeam(staff)) {
+    res.status(403).json({ error: "Deine Rolle darf keine Teamzugänge verwalten." });
+    return null;
+  }
+  return staff;
+}
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function invitationStatus(status: string, expiresAt: Date) {
+  if (status === "pending" && expiresAt <= new Date()) return "expired";
+  return status;
+}
+
+router.get("/team/invitations", async (req, res): Promise<void> => {
+  const staff = await requireManager(req, res);
+  if (!staff) return;
+  const studioIds = await getAccessibleStudioIds(staff);
+  if (studioIds.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const invitations = await db
+    .select({
+      id: invitationsTable.id,
+      email: invitationsTable.email,
+      role: invitationsTable.role,
+      studioId: invitationsTable.studioId,
+      studioName: studiosTable.name,
+      status: invitationsTable.status,
+      expiresAt: invitationsTable.expiresAt,
+    })
+    .from(invitationsTable)
+    .innerJoin(studiosTable, eq(invitationsTable.studioId, studiosTable.id))
+    .where(
+      and(
+        eq(invitationsTable.organizationId, staff.organizationId),
+        inArray(invitationsTable.studioId, studioIds),
+      ),
+    )
+    .orderBy(desc(invitationsTable.createdAt))
+    .limit(100);
+
+  res.json(
+    ListInvitationsResponse.parse(
+      invitations.map((invitation) => ({
+        ...invitation,
+        status: invitationStatus(invitation.status, invitation.expiresAt),
+        inviteUrl: "",
+        expiresAt: invitation.expiresAt.toISOString(),
+      })),
+    ),
+  );
+});
+
+router.post("/team/invitations", async (req, res): Promise<void> => {
+  const staff = await requireManager(req, res);
+  if (!staff) return;
+  const body = CreateInvitationBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  if (
+    staff.role === "studio_manager" &&
+    body.data.role !== "studio_employee"
+  ) {
+    res.status(403).json({
+      error: "Studioleitungen können nur Teammitarbeitende einladen.",
+    });
+    return;
+  }
+  if (!(await canAccessStudio(staff, body.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+
+  const email = body.data.email.trim().toLowerCase();
+  const [existingStaff] = await db
+    .select({ id: staffTable.id })
+    .from(staffTable)
+    .where(
+      and(
+        eq(staffTable.organizationId, staff.organizationId),
+        eq(staffTable.email, email),
+      ),
+    )
+    .limit(1);
+  if (existingStaff) {
+    res.status(409).json({ error: "Diese Person hat bereits einen Teamzugang." });
+    return;
+  }
+  const [existingInvitation] = await db
+    .select({ id: invitationsTable.id })
+    .from(invitationsTable)
+    .where(
+      and(
+        eq(invitationsTable.organizationId, staff.organizationId),
+        eq(invitationsTable.email, email),
+        eq(invitationsTable.status, "pending"),
+        gt(invitationsTable.expiresAt, new Date()),
+      ),
+    )
+    .limit(1);
+  if (existingInvitation) {
+    res.status(409).json({ error: "Für diese E-Mail ist bereits eine Einladung offen." });
+    return;
+  }
+
+  const rawToken = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const [invitation] = await db
+    .insert(invitationsTable)
+    .values({
+      organizationId: staff.organizationId,
+      studioId: body.data.studioId,
+      invitedByStaffId: staff.id,
+      email,
+      role: body.data.role,
+      tokenHash: hashToken(rawToken),
+      expiresAt,
+    })
+    .returning();
+  const [studio] = await db
+    .select({ name: studiosTable.name })
+    .from(studiosTable)
+    .where(eq(studiosTable.id, invitation.studioId))
+    .limit(1);
+
+  res.status(201).json(
+    CreateInvitationResponse.parse({
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      studioId: invitation.studioId,
+      studioName: studio.name,
+      status: invitation.status,
+      inviteUrl: `/invite/${rawToken}`,
+      expiresAt: invitation.expiresAt.toISOString(),
+    }),
+  );
+});
+
+router.post(
+  "/team/invitations/:token/accept",
+  async (req, res): Promise<void> => {
+    const userId = getRequestUserId(req);
+    if (!userId) {
+      res.status(401).json({ error: "Bitte melde dich an." });
+      return;
+    }
+    const params = AcceptInvitationParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(404).json({ error: "Einladung nicht gefunden." });
+      return;
+    }
+    const identity = await getClerkIdentity(userId);
+    if (!identity.emailVerified) {
+      res.status(403).json({ error: "Bestätige zuerst deine E-Mail-Adresse." });
+      return;
+    }
+    if (await getStaffContext(userId)) {
+      res.status(409).json({ error: "Für dieses Konto besteht bereits ein Fiudia-Zugang." });
+      return;
+    }
+
+    const [invitation] = await db
+      .select()
+      .from(invitationsTable)
+      .where(eq(invitationsTable.tokenHash, hashToken(params.data.token)))
+      .limit(1);
+    if (
+      !invitation ||
+      invitation.status !== "pending" ||
+      invitation.expiresAt <= new Date()
+    ) {
+      res.status(404).json({ error: "Die Einladung ist abgelaufen oder wurde bereits verwendet." });
+      return;
+    }
+    if (identity.email !== invitation.email.toLowerCase()) {
+      res.status(403).json({
+        error: "Melde dich mit der E-Mail-Adresse an, an die die Einladung gesendet wurde.",
+      });
+      return;
+    }
+
+    const role = invitation.role as FiudiaRole;
+    const created = await db.transaction(async (tx) => {
+      const [accepted] = await tx
+        .update(invitationsTable)
+        .set({ status: "accepted" })
+        .where(
+          and(
+            eq(invitationsTable.id, invitation.id),
+            eq(invitationsTable.status, "pending"),
+            gt(invitationsTable.expiresAt, new Date()),
+          ),
+        )
+        .returning({ id: invitationsTable.id });
+      if (!accepted) return null;
+
+      const [member] = await tx
+        .insert(staffTable)
+        .values({
+          clerkUserId: userId,
+          organizationId: invitation.organizationId,
+          studioId: invitation.studioId,
+          fullName: identity.fullName,
+          email: identity.email,
+          role,
+        })
+        .returning();
+      const [studio] = await tx
+        .select({
+          studioName: studiosTable.name,
+          organizationName: organizationsTable.name,
+        })
+        .from(studiosTable)
+        .innerJoin(
+          organizationsTable,
+          eq(studiosTable.organizationId, organizationsTable.id),
+        )
+        .where(eq(studiosTable.id, invitation.studioId))
+        .limit(1);
+      return { member, studio };
+    });
+    if (!created) {
+      res.status(404).json({ error: "Die Einladung ist abgelaufen oder wurde bereits verwendet." });
+      return;
+    }
+
+    res.json(
+      AcceptInvitationResponse.parse({
+        userId,
+        userName: created.member.fullName,
+        email: created.member.email,
+        isOnboarded: true,
+        role: created.member.role,
+        organizationId: created.member.organizationId,
+        organizationName: created.studio.organizationName,
+        studioId: created.member.studioId,
+        studioName: created.studio.studioName,
+      }),
+    );
+  },
+);
+
+export default router;
