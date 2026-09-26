@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { after, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
@@ -51,26 +51,29 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         guestA1Replay: `team-guest-a1-replay-${run}`,
         guestA2: `team-guest-a2-${run}`,
         guestB: `team-guest-b-${run}`,
+        foreignStudio: `team-foreign-studio-${run}`,
         wrongEmail: `team-wrong-email-${run}`,
         unverified: `team-unverified-${run}`,
       };
-      await tx.insert(staffTable).values([
+      const [, managerA1] = await tx.insert(staffTable).values([
         { clerkUserId: users.districtA, organizationId: orgA.id, studioId: null, fullName: "District A", email: `district-a-${run}@example.com`, role: "district_manager" },
         { clerkUserId: users.managerA1, organizationId: orgA.id, studioId: studioA1.id, fullName: "Manager A1", email: `manager-a1-${run}@example.com`, role: "studio_manager" },
         { clerkUserId: users.managerA2, organizationId: orgA.id, studioId: studioA2.id, fullName: "Manager A2", email: `manager-a2-${run}@example.com`, role: "studio_manager" },
         { clerkUserId: users.employeeA1, organizationId: orgA.id, studioId: studioA1.id, fullName: "Employee A1", email: `employee-a1-${run}@example.com`, role: "studio_employee" },
         { clerkUserId: users.districtB, organizationId: orgB.id, studioId: null, fullName: "District B", email: `district-b-${run}@example.com`, role: "district_manager" },
-      ]);
+      ]).returning();
       const emails = {
         a1: `invite-a1-${run}@example.com`,
         a2: `invite-a2-${run}@example.com`,
         b: `invite-b-${run}@example.com`,
+        foreignStudio: `invite-foreign-studio-${run}@example.com`,
       };
       const identities = new Map([
         [users.guestA1, { fullName: "New A1", email: emails.a1, emailVerified: true }],
         [users.guestA1Replay, { fullName: "Replay A1", email: emails.a1, emailVerified: true }],
         [users.guestA2, { fullName: "New A2", email: emails.a2, emailVerified: true }],
         [users.guestB, { fullName: "New B", email: emails.b, emailVerified: true }],
+        [users.foreignStudio, { fullName: "Wrong studio", email: emails.foreignStudio, emailVerified: true }],
         [users.wrongEmail, { fullName: "Wrong address", email: `wrong-${run}@example.com`, emailVerified: true }],
         [users.unverified, { fullName: "Unverified", email: emails.a1, emailVerified: false }],
       ]);
@@ -146,6 +149,19 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         assert.ok(tokenA2);
         assert.ok(tokenB);
 
+        // Simulate a stale or incorrectly imported invitation: both foreign keys exist,
+        // but the invitation's studio belongs to a different organization.
+        const foreignToken = randomUUID();
+        const [foreignStudioInvitation] = await tx.insert(invitationsTable).values({
+          organizationId: orgA.id,
+          studioId: studioB.id,
+          invitedByStaffId: managerA1.id,
+          email: emails.foreignStudio,
+          role: "studio_employee",
+          tokenHash: createHash("sha256").update(foreignToken).digest("hex"),
+          expiresAt: new Date(Date.now() + 60_000),
+        }).returning();
+
         await t.test("invitation lists and duplicates stay in the intended scope", async () => {
           assert.equal((await api(users.managerA1, "GET", "/team/invitations")).status, 200);
           assert.equal((await api(users.employeeA1, "GET", "/team/invitations")).status, 403);
@@ -154,6 +170,8 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
           assert.deepEqual(ids(await list(users.managerA2)), [a2.id]);
           assert.deepEqual(ids(await list(users.districtA)), [a1.id, a2.id].sort((x, y) => x - y));
           assert.deepEqual(ids(await list(users.districtB)), [b.id]);
+          assert.ok(!(await list(users.districtA)).some((invitation) => invitation.id === foreignStudioInvitation.id));
+          assert.ok(!(await list(users.districtB)).some((invitation) => invitation.id === foreignStudioInvitation.id));
           assert.ok((await list(users.districtA)).every((invitation) => invitation.inviteUrl === ""));
           assert.equal((await api(users.districtA, "POST", "/team/invitations", draft(studioA2.id, "studio_employee", emails.a1))).status, 409);
           const rows = await tx.select({
@@ -167,6 +185,11 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
 
         await t.test("acceptance binds the verified email to the invitation's studio and role", async () => {
           const acceptA1 = `/team/invitations/${tokenA1}/accept`;
+          const foreignAccept = await api(users.foreignStudio, "POST", `/team/invitations/${foreignToken}/accept`);
+          assert.equal(foreignAccept.status, 404);
+          const [foreignStillPending] = await tx.select({ status: invitationsTable.status })
+            .from(invitationsTable).where(eq(invitationsTable.id, foreignStudioInvitation.id));
+          assert.equal(foreignStillPending.status, "pending");
           assert.equal((await api(null, "POST", acceptA1)).status, 401);
           assert.equal((await api(users.unverified, "POST", acceptA1)).status, 403);
           assert.equal((await api(users.wrongEmail, "POST", acceptA1)).status, 403);
@@ -207,7 +230,7 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
             role: staffTable.role,
           }).from(staffTable).where(inArray(staffTable.clerkUserId, [
             users.guestA1, users.guestA1Replay, users.guestA2, users.guestB,
-            users.wrongEmail, users.unverified,
+            users.wrongEmail, users.unverified, users.foreignStudio,
           ]));
           assert.deepEqual(joined, [
             { clerkUserId: users.guestA1, organizationId: orgA.id, studioId: studioA1.id, role: "studio_employee" },
