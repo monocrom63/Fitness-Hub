@@ -179,7 +179,7 @@ function LandingPage() {
 }
 
 function SignInPage() {
-  return <div className="auth-page"><div className="auth-aside"><Brand light /><div><div className="eyebrow">Fiudia workspace</div><h1>Mehr Raum für<br /><em>gute Arbeit.</em></h1><p>Dein Studio-Alltag, in der Perspektive, die zu dir gehört.</p></div><span className="auth-aside-foot">Für Teams, die Menschen bewegen.</span></div><div className="auth-main"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div></div>;
+  return <div className="auth-page auth-page--photo"><div className="auth-aside auth-aside--photo"><Brand light /><div className="auth-photo-copy"><div className="eyebrow">Fiudia workspace</div><h1>Mehr Raum für<br /><em>gute Arbeit.</em></h1><p>Dein Studio-Alltag, in der Perspektive, die zu dir gehört.</p></div><span className="auth-aside-foot">Für Teams, die Menschen bewegen.</span></div><div className="auth-main"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div></div>;
 }
 
 function SignUpPage() {
