@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
+import { deDE } from '@clerk/localizations';
 import {
   Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Copy, Dumbbell,
   LayoutDashboard, LogOut, Mail, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2,
@@ -56,7 +57,7 @@ const clerkAppearance = {
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
     headerTitle: 'text-[#1e2638] font-semibold',
     headerSubtitle: 'text-[#687086]',
-    socialButtonsBlockButtonText: 'text-[#1e2638]',
+    socialButtonsBlockButtonText: '!text-[#1e2638]',
     formFieldLabel: 'text-[#1e2638]',
     footerActionLink: 'text-[#6554c0]',
     footerActionText: 'text-[#687086]',
@@ -66,7 +67,7 @@ const clerkAppearance = {
     alertText: 'text-[#a53d36]',
     logoBox: 'h-10',
     logoImage: 'h-10',
-    socialButtonsBlockButton: 'border-[#dfe4ed] bg-[#f5f7fb]',
+    socialButtonsBlockButton: '!border-[#dfe4ed] !bg-[#f5f7fb]',
     formButtonPrimary: 'bg-[#1e2638] hover:bg-[#303c55] text-white',
     formFieldInput: 'bg-[#f5f7fb] border-[#dfe4ed] text-[#1e2638]',
     footerAction: 'bg-transparent',
@@ -75,6 +76,42 @@ const clerkAppearance = {
     otpCodeFieldInput: 'bg-[#f5f7fb] border-[#dfe4ed]',
     formFieldRow: 'mb-4',
     main: 'p-8',
+  },
+};
+
+// The managed Clerk tenant name is set outside this app. Keep every embedded
+// authentication step branded while preserving the rest of the German locale.
+function withFiudiaName<T>(value: T): T {
+  if (typeof value === 'string') return value.replaceAll('{{applicationName}}', 'Fiudia') as T;
+  if (Array.isArray(value)) return value.map(withFiudiaName) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, text]) => [key, withFiudiaName(text)])) as T;
+  }
+  return value;
+}
+const germanClerk = withFiudiaName(deDE);
+const clerkLocalization = {
+  ...germanClerk,
+  formFieldInputPlaceholder__signUpPassword: 'Passwort erstellen',
+  signIn: {
+    ...germanClerk.signIn,
+    start: {
+      ...germanClerk.signIn?.start,
+      title: 'Bei Fiudia anmelden',
+      titleCombined: 'Bei Fiudia anmelden',
+      subtitle: 'Melde dich bei Fiudia an, um fortzufahren.',
+      subtitleCombined: 'Melde dich bei Fiudia an, um fortzufahren.',
+    },
+  },
+  signUp: {
+    ...germanClerk.signUp,
+    start: {
+      ...germanClerk.signUp?.start,
+      title: 'Fiudia-Workspace erstellen',
+      titleCombined: 'Fiudia-Workspace erstellen',
+      subtitle: 'Registriere dich bei Fiudia und starte deinen Workspace.',
+      subtitleCombined: 'Registriere dich bei Fiudia und starte deinen Workspace.',
+    },
   },
 };
 
@@ -440,7 +477,7 @@ function ClerkQueryScope() {
 
 function ClerkApp() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Willkommen zurück', subtitle: 'Melde dich an, um weiterzumachen' } }, signUp: { start: { title: 'Erstelle deinen Workspace', subtitle: 'Starte mit Fiudia' } } }} routerPush={(to: string) => setLocation(stripBase(to))} routerReplace={(to: string) => setLocation(stripBase(to), { replace: true })}><ClerkQueryScope /></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={clerkLocalization} routerPush={(to: string) => setLocation(stripBase(to))} routerReplace={(to: string) => setLocation(stripBase(to), { replace: true })}><ClerkQueryScope /></ClerkProvider>;
 }
 
 function App() {

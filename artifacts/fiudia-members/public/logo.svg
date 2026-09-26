@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 202 48" role="img" aria-label="Fiudia">
+  <rect width="48" height="48" rx="14" fill="#D4C4F5"/>
+  <path d="M15 12h21v6H22v7h12v6H22v10h-7V12Z" fill="#29354C"/>
+  <text x="60" y="34" font-family="Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="-1.5" fill="#29354C">Fiudia</text>
+</svg>

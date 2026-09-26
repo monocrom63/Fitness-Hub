@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
+import { deDE } from '@clerk/localizations';
 import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
@@ -20,6 +21,42 @@ const stripBase = (path: string) => basePath && path.startsWith(basePath) ? path
 const pendingInviteKey = 'fiudia-member-pending-invite';
 const pendingInvite = () => sessionStorage.getItem(pendingInviteKey);
 const invitePath = (token: string) => `/invite/${encodeURIComponent(token)}`;
+
+// The managed Clerk tenant name is set outside this app. Keep every embedded
+// authentication step branded while preserving the rest of the German locale.
+function withFiudiaName<T>(value: T): T {
+  if (typeof value === 'string') return value.replaceAll('{{applicationName}}', 'Fiudia') as T;
+  if (Array.isArray(value)) return value.map(withFiudiaName) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, text]) => [key, withFiudiaName(text)])) as T;
+  }
+  return value;
+}
+const germanClerk = withFiudiaName(deDE);
+const clerkLocalization = {
+  ...germanClerk,
+  formFieldInputPlaceholder__signUpPassword: 'Passwort erstellen',
+  signIn: {
+    ...germanClerk.signIn,
+    start: {
+      ...germanClerk.signIn?.start,
+      title: 'Bei Fiudia anmelden',
+      titleCombined: 'Bei Fiudia anmelden',
+      subtitle: 'Melde dich bei Fiudia an, um fortzufahren.',
+      subtitleCombined: 'Melde dich bei Fiudia an, um fortzufahren.',
+    },
+  },
+  signUp: {
+    ...germanClerk.signUp,
+    start: {
+      ...germanClerk.signUp?.start,
+      title: 'Fiudia-Konto erstellen',
+      titleCombined: 'Fiudia-Konto erstellen',
+      subtitle: 'Registriere dich bei Fiudia und verbinde deine Mitgliedschaft.',
+      subtitleCombined: 'Registriere dich bei Fiudia und verbinde deine Mitgliedschaft.',
+    },
+  },
+};
 
 function pageTitle(title: string) {
   document.title = `${title} · Fiudia Mitglieder`;
@@ -305,10 +342,15 @@ function ClerkApp() {
   const appearance = {
     theme: shadcn,
     cssLayerName: 'clerk',
+    options: {
+      logoPlacement: 'inside' as const,
+      logoLinkUrl: `${basePath}/`,
+      logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    },
     variables: { colorPrimary: '#66548f', colorForeground: '#29354c', colorMutedForeground: '#707784', colorBackground: '#fdfbf7', colorInput: '#f7f5ef', colorInputForeground: '#29354c', colorNeutral: '#d9d3c6', fontFamily: 'DM Sans', borderRadius: '0.9rem' },
-    elements: { rootBox: 'w-full', cardBox: 'w-full !shadow-none !border !border-[#e5e0d4] !rounded-[18px] overflow-hidden', card: '!shadow-none !border-0 !bg-transparent', footer: '!shadow-none !border-0 !bg-transparent', formButtonPrimary: '!bg-[#29354c] !text-white hover:!bg-[#43506b]', formFieldInput: '!bg-[#f7f5ef] !border-[#d9d3c6]' },
+    elements: { rootBox: 'w-full', cardBox: 'w-full !shadow-none !border !border-[#e5e0d4] !rounded-[18px] overflow-hidden', card: '!shadow-none !border-0 !bg-transparent', footer: '!shadow-none !border-0 !bg-transparent', socialButtonsBlockButton: '!bg-[#f7f5ef] !border-[#d9d3c6]', socialButtonsBlockButtonText: '!text-[#29354c]', formButtonPrimary: '!bg-[#29354c] !text-white hover:!bg-[#43506b]', formFieldInput: '!bg-[#f7f5ef] !border-[#d9d3c6]' },
   };
-  return <ClerkProvider publishableKey={clerkKey} proxyUrl={clerkProxy} appearance={appearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} routerPush={(to: string) => navigate(stripBase(to))} routerReplace={(to: string) => navigate(stripBase(to), { replace: true })}>
+  return <ClerkProvider publishableKey={clerkKey} proxyUrl={clerkProxy} appearance={appearance} localization={clerkLocalization} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} routerPush={(to: string) => navigate(stripBase(to))} routerReplace={(to: string) => navigate(stripBase(to), { replace: true })}>
     <IdentityQueryBoundary />
   </ClerkProvider>;
 }
