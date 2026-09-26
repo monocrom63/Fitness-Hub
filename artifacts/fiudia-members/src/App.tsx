@@ -1,22 +1,25 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
 import { useForm } from 'react-hook-form';
-import { Activity, ArrowRight, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
-import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation } from 'wouter';
+import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
+import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import type { Member, MemberCourse, MemberHome } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useGetMemberHome, useListMemberCheckIns, useListMemberCourses, useMemberActions } from '@/hooks/use-member';
+import { useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxy = import.meta.env.VITE_CLERK_PROXY_URL;
 const stripBase = (path: string) => basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
+const pendingInviteKey = 'fiudia-member-pending-invite';
+const pendingInvite = () => sessionStorage.getItem(pendingInviteKey);
+const invitePath = (token: string) => `/invite/${encodeURIComponent(token)}`;
 
 function pageTitle(title: string) {
   document.title = `${title} · Fiudia Mitglieder`;
@@ -48,9 +51,12 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
   const [location] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const notifications = useMemberNotifications(Boolean(member && home?.coursesEnabled));
+  const unread = notifications.data?.filter(item => !item.readAt).length ?? 0;
   const nav = [
     { href: '/', label: 'Heute', icon: Activity },
     ...(member && home?.coursesEnabled ? [{ href: '/courses', label: 'Kurse', icon: CalendarDays }] : []),
+    ...(member && home?.coursesEnabled ? [{ href: '/notifications', label: 'Hinweise', icon: Bell }] : []),
     ...(member && home?.checkInsEnabled ? [{ href: '/check-ins', label: 'Check-ins', icon: History }] : []),
     { href: '/connect', label: 'Mitgliedschaft', icon: Link2 },
   ];
@@ -58,18 +64,18 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
     <aside className="rail">
       <Brand />
       <div className="rail-kicker">Mein Fiudia</div>
-      <nav className="rail-nav" aria-label="Hauptnavigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`rail-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${href === '/' ? 'today' : href.slice(1)}`}><Icon />{label}</Link>)}</nav>
+      <nav className="rail-nav" aria-label="Hauptnavigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`rail-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${href === '/' ? 'today' : href.slice(1)}`}><Icon /><span className="nav-label">{label}</span>{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`} data-testid="status-unread-count">{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
       <div className="rail-bottom">
         <div className="rail-note"><div><strong>Dein Tempo zählt.</strong>Ein guter Trainingstag beginnt damit, dass du einfach auftauchst.</div></div>
         <div className="rail-user"><span className="avatar">{initials(member?.fullName || user?.fullName || 'Fiudia')}</span><span>{member?.fullName || user?.fullName || 'Mein Konto'}<small>{member?.studioName || 'Noch kein Studio verbunden'}</small></span><button className="signout" type="button" onClick={() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` })} aria-label="Abmelden" title="Abmelden" data-testid="button-sign-out"><LogOut size={17} /></button></div>
       </div>
     </aside>
     <div className="main"><div className="mobile-header"><Brand /><button className="signout" type="button" onClick={() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` })} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{children}</div>
-    <nav className="mobile-nav" aria-label="Mobile Navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} data-testid={`link-mobile-${href === '/' ? 'today' : href.slice(1)}`}><Icon size={19} strokeWidth={1.7} />{label}</Link>)}</nav>
+    <nav className="mobile-nav" aria-label="Mobile Navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} data-testid={`link-mobile-${href === '/' ? 'today' : href.slice(1)}`}><Icon size={19} strokeWidth={1.7} />{label}{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`}>{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
   </div>;
 }
 function MembershipRequired() {
-  return <div className="page"><PageHeader eyebrow="Dein Anfang" title="Erst verbinden. Dann los." description="Verknüpfe deine bestehende Mitgliedschaft, um deinen persönlichen Studiobereich zu sehen." /><EmptyView icon={<Link2 size={22} />} title="Dein Studio wartet auf dich" description="Halte deine Mitgliedsnummer bereit. Nach der Verbindung siehst du alles, was für dich wichtig ist." action={<Link href="/connect" className="button button-primary" data-testid="link-connect-membership">Mitgliedschaft verbinden <ArrowRight size={15} /></Link>} /></div>;
+  return <div className="page"><PageHeader eyebrow="Dein Anfang" title="Erst verbinden. Dann los." description="Verknüpfe deine bestehende Mitgliedschaft, um deinen persönlichen Studiobereich zu sehen." /><EmptyView icon={<Link2 size={22} />} title="Dein Studio wartet auf dich" description="Am einfachsten geht es mit dem persönlichen Einladungslink deines Studios. Melde dich mit der bestätigten E-Mail-Adresse an, an die die Einladung geschickt wurde." action={<Link href="/connect" className="button button-primary" data-testid="link-connect-membership">Verbindungsmöglichkeiten <ArrowRight size={15} /></Link>} /></div>;
 }
 function StatusChip({ course }: { course: MemberCourse }) {
   if (course.bookingStatus === 'confirmed') return <span className="status-chip" data-testid={`status-booking-${course.id}`}><Check size={12} /> Platz gesichert</span>;
@@ -140,6 +146,71 @@ function CheckInsPage() {
     <div className="footer-line">Deine Besuche bleiben deine Geschichte.</div>
   </div>;
 }
+function NotificationsPage() {
+  const notifications = useMemberNotifications(true);
+  const markRead = useNotificationRead();
+  const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
+  const read = async (id: number) => {
+    setActionError(null);
+    try { await markRead.mutateAsync({ id }); }
+    catch { setActionError({ id, message: 'Der Hinweis konnte nicht als gelesen markiert werden. Bitte versuche es erneut.' }); }
+  };
+  const items = [...(notifications.data || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return <div className="page"><PageHeader eyebrow="Hinweise" title="Deine Hinweise." description="Hier erfährst du, wenn sich etwas an deinen Kursbuchungen oder Wartelistenplätzen ändert." />
+    {notifications.isLoading ? <div className="skeleton-page" data-testid="status-notifications-loading"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> :
+      notifications.isError ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
+      items.length ? <div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
+        <div className="notification-icon"><Bell size={20} /></div><div className="notification-content"><div className="eyebrow">{item.readAt ? 'Gelesen' : 'Neu'}</div><h3>{item.title}</h3><p>{item.body}</p><time dateTime={item.createdAt}>{dateLabel(item.createdAt)} · {timeLabel(item.createdAt)} Uhr</time>
+          <div className="notification-actions"><Link href="/courses" className="text-link" data-testid={`link-notification-courses-${item.id}`}>Meine Kurse <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
+          {actionError?.id === item.id && <div className="form-error" role="alert" data-testid={`status-notification-error-${item.id}`}>{actionError.message}</div>}
+        </div></article>)}</div> :
+      <EmptyView icon={<Bell size={22} />} title="Alles auf dem Laufenden." description="Noch keine Hinweise. Änderungen an deinen Kursbuchungen und Wartelistenplätzen erscheinen hier." action={<Link href="/courses" className="button button-secondary" data-testid="link-notification-empty-courses">Kurse ansehen <ArrowRight size={15} /></Link>} />}
+    <div className="footer-line">Deine Hinweise sind nur für dich sichtbar.</div>
+  </div>;
+}
+function invitationError(error: unknown) {
+  const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+  if (status === 400 || status === 404 || status === 409 || status === 410) return 'Dieser Einladungslink ist ungültig, abgelaufen oder wurde bereits verwendet. Bitte fordere bei deinem Studio eine neue Einladung an.';
+  if (status === 403 || status === 422) return 'Die bestätigte E-Mail-Adresse deines Kontos passt nicht zur Einladung oder die Mitgliedschaft ist bereits verbunden. Melde dich mit dem eingeladenen Konto an oder kontaktiere dein Studio.';
+  return 'Die Einladung konnte nicht angenommen werden. Prüfe deine bestätigte E-Mail-Adresse und versuche es erneut. Falls der Link abgelaufen ist, fordere eine neue Einladung bei deinem Studio an.';
+}
+function InvitePage({ token, member }: { token: string; member: Member | null }) {
+  const accept = useInvitationAcceptance();
+  const [, navigate] = useLocation();
+  const [error, setError] = useState('');
+  const submit = async () => {
+    setError('');
+    try {
+      await accept.mutateAsync({ data: { token } });
+      sessionStorage.removeItem(pendingInviteKey);
+      navigate('/', { replace: true });
+    } catch (failure) { setError(invitationError(failure)); }
+  };
+  const leave = () => {
+    sessionStorage.removeItem(pendingInviteKey);
+    navigate('/connect', { replace: true });
+  };
+  return <div className="page"><PageHeader eyebrow="Einladung" title="Dein Platz wartet." description="Du entscheidest, ob du diese persönliche Einladung annehmen möchtest." />
+    <div className="soft-card invite-card"><div className="empty-icon"><Ticket size={22} /></div><h2>Mitgliedschaft verbinden</h2><p>{member ? 'Dieses Konto ist bereits mit einer Mitgliedschaft verbunden. Falls du eine andere Einladung erhalten hast, kläre die Zuordnung bitte zuerst mit deinem Studio.' : 'Mit einem Klick verbindest du dein Fiudia Konto mit der Mitgliedschaft, für die dein Studio dich eingeladen hat. Der Link kann nur einmal verwendet werden.'}</p>
+      {error && <div className="form-error" role="alert" data-testid="status-invite-error">{error}</div>}
+      <div className="invite-actions"><button className="button button-primary" type="button" disabled={accept.isPending || Boolean(member) || !token} onClick={() => { void submit(); }} data-testid="button-accept-invitation">{accept.isPending ? 'Wird verbunden …' : 'Einladung annehmen'} <ArrowRight size={15} /></button><button type="button" className="button button-quiet" onClick={leave} disabled={accept.isPending} data-testid="button-invite-connect">Andere Möglichkeiten</button></div>
+    </div><p className="invite-hint"><ShieldCheck size={15} /> Verwende das Konto mit der bestätigten E-Mail-Adresse, an die dein Studio die Einladung geschickt hat. Stimmt sie nicht überein, kannst du die Einladung nicht annehmen.</p>
+    <div className="footer-line">Nur du kannst diese Einladung annehmen.</div>
+  </div>;
+}
+function InviteEntry() {
+  const { token } = useParams<{ token: string }>();
+  const { isLoaded, isSignedIn } = useAuth();
+  const savedToken = useRef<string | null>(null);
+  // Preserve the one-use secret only in this tab across Clerk's authentication flow.
+  if (token && savedToken.current !== token) {
+    sessionStorage.setItem(pendingInviteKey, token);
+    savedToken.current = token;
+  }
+  if (!isLoaded) return <LoadingPage />;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return <AuthenticatedPage page="invite" token={token} />;
+}
 function ConnectPage({ member }: { member: Member | null }) {
   const form = useForm<{ memberId: string }>({ defaultValues: { memberId: '' } });
   const { claim } = useMemberActions();
@@ -149,33 +220,36 @@ function ConnectPage({ member }: { member: Member | null }) {
     try { await claim.mutateAsync({ data: { memberId: id } }); navigate('/'); }
     catch { /* Mutation error is shown below. */ }
   };
-  return <div className="page"><PageHeader eyebrow="Mitgliedschaft" title={member ? 'Dein Studio. Dein Platz.' : 'Hier gehörst du hin.'} description={member ? 'Deine Mitgliedschaft ist mit deinem Fiudia Konto verbunden.' : 'Verbinde deine bestehende Mitgliedschaft mit diesem Konto. Danach ist dein Studio nur einen Klick entfernt.'} />
+  return <div className="page"><PageHeader eyebrow="Mitgliedschaft" title={member ? 'Dein Studio. Dein Platz.' : 'Hier gehörst du hin.'} description={member ? 'Deine Mitgliedschaft ist mit deinem Fiudia Konto verbunden.' : 'Der persönliche Einladungslink deines Studios ist der normale Weg zu deiner Mitgliedschaft. Melde dich mit der bestätigten E-Mail-Adresse an, an die die Einladung geschickt wurde.'} />
     <div className="connect-layout">
       {member ? <div className="soft-card"><div className="linked-summary"><span className="avatar" style={{ width: 50, height: 50, flexBasis: 50, fontSize: 16 }}>{initials(member.fullName)}</span><div><div className="eyebrow">Verbundene Mitgliedschaft</div><strong data-testid="text-member-name">{member.fullName}</strong><p data-testid="text-member-studio">{member.studioName} · {member.membershipType}</p></div></div><div style={{ marginTop: 24 }}><span className="status-chip"><Check size={12} /> Verbunden</span></div><div style={{ marginTop: 28 }}><Link href="/" className="button button-primary" data-testid="link-back-today">Zurück zu Heute <ArrowRight size={15} /></Link></div></div> :
-      <div className="soft-card"><div className="empty-icon"><Link2 size={21} /></div><h2 style={{ fontFamily: 'Space Grotesk', fontSize: 23, letterSpacing: '-.05em', margin: '0 0 8px' }}>Mitgliedschaft verbinden</h2><p style={{ color: '#707784', fontSize: 13, lineHeight: 1.65, margin: '0 0 28px' }}>Nutze die Mitgliedsnummer, die du von deinem Studio erhalten hast.</p><Form {...form}><form className="connect-form" onSubmit={form.handleSubmit(submit)}><FormField control={form.control} name="memberId" rules={{ required: 'Bitte gib deine Mitgliedsnummer ein.', validate: value => Number.isSafeInteger(Number(value.trim())) && Number(value.trim()) > 0 || 'Bitte gib eine gültige Mitgliedsnummer ein.' }} render={({ field }) => <FormItem><FormLabel>Deine Mitgliedsnummer</FormLabel><FormControl><input {...field} className="field" id="member-id" type="text" inputMode="numeric" placeholder="Mitgliedsnummer eingeben" autoComplete="off" data-testid="input-member-id" /></FormControl><FormMessage /></FormItem>} /><div className="field-help">Du findest die Nummer in deiner Mitgliedsbestätigung. Bei Fragen hilft dir dein Studio weiter.</div>{claim.isError && <div className="form-error" role="alert" data-testid="status-claim-error">{errorMessage(claim.error)}</div>}<button type="submit" className="button button-primary" disabled={claim.isPending} data-testid="button-claim-membership">{claim.isPending ? 'Wird verbunden …' : 'Jetzt verbinden'} <ArrowRight size={15} /></button></form></Form></div>}
+      <div className="soft-card"><div className="empty-icon"><Link2 size={21} /></div><h2 style={{ fontFamily: 'Space Grotesk', fontSize: 23, letterSpacing: '-.05em', margin: '0 0 8px' }}>Deine Einladung</h2><p style={{ color: '#707784', fontSize: 13, lineHeight: 1.65, margin: '0 0 28px' }}>Öffne den persönlichen Link aus der Nachricht deines Studios. Noch keinen Link erhalten? Bitte dein Studio um eine Einladung. Deine Konto-E-Mail muss bestätigt sein und mit der eingeladenen Adresse übereinstimmen.</p><div className="eyebrow" style={{ marginBottom: 12 }}>Alternativ · Mitgliedsnummer</div><p style={{ color: '#707784', fontSize: 12, lineHeight: 1.65 }}>Falls du keinen Einladungslink nutzen kannst, bleibt die Verbindung über deine Mitgliedsnummer möglich.</p><Form {...form}><form className="connect-form" onSubmit={form.handleSubmit(submit)}><FormField control={form.control} name="memberId" rules={{ required: 'Bitte gib deine Mitgliedsnummer ein.', validate: value => Number.isSafeInteger(Number(value.trim())) && Number(value.trim()) > 0 || 'Bitte gib eine gültige Mitgliedsnummer ein.' }} render={({ field }) => <FormItem><FormLabel>Deine Mitgliedsnummer</FormLabel><FormControl><input {...field} className="field" id="member-id" type="text" inputMode="numeric" placeholder="Mitgliedsnummer eingeben" autoComplete="off" data-testid="input-member-id" /></FormControl><FormMessage /></FormItem>} /><div className="field-help">Du findest die Nummer in deiner Mitgliedsbestätigung. Bei Fragen hilft dir dein Studio weiter.</div>{claim.isError && <div className="form-error" role="alert" data-testid="status-claim-error">{errorMessage(claim.error)}</div>}<button type="submit" className="button button-primary" disabled={claim.isPending} data-testid="button-claim-membership">{claim.isPending ? 'Wird verbunden …' : 'Mit Nummer verbinden'} <ArrowRight size={15} /></button></form></Form></div>}
       <aside className="connect-aside"><ShieldCheck size={26} strokeWidth={1.6} /><h3>Nur für dich.</h3><p>Dein Konto ist durch deine Anmeldung geschützt. Nach dem Verbinden siehst du ausschließlich die für dich verfügbaren Bereiche deines Studios. Deine Mitgliedschaft muss zu deiner bestätigten E-Mail-Adresse passen.</p></aside>
     </div><div className="footer-line">Deine Daten gehören zu dir.</div>
   </div>;
 }
 function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const signIn = mode === 'sign-in';
+  const redirect = pendingInvite() ? `${basePath}${invitePath(pendingInvite()!)}` : `${basePath}${signIn ? '/' : '/connect'}`;
   useEffect(() => pageTitle(signIn ? 'Anmelden' : 'Registrieren'), [signIn]);
-  return <div className="auth-page"><div className="auth-aside"><Brand /><h1>Dein Studio.<br /><em>Dein Rhythmus.</em></h1><p>Alle Kurse, deine Buchungen und jeder Besuch. Ein ruhiger Ort für alles, was dich in Bewegung hält.</p><small>Fiudia / Dein Raum für Bewegung</small></div><main className="auth-main"><div className="auth-content"><div className="eyebrow">Fiudia Mitglieder</div><h2>{signIn ? 'Willkommen zurück.' : 'Schön, dass du da bist.'}</h2><p>{signIn ? 'Melde dich an und mach dort weiter, wo du aufgehört hast.' : 'Erstelle ein Konto und verbinde danach deine Mitgliedschaft.'}</p><div className="auth-clerk">{signIn ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={`${basePath}/`} /> : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={`${basePath}/connect`} />}</div><div className="auth-switch">{signIn ? <>Noch kein Konto? <Link href="/sign-up" data-testid="link-sign-up">Registrieren</Link></> : <>Schon dabei? <Link href="/sign-in" data-testid="link-sign-in">Anmelden</Link></>}</div></div></main></div>;
+  return <div className="auth-page"><div className="auth-aside"><Brand /><h1>Dein Studio.<br /><em>Dein Rhythmus.</em></h1><p>Alle Kurse, deine Buchungen und jeder Besuch. Ein ruhiger Ort für alles, was dich in Bewegung hält.</p><small>Fiudia / Dein Raum für Bewegung</small></div><main className="auth-main"><div className="auth-content"><div className="eyebrow">Fiudia Mitglieder</div><h2>{signIn ? 'Willkommen zurück.' : 'Schön, dass du da bist.'}</h2><p>{pendingInvite() ? 'Deine Einladung wartet nach der Anmeldung auf dich. Nutze die E-Mail-Adresse, an die dein Studio sie geschickt hat, und bestätige sie.' : signIn ? 'Melde dich an und mach dort weiter, wo du aufgehört hast.' : 'Erstelle ein Konto und verbinde danach deine Mitgliedschaft.'}</p><div className="auth-clerk">{signIn ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={redirect} /> : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} />}</div><div className="auth-switch">{signIn ? <>Noch kein Konto? <Link href="/sign-up" data-testid="link-sign-up">Registrieren</Link></> : <>Schon dabei? <Link href="/sign-in" data-testid="link-sign-in">Anmelden</Link></>}</div></div></main></div>;
 }
-function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'connect' }) {
+function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <LoadingPage />;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
+  const pending = pendingInvite();
+  if (pending) return <Redirect to={invitePath(pending)} />;
   return <AuthenticatedPage page={page} />;
 }
-function AuthenticatedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'connect' }) {
+function AuthenticatedPage({ page, token = '' }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'invite'; token?: string }) {
   const home = useGetMemberHome();
   if (home.isLoading) return <MemberShell member={null}><LoadingPage /></MemberShell>;
   if (home.isError || !home.data) return <MemberShell member={null}><div className="page"><PageHeader eyebrow="Dein Fiudia" title="Einen Moment." description="Wir versuchen, deine Mitgliedschaft zu laden." /><ErrorView onRetry={() => { void home.refetch(); }} /></div></MemberShell>;
   const memberHome = home.data;
   const member = memberHome.member;
-  if (page === 'courses' && !memberHome.coursesEnabled || page === 'check-ins' && !memberHome.checkInsEnabled) return <Redirect to="/" />;
-  return <MemberShell member={member} home={memberHome}>{page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'check-ins' ? <CheckInsPage /> : <ConnectPage member={member} />}</MemberShell>;
+  if ((page === 'courses' || page === 'notifications') && (!member || !memberHome.coursesEnabled) || page === 'check-ins' && !memberHome.checkInsEnabled) return <Redirect to="/" />;
+  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage /> : page === 'check-ins' ? <CheckInsPage /> : <ConnectPage member={member} />}</MemberShell>;
 }
 function NotFoundPage() {
   useEffect(() => pageTitle('Seite nicht gefunden'), []);
@@ -190,7 +264,9 @@ function Routes() {
     <Route path="/sign-in/*?"><AuthPage mode="sign-in" /></Route>
     <Route path="/sign-up/*?"><AuthPage mode="sign-up" /></Route>
     <Route path="/"><ProtectedPage page="today" /></Route>
+    <Route path="/invite/:token"><InviteEntry /></Route>
     <Route path="/courses"><ProtectedPage page="courses" /></Route>
+    <Route path="/notifications"><ProtectedPage page="notifications" /></Route>
     <Route path="/check-ins"><ProtectedPage page="check-ins" /></Route>
     <Route path="/connect"><ProtectedPage page="connect" /></Route>
     <Route component={NotFoundPage} />

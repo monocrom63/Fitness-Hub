@@ -4,17 +4,17 @@ import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@cler
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
 import {
-  Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Dumbbell,
+  Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Copy, Dumbbell,
   LayoutDashboard, LogOut, Mail, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2,
   ShieldCheck, Sparkles, Users, UserRound, X, Zap,
 } from 'lucide-react';
 import {
-  getGetDashboardQueryKey, getGetMeQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
+  getGetDashboardQueryKey, getGetMeQueryKey, getListCourseBookingsQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
   getListMembersQueryKey, getListModulesQueryKey, useAcceptInvitation, useCompleteOnboarding, useCreateCheckIn,
-  useCreateCourse, useCreateInvitation, useCreateMember, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
-  useListCourses, useListInvitations, useListMembers, useListModules, useUpdateMember, useUpdateModule,
+  useCancelStaffCourseBooking, useCreateCourse, useCreateInvitation, useCreateMember, useCreateMemberInvitation, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
+  useListCourseBookings, useListCourses, useListInvitations, useListMembers, useListModules, useUpdateMember, useUpdateModule,
 } from '@workspace/api-client-react';
-import type { Course, Dashboard, Invitation, Member, Me, ModuleKey, ModuleSetting, Role } from '@workspace/api-client-react';
+import type { Course, CourseRosterBooking, Dashboard, Invitation, Member, MemberInvitationLink, Me, ModuleKey, ModuleSetting, Role } from '@workspace/api-client-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -206,7 +206,7 @@ function DashboardPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   */
 }
 
-function MembersPage({ me }: { me: Me }) {
+function MembersContent({ me }: { me: Me }) {
   const client = useQueryClient();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
@@ -226,22 +226,120 @@ function MembersPage({ me }: { me: Me }) {
   return <><PageHeader eyebrow={`${me.studioName || 'Workspace'} / Menschen`} title="Mitglieder" description="Behalte Beziehungen im Blick — nicht nur Datensätze." action={manager && <button className="button button-dark" onClick={openCreate} data-testid="button-create-member"><Plus size={17} /> Mitglied anlegen</button>} /><div className="toolbar"><div className="input-search"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={manager ? 'Nach Name, E-Mail oder Mitgliedsnummer suchen …' : 'Nach Namen suchen …'} data-testid="input-member-search" /></div><span className="toolbar-count">{members.length} Mitglieder</span></div>{membersQuery.isLoading ? <LoadingBlock label="Mitglieder werden geladen" /> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : members.length === 0 ? <div className="empty-state" data-testid="status-members-empty"><div className="empty-icon"><Users size={22} /></div><h3>Noch keine Mitglieder</h3><p>Hier erscheinen die Mitglieder deines Studios.</p>{manager && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-member"><Plus size={16} /> Erstes Mitglied anlegen</button>}</div> : <div className={`table-card ${manager ? '' : 'employee-members'}`}><div className="member-table-head"><span>Mitglied</span>{manager && <span>Kontakt</span>}<span>Mitgliedschaft</span><span>Status</span><span>Letzter Check-in</span><span /></div>{members.map((member) => <div className="member-row" key={member.id} data-testid={`member-row-${member.id}`}><div className="member-name"><span className="avatar avatar-violet">{initials(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{manager && <span data-testid={`text-member-id-${member.id}`}>Mitglieds-ID: {member.id} · </span>}seit {new Intl.DateTimeFormat('de-DE', { month: 'short', year: 'numeric' }).format(new Date(member.joinedAt))}</small></span></div>{manager && <div className="member-contact"><strong>{member.email || 'Keine E-Mail'}</strong><small>{member.phone || 'Keine Telefonnummer'}</small></div>}<span className="membership-type">{member.membershipType}</span><span className={`status-label status-${member.status}`}><i />{member.status === 'active' ? 'Aktiv' : member.status === 'trial' ? 'Probetraining' : 'Pausiert'}</span><span className="last-checkin">{member.lastCheckIn ? timeAgo(member.lastCheckIn) : 'Noch nicht'}</span><div className="row-actions"><button className="icon-button" disabled={checkIn.isPending} onClick={() => checkIn.mutate({ data: { memberId: member.id, studioId: member.studioId } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} title="Check-in" data-testid={`button-checkin-member-${member.id}`}><Check size={16} /></button>{manager && <button className="icon-button" onClick={() => openEdit(member)} title="Bearbeiten" data-testid={`button-edit-member-${member.id}`}><Pencil size={16} /></button>}</div></div>)}</div>}{checkIn.isError && <p className="form-error" role="alert">Check-in fehlgeschlagen. Bitte erneut versuchen.</p>}{manager && modal && <Modal title={modal === 'create' ? 'Neues Mitglied' : 'Mitglied bearbeiten'} onClose={() => setModal(null)}><form onSubmit={submit} className="modal-form">{modal === 'edit' && selected && <p data-testid={`text-edit-member-id-${selected.id}`}>Mitglieds-ID für die Konto-Verknüpfung: <strong>{selected.id}</strong></p>}<TextField label="Vollständiger Name" name="member-name" value={form.fullName} onChange={updateForm('fullName')} /><TextField label="E-Mail-Adresse" name="member-email" value={form.email} onChange={updateForm('email')} type="email" /><TextField label="Telefon" name="member-phone" value={form.phone} onChange={updateForm('phone')} /><TextField label="Mitgliedschaft" name="member-membership" value={form.membershipType} onChange={updateForm('membershipType')} /><label className="field"><span>Status</span><select value={form.status} onChange={(e) => updateForm('status')(e.target.value)} data-testid="select-member-status"><option value="active">Aktiv</option><option value="trial">Probetraining</option><option value="paused">Pausiert</option></select></label>{(create.isError || updateMember.isError) && <p className="form-error" role="alert">Mitglied konnte nicht gespeichert werden.</p>}<button className="button button-dark button-wide" disabled={create.isPending || updateMember.isPending} data-testid="button-save-member"><Check size={16} /> Speichern</button></form></Modal>}</>;
 }
 
+function MemberInvitationDialog({ member, onClose }: { member: Member; onClose: () => void }) {
+  const invitation = useCreateMemberInvitation();
+  const [link, setLink] = useState<MemberInvitationLink | null>(null);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const shareableUrl = link ? new URL(link.inviteUrl, window.location.origin).href : null;
+  return <Modal title="Mitglied einladen" onClose={onClose}>
+    <div className="invitation-details">
+      <p>Ein einmaliger, vertraulicher Einladungslink für <strong>{member.fullName}</strong>. Teile ihn nur mit der zugeordneten Person.</p>
+      <div className="invitation-recipient"><Mail size={16} /><span data-testid="text-invitation-recipient">{link?.memberEmail || member.email}</span></div>
+      {!link ? <>
+        <p className="booking-hint">Der Link wird nur direkt nach dem Erstellen angezeigt. Sichere ihn jetzt, denn er kann später nicht erneut eingesehen werden.</p>
+        {invitation.isError && <p className="form-error" role="alert" data-testid="status-invitation-error">Einladung konnte nicht erstellt werden. Bitte versuche es erneut.</p>}
+        <button className="button button-dark button-wide" disabled={invitation.isPending} onClick={() => invitation.mutate({ id: member.id }, { onSuccess: result => setLink(result) })} data-testid={`button-generate-member-invitation-${member.id}`}>{invitation.isPending ? 'Link wird erstellt …' : 'Einmaligen Link erstellen'}</button>
+      </> : <>
+        <div className="invitation-link"><span data-testid="text-member-invitation-link">{shareableUrl}</span></div>
+        <p className="booking-hint" data-testid="text-member-invitation-expiry">Gültig bis {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(link.expiresAt))}. Nur für {link.memberEmail}.</p>
+        <button className="button button-dark button-wide" onClick={async () => { try { if (!shareableUrl) return; await navigator.clipboard.writeText(shareableUrl); setCopyState('copied'); } catch { setCopyState('error'); } }} data-testid="button-copy-member-invitation"><Copy size={16} /> Link kopieren</button>
+        {copyState === 'copied' && <p className="booking-result" role="status" data-testid="status-invitation-copied">Link kopiert.</p>}
+        {copyState === 'error' && <p className="form-error" role="alert" data-testid="status-invitation-copy-error">Kopieren nicht möglich. Bitte den Link manuell kopieren.</p>}
+      </>}
+    </div>
+  </Modal>;
+}
+
+function MembersPage({ me }: { me: Me }) {
+  const manager = me.role === 'studio_manager' || me.role === 'district_manager';
+  const [inviteMember, setInviteMember] = useState<Member | null>(null);
+  return <>
+    <MembersContent me={me} />
+    {manager && <MemberInvitationList onSelect={setInviteMember} />}
+    {manager && inviteMember && <MemberInvitationDialog key={inviteMember.id} member={inviteMember} onClose={() => setInviteMember(null)} />}
+  </>;
+}
+
+function MemberInvitationList({ onSelect }: { onSelect: (member: Member) => void }) {
+  const query = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey() } });
+  return <section className="panel invitation-management" aria-label="Mitgliedereinladungen">
+    <div className="panel-head"><div><div className="eyebrow">Sicherer Zugang</div><h3>Mitglieder einladen</h3></div><Mail size={19} className="muted-icon" /></div>
+    <p className="booking-hint">Erstelle einen einmaligen Link für ein Mitglied mit hinterlegter E-Mail-Adresse.</p>
+    {query.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : query.data?.length ? <div className="invitation-members">{query.data.map(member => <div className="invitation-member" key={member.id} data-testid={`row-invitation-member-${member.id}`}><span><strong>{member.fullName}</strong><small>{member.email || 'Keine E-Mail hinterlegt'}</small></span><button className="button button-outline" disabled={!member.email} onClick={() => onSelect(member)} data-testid={`button-invite-member-${member.id}`}>Link erstellen</button></div>)}</div> : <p className="booking-hint">Noch keine Mitglieder vorhanden.</p>}
+  </section>;
+}
+
+function CourseRoster({ course, onClose }: { course: Course; onClose: () => void }) {
+  const client = useQueryClient();
+  const query = useListCourseBookings(course.id, { query: { queryKey: getListCourseBookingsQueryKey(course.id) } });
+  const cancel = useCancelStaffCourseBooking();
+  const [confirmBooking, setConfirmBooking] = useState<CourseRosterBooking | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const confirmed = (query.data || []).filter(item => item.status === 'confirmed');
+  const waitlisted = (query.data || []).filter(item => item.status === 'waitlisted').sort((a, b) => (a.waitlistPosition ?? Infinity) - (b.waitlistPosition ?? Infinity));
+  const cancelBooking = () => {
+    if (!confirmBooking) return;
+    cancel.mutate({ id: course.id, memberId: confirmBooking.memberId, data: { expectedStatus: confirmBooking.status } }, { onSuccess: () => {
+      setConfirmBooking(null);
+      setConflict(false);
+      setMessage('Buchung storniert. Die Kursliste und Warteliste werden aktualisiert.');
+      void client.invalidateQueries({ queryKey: getListCourseBookingsQueryKey(course.id) });
+      void client.invalidateQueries({ queryKey: getListCoursesQueryKey() });
+      void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    }, onError: error => {
+      if (error.status === 409) {
+        setConfirmBooking(null);
+        setConflict(true);
+        setMessage(null);
+        void client.invalidateQueries({ queryKey: getListCourseBookingsQueryKey(course.id) });
+        void client.invalidateQueries({ queryKey: getListCoursesQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      }
+    } });
+  };
+  return <Modal title={`${course.title} · Teilnehmerliste`} onClose={onClose}>
+    <div className="roster-content">
+      {query.isLoading ? <div className="pulse-skeleton" role="status"><i /><i /></div> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : <>
+        {[{ title: 'Bestätigt', items: confirmed }, { title: 'Warteliste', items: waitlisted }].map(group => <section className="roster-group" key={group.title}>
+          <h3>{group.title} <span>{group.items.length}</span></h3>
+          {group.items.length ? group.items.map(item => <div className="roster-member" key={item.id} data-testid={`row-course-booking-${item.id}`}>
+            <span className="avatar avatar-violet">{initials(item.memberName)}</span>
+            <span className="roster-member-name"><strong>{item.memberName}</strong><small>{item.status === 'waitlisted' ? `Warteliste · Platz ${item.waitlistPosition ?? '–'}` : 'Platz bestätigt'}</small></span>
+            <button className="button button-outline roster-cancel" onClick={() => { setConfirmBooking(item); setMessage(null); setConflict(false); cancel.reset(); }} data-testid={`button-cancel-course-booking-${item.id}`}>Stornieren</button>
+          </div>) : <p className="booking-hint">Noch keine {group.title === 'Bestätigt' ? 'bestätigten Buchungen' : 'Mitglieder auf der Warteliste'}.</p>}
+        </section>)}
+      </>}
+      {message && <p className="booking-result" role="status" data-testid="status-cancel-booking-success">{message}</p>}
+      {conflict && <p className="form-error" role="alert" data-testid="status-cancel-booking-conflict">Der Buchungsstatus hat sich geändert. Es wurde nichts storniert. Bitte prüfe die aktualisierte Teilnehmerliste und bestätige eine Stornierung bei Bedarf erneut.</p>}
+      {confirmBooking && <div className="roster-confirm" role="group" aria-label="Buchung stornieren">
+        <strong>Buchung von {confirmBooking.memberName} wirklich stornieren?</strong>
+        <p>Bei einem bestätigten Platz kann ein Mitglied von der Warteliste nachrücken.</p>
+        {cancel.isError && <p className="form-error" role="alert" data-testid="status-cancel-booking-error">Stornierung fehlgeschlagen. Bitte erneut versuchen.</p>}
+        <div className="roster-confirm-actions"><button className="button button-outline" disabled={cancel.isPending} onClick={() => setConfirmBooking(null)} data-testid="button-keep-course-booking">Zurück</button><button className="button button-dark" disabled={cancel.isPending} onClick={cancelBooking} data-testid="button-confirm-cancel-course-booking">{cancel.isPending ? 'Storniere …' : 'Buchung stornieren'}</button></div>
+      </div>}
+    </div>
+  </Modal>;
+}
+
 function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const client = useQueryClient();
-  const canBookMembers = moduleEnabled(modules, 'members');
+  const manager = me.role === 'studio_manager' || me.role === 'district_manager';
+  const canBookMembers = manager && moduleEnabled(modules, 'members');
   const query = useListCourses({ query: { queryKey: getListCoursesQueryKey() } });
   const create = useCreateCourse();
   const booking = useCreateStaffCourseBooking();
   const [bookingCourse, setBookingCourse] = useState<Course | null>(null);
   const [bookingMemberId, setBookingMemberId] = useState('');
   const [bookingResult, setBookingResult] = useState<string | null>(null);
+  const [rosterCourse, setRosterCourse] = useState<Course | null>(null);
   const membersQuery = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey(), enabled: !!bookingCourse && canBookMembers } });
   useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: '', instructor: '', startsAt: '', endsAt: '', capacity: '20', room: '' });
   const update = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = (e: React.FormEvent) => { e.preventDefault(); create.mutate({ data: { ...form, capacity: Number(form.capacity), studioId: me.studioId || 0, startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setOpen(false); } }); };
-  const book = (e: React.FormEvent) => { e.preventDefault(); if (!bookingCourse || !bookingMemberId || !canBookMembers) return; setBookingResult(null); booking.mutate({ id: bookingCourse.id, data: { memberId: Number(bookingMemberId) } }, { onSuccess: result => { setBookingResult(result.status === 'confirmed' ? 'Platz bestätigt.' : result.status === 'waitlisted' ? `Auf der Warteliste${result.waitlistPosition ? ` · Position ${result.waitlistPosition}` : ''}.` : 'Buchungsstatus: ' + result.status); client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } }); };
+  const book = (e: React.FormEvent) => { e.preventDefault(); if (!bookingCourse || !bookingMemberId || !canBookMembers) return; setBookingResult(null); booking.mutate({ id: bookingCourse.id, data: { memberId: Number(bookingMemberId) } }, { onSuccess: result => { setBookingResult(result.status === 'confirmed' ? 'Platz bestätigt.' : result.status === 'waitlisted' ? `Auf der Warteliste${result.waitlistPosition ? ` · Position ${result.waitlistPosition}` : ''}.` : 'Buchungsstatus: ' + result.status); void client.invalidateQueries({ queryKey: getListCourseBookingsQueryKey(bookingCourse.id) }); void client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } }); };
   const courses = query.data || [];
   return <>
     <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button>} />
@@ -250,8 +348,10 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
       <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{course.instructor} · {course.room}</p>
       <div className="course-card-bottom"><span><Users size={15} /> {course.enrolled} / {course.capacity}</span><span className={course.enrolled / course.capacity > .8 ? 'warning-text' : 'positive-text'}>{Math.round((course.enrolled / course.capacity) * 100)}% belegt</span></div>
       <div className="capacity-bar"><i style={{ width: `${Math.min(100, (course.enrolled / course.capacity) * 100)}%` }} /></div>
+      {manager && <button className="button button-outline course-book-button" onClick={() => setRosterCourse(course)} data-testid={`button-course-roster-${course.id}`}><Users size={15} /> Teilnehmerliste ansehen</button>}
       {canBookMembers && course.status !== 'cancelled' && new Date(course.startsAt).getTime() > Date.now() && <button className="button button-outline course-book-button" onClick={() => { setBookingCourse(course); setBookingMemberId(''); setBookingResult(null); booking.reset(); }} data-testid={`button-book-course-${course.id}`}>Mitglied buchen <ArrowRight size={15} /></button>}
     </div>)}</div>}
+    {manager && rosterCourse && <CourseRoster key={rosterCourse.id} course={rosterCourse} onClose={() => setRosterCourse(null)} />}
     {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}
     {me.role !== 'studio_employee' && open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}><form onSubmit={submit} className="modal-form"><TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" /><TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} /><div className="field-grid"><TextField label="Beginn" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" /><TextField label="Ende" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" /></div><div className="field-grid"><TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" /><TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} /></div>{create.isError && <p className="form-error" role="alert">Kurs konnte nicht gespeichert werden.</p>}<button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button></form></Modal>}
   </>;

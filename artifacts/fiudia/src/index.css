@@ -505,6 +505,30 @@ button { cursor: pointer; }
 .loading-orb { width: 16px; height: 16px; border: 3px solid #e6e0ff; border-top-color: #7567b8; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .course-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.invitation-management { margin-top: 26px; max-width: 760px; }
+.invitation-management .panel-head { margin-bottom: 8px; }
+.invitation-members { display: grid; margin-top: 17px; border-top: 1px solid hsl(var(--border)); }
+.invitation-member { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 0; border-bottom: 1px solid hsl(var(--border)); }
+.invitation-member > span { min-width: 0; }
+.invitation-member strong, .invitation-member small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invitation-member strong { font-size: .79rem; }.invitation-member small { margin-top: 3px; color: hsl(var(--muted-foreground)); font-size: .7rem; }
+.invitation-details, .roster-content { display: grid; gap: 15px; }
+.invitation-details > p { margin: 0; color: hsl(var(--muted-foreground)); font-size: .78rem; line-height: 1.55; }
+.invitation-recipient { display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: 9px; background: #f2efff; color: #6655aa; font-size: .76rem; overflow-wrap: anywhere; }
+.invitation-link { padding: 13px; border: 1px solid #dcd4fb; border-radius: 9px; background: #f8f6ff; color: #30335b; font-size: .75rem; overflow-wrap: anywhere; user-select: all; }
+.roster-content { max-height: min(65dvh, 620px); overflow-y: auto; padding-right: 3px; }
+.roster-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-family: var(--font-serif); font-size: 1rem; letter-spacing: -.035em; }
+.roster-group h3 span { color: #7567b8; font-family: var(--font-sans); font-size: .72rem; }
+.roster-group .booking-hint { margin: 10px 0 4px; }
+.roster-member { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid hsl(var(--border)); }
+.roster-member-name { flex: 1; min-width: 0; }
+.roster-member-name strong, .roster-member-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roster-member-name strong { font-size: .77rem; }.roster-member-name small { margin-top: 2px; color: hsl(var(--muted-foreground)); font-size: .68rem; }
+.roster-cancel { min-height: 34px; padding-inline: 10px; font-size: .7rem; }
+.roster-confirm { display: grid; gap: 7px; padding: 16px; border: 1px solid #e5d5d1; border-radius: 11px; background: #fff7f5; font-size: .76rem; }
+.roster-confirm p { margin: 0; color: #765e5b; line-height: 1.5; }
+.roster-confirm-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+@media (max-width: 500px) { .invitation-member { align-items: flex-start; flex-direction: column; gap: 8px; }.roster-cancel { padding-inline: 7px; }.roster-member .avatar { display: none; } }
 .course-card { position: relative; padding: 21px; overflow: hidden; border: 1px solid hsl(var(--card-border)); border-radius: 15px; background: hsl(var(--card)); transition: border-color .2s ease, transform .2s ease; }
 .course-card:hover { transform: translateY(-2px); }
 .course-accent { position: absolute; inset: 0 auto 0 0; width: 4px; background: #c8bbff; }.course-card:nth-child(3n+2) .course-accent { background: #aef0d9; }.course-card:nth-child(3n) .course-accent { background: #ffd598; }

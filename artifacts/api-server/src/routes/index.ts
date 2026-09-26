@@ -5,6 +5,7 @@ import pulseRouter from "./pulse";
 import teamRouter from "./team";
 import modulesRouter from "./modules";
 import memberAppRouter from "./member-app";
+import memberInvitationsRouter from "./member-invitations";
 import courseBookingsRouter from "./course-bookings";
 import { requireModule } from "../lib/module-access";
 
@@ -23,5 +24,6 @@ router.use(courseBookingsRouter);
 router.use(pulseRouter);
 router.use(teamRouter);
 router.use(memberAppRouter);
+router.use(memberInvitationsRouter);
 
 export default router;

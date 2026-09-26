@@ -232,6 +232,25 @@ paths:
         "403":
           description: Insufficient role or studio access
   /courses/{id}/bookings:
+    get:
+      operationId: listCourseBookings
+      tags: [portal]
+      summary: List confirmed and waitlisted members for an accessible course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Course roster
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CourseRosterBooking" }
+        "403": { description: Manager access required }
+        "404": { description: Course not found }
     post:
       operationId: createStaffCourseBooking
       tags: [portal]
@@ -256,6 +275,53 @@ paths:
         "403": { description: Studio access denied }
         "404": { description: Course or member not found }
         "409": { description: Already booked or course unavailable }
+  /courses/{id}/bookings/{memberId}:
+    delete:
+      operationId: cancelStaffCourseBooking
+      tags: [portal]
+      summary: Cancel a member booking as an authorized studio manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookingCancellationInput" }
+      responses:
+        "200":
+          description: Cancelled booking
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseBooking" }
+        "403": { description: Manager access required }
+        "404": { description: Booking not found }
+        "409": { description: Booking status changed since the roster was viewed }
+  /members/{id}/invite:
+    post:
+      operationId: createMemberInvitation
+      tags: [portal]
+      summary: Generate a one-use member onboarding link
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Invitation link, shown only once
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberInvitationLink" }
+        "403": { description: Manager access required }
+        "404": { description: Member not found }
+        "409": { description: Member is already linked or inactive }
   /modules:
     get:
       operationId: listModules
@@ -322,6 +388,55 @@ paths:
         "403": { description: Email not verified or does not match }
         "404": { description: Membership not found }
         "409": { description: Membership already linked }
+  /member/invitations/accept:
+    post:
+      operationId: acceptMemberInvitation
+      tags: [member-app]
+      summary: Link a membership using a one-use invitation and verified email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberInvitationAcceptInput" }
+      responses:
+        "200":
+          description: Linked member home
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberHome" }
+        "403": { description: Email unverified or mismatch }
+        "404": { description: "Invitation expired, invalid or used" }
+        "409": { description: Already linked or inactive }
+  /member/notifications:
+    get:
+      operationId: listMemberNotifications
+      tags: [member-app]
+      summary: Recent waitlist promotion notifications for the signed-in member
+      responses:
+        "200":
+          description: Own notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MemberNotification" }
+  /member/notifications/{id}/read:
+    patch:
+      operationId: markMemberNotificationRead
+      tags: [member-app]
+      summary: Mark an own notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberNotification" }
+        "404": { description: Notification not found }
   /member/courses:
     get:
       operationId: listMemberCourses
@@ -675,6 +790,11 @@ components:
       required: [memberId]
       properties:
         memberId: { type: integer }
+    BookingCancellationInput:
+      type: object
+      required: [expectedStatus]
+      properties:
+        expectedStatus: { type: string, enum: [confirmed, waitlisted] }
     CourseBooking:
       type: object
       required: [id, courseId, memberId, status, waitlistPosition]
@@ -684,6 +804,40 @@ components:
         memberId: { type: integer }
         status: { type: string, enum: [confirmed, waitlisted, cancelled] }
         waitlistPosition: { type: ["integer", "null"] }
+    CourseRosterBooking:
+      type: object
+      required: [id, courseId, memberId, memberName, status, waitlistPosition, createdAt]
+      properties:
+        id: { type: integer }
+        courseId: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        status: { type: string, enum: [confirmed, waitlisted] }
+        waitlistPosition: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    MemberInvitationLink:
+      type: object
+      required: [inviteUrl, expiresAt, memberName, memberEmail]
+      properties:
+        inviteUrl: { type: string }
+        expiresAt: { type: string, format: date-time }
+        memberName: { type: string }
+        memberEmail: { type: string, format: email }
+    MemberInvitationAcceptInput:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, minLength: 32, maxLength: 128 }
+    MemberNotification:
+      type: object
+      required: [id, courseId, title, body, createdAt, readAt]
+      properties:
+        id: { type: integer }
+        courseId: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: ["string", "null"], format: date-time }
     ModuleKey:
       type: string
       enum: [members, courses, pulse, team]

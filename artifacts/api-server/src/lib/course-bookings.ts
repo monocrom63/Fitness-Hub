@@ -1,5 +1,5 @@
 import { and, asc, count, eq } from "drizzle-orm";
-import { courseBookingsTable, coursesTable, db, membersTable } from "@workspace/db";
+import { courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable } from "@workspace/db";
 
 export class BookingError extends Error {
   constructor(public status: number, message: string) {
@@ -66,6 +66,7 @@ export async function cancelCourseBooking(
   courseId: number,
   memberId: number,
   database: typeof db = db,
+  options: { expectedStatus?: "confirmed" | "waitlisted"; cancelledByStaff?: boolean } = {},
 ) {
   return database.transaction(async (tx) => {
     const [course] = await tx.select().from(coursesTable)
@@ -80,14 +81,40 @@ export async function cancelCourseBooking(
         eq(courseBookingsTable.memberId, memberId),
       )).limit(1);
     if (!booking || booking.status === "cancelled") {
+      if (booking && options.expectedStatus) {
+        throw new BookingError(409, "Der Buchungsstatus hat sich geändert. Bitte lade die Teilnehmerliste neu.");
+      }
       throw new BookingError(404, "Aktive Buchung nicht gefunden.");
+    }
+    if (options.expectedStatus && booking.status !== options.expectedStatus) {
+      throw new BookingError(409, "Der Buchungsstatus hat sich geändert. Bitte lade die Teilnehmerliste neu.");
     }
 
     await tx.update(courseBookingsTable).set({ status: "cancelled" })
       .where(eq(courseBookingsTable.id, booking.id));
+    await tx.update(memberNotificationsTable)
+      .set({
+        title: "Diese Platzbestätigung ist nicht mehr gültig",
+        body: `Deine frühere Platzbestätigung für „${course.title}“ gilt nicht mehr. Sieh dir deinen aktuellen Kursplan an.`,
+        readAt: options.cancelledByStaff ? null : new Date(),
+      })
+      .where(and(
+        eq(memberNotificationsTable.bookingId, booking.id),
+        eq(memberNotificationsTable.title, "Dein Kursplatz ist bestätigt"),
+      ));
+    if (options.cancelledByStaff) {
+      await tx.insert(memberNotificationsTable).values({
+        bookingId: booking.id,
+        memberId,
+        courseId,
+        title: "Deine Kursbuchung wurde storniert",
+        body: `Dein Studio hat deine ${booking.status === "waitlisted" ? "Wartelistenposition" : "Buchung"} für „${course.title}“ storniert.`,
+      });
+    }
     if (booking.status === "confirmed") {
-      const queue = await tx.select({
+      const queue = course.status === "cancelled" ? [] : await tx.select({
         id: courseBookingsTable.id,
+        memberId: courseBookingsTable.memberId,
         memberStatus: membersTable.status,
         memberStudioId: membersTable.studioId,
       }).from(courseBookingsTable)
@@ -107,10 +134,24 @@ export async function cancelCourseBooking(
         }
         await tx.update(courseBookingsTable).set({ status: "confirmed" })
           .where(eq(courseBookingsTable.id, candidate.id));
+        await tx.insert(memberNotificationsTable).values({
+          bookingId: candidate.id,
+          memberId: candidate.memberId,
+          courseId,
+          title: "Dein Kursplatz ist bestätigt",
+          body: `Du bist für „${course.title}“ von der Warteliste nachgerückt. Deinen Platz findest du unter „Meine Plätze“.`,
+        });
         promoted = true;
         break;
       }
       const enrolled = Math.max(0, course.enrolled - (promoted ? 0 : 1));
+      if (course.status === "cancelled") {
+        await tx.update(courseBookingsTable).set({ status: "cancelled" })
+          .where(and(
+            eq(courseBookingsTable.courseId, courseId),
+            eq(courseBookingsTable.status, "waitlisted"),
+          ));
+      }
       await tx.update(coursesTable)
         .set({
           enrolled,

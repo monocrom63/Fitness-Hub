@@ -234,6 +234,25 @@ button:disabled { cursor: not-allowed; }
 .connect-aside p { margin: 0; color: #625d73; font-size: 12px; line-height: 1.7; }
 .linked-summary { display: flex; align-items: center; gap: 16px; }
 .linked-summary strong { display: block; font-size: 15px; }.linked-summary p { margin: 4px 0 0; color: #737d89; font-size: 12px; }
+.nav-label { flex: 1; }
+.unread-badge { margin-left: auto; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 20px; background: #d2c5f2; color: #253047; font: 700 10px 'Space Mono', monospace; }
+.rail-link.active .unread-badge { background: #253047; color: #f8f6ef; }
+.invite-card { max-width: 620px; padding: clamp(27px, 4vw, 46px); }
+.invite-card h2 { margin: 0 0 12px; font: 600 28px/1.13 'Space Grotesk', sans-serif; letter-spacing: -.055em; }
+.invite-card p { margin: 0 0 22px; color: #707784; font-size: 13px; line-height: 1.7; }
+.invite-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.invite-hint { max-width: 620px; margin: 17px 0 0; color: #707784; font-size: 12px; line-height: 1.6; }
+.notification-list { display: grid; gap: 12px; }
+.notification-item { display: flex; gap: 17px; align-items: flex-start; padding: 23px 25px; border: 1px solid #e5e0d4; border-radius: 17px; background: #fdfbf7; }
+.notification-item.unread { border-color: #c6b5e6; background: #f5f0fb; }
+.notification-icon { flex: 0 0 43px; width: 43px; height: 43px; display: grid; place-items: center; border-radius: 12px; background: #e9e4f5; color: #746099; }
+.notification-content { flex: 1; min-width: 0; }
+.notification-content h3 { margin: 3px 0 6px; font: 600 18px/1.2 'Space Grotesk', sans-serif; letter-spacing: -.04em; }
+.notification-content p { margin: 0 0 11px; color: #626b77; font-size: 12px; line-height: 1.6; }
+.notification-content time { color: #82778e; font: 700 10px 'Space Mono', monospace; }
+.notification-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 17px; }
+.notification-actions .form-error { margin: 0; }
+.read-label { color: #347456; font-size: 11px; font-weight: 700; }
 .skeleton { background: linear-gradient(90deg,#e9e5dd 25%,#f2eee8 50%,#e9e5dd 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite linear; border-radius: 9px; }
 .skeleton-page { display: grid; gap: 16px; }
 .skeleton-page .skeleton:first-child { width: 38%; height: 48px; margin-bottom: 12px; }
@@ -270,6 +289,10 @@ button:disabled { cursor: not-allowed; }
   .mobile-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: 66px; display: flex; justify-content: space-around; align-items: center; background: #28334a; padding-bottom: env(safe-area-inset-bottom); }
   .mobile-nav a { display: grid; justify-items: center; gap: 3px; min-width: 60px; color: #aab4c4; text-decoration: none; font-size: 9px; font-weight: 700; }
   .mobile-nav a.active { color: #d5c8f3; }
+  .mobile-nav a { position: relative; min-width: 0; flex: 1; }
+  .mobile-nav .unread-badge { position: absolute; top: -12px; left: calc(50% + 8px); min-width: 17px; height: 17px; font-size: 9px; }
+  .notification-item { padding: 19px 16px; gap: 12px; }
+  .notification-icon { flex-basis: 35px; width: 35px; height: 35px; }
   .page { padding: 32px 20px 55px; }
   .topline { margin-bottom: 25px; }
   .page-head { margin-bottom: 27px; }

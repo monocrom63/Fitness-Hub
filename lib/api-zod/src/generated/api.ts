@@ -276,6 +276,25 @@ export const CreateCourseResponse = zod.object({
 
 
 /**
+ * @summary List confirmed and waitlisted members for an accessible course
+ */
+export const ListCourseBookingsParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ListCourseBookingsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "memberId": zod.number().int(),
+  "memberName": zod.string(),
+  "status": zod.enum(['confirmed', 'waitlisted']),
+  "waitlistPosition": zod.number().int().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListCourseBookingsResponse = zod.array(ListCourseBookingsResponseItem)
+
+
+/**
  * @summary Book a member into an accessible course or join its waitlist
  */
 export const CreateStaffCourseBookingParams = zod.object({
@@ -292,6 +311,42 @@ export const CreateStaffCourseBookingResponse = zod.object({
   "memberId": zod.number().int(),
   "status": zod.enum(['confirmed', 'waitlisted', 'cancelled']),
   "waitlistPosition": zod.number().int().nullable()
+})
+
+
+/**
+ * @summary Cancel a member booking as an authorized studio manager
+ */
+export const CancelStaffCourseBookingParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "memberId": zod.coerce.number().int()
+})
+
+export const CancelStaffCourseBookingBody = zod.object({
+  "expectedStatus": zod.enum(['confirmed', 'waitlisted'])
+})
+
+export const CancelStaffCourseBookingResponse = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "memberId": zod.number().int(),
+  "status": zod.enum(['confirmed', 'waitlisted', 'cancelled']),
+  "waitlistPosition": zod.number().int().nullable()
+})
+
+
+/**
+ * @summary Generate a one-use member onboarding link
+ */
+export const CreateMemberInvitationParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const CreateMemberInvitationResponse = zod.object({
+  "inviteUrl": zod.string(),
+  "expiresAt": zod.coerce.date(),
+  "memberName": zod.string(),
+  "memberEmail": zod.string().email()
 })
 
 
@@ -397,6 +452,82 @@ export const ClaimMembershipResponse = zod.object({
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
   "upcomingBookings": zod.number().int()
+})
+
+
+/**
+ * @summary Link a membership using a one-use invitation and verified email
+ */
+export const acceptMemberInvitationBodyTokenMin = 32;
+export const acceptMemberInvitationBodyTokenMax = 128;
+
+
+
+export const AcceptMemberInvitationBody = zod.object({
+  "token": zod.string().min(acceptMemberInvitationBodyTokenMin).max(acceptMemberInvitationBodyTokenMax)
+})
+
+export const AcceptMemberInvitationResponse = zod.object({
+  "member": zod.union([zod.object({
+  "id": zod.number().int(),
+  "fullName": zod.string(),
+  "email": zod.string().email().nullable(),
+  "phone": zod.string().nullable(),
+  "membershipType": zod.string(),
+  "status": zod.enum(['active', 'trial', 'paused']),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "joinedAt": zod.coerce.date(),
+  "lastCheckIn": zod.coerce.date().nullable()
+}),zod.null()]),
+  "checkInCount": zod.number().int(),
+  "coursesEnabled": zod.boolean(),
+  "checkInsEnabled": zod.boolean(),
+  "nextCourse": zod.union([zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
+  "waitlistPosition": zod.number().int().nullable()
+}),zod.null()]),
+  "upcomingBookings": zod.number().int()
+})
+
+
+/**
+ * @summary Recent waitlist promotion notifications for the signed-in member
+ */
+export const ListMemberNotificationsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "readAt": zod.coerce.date().nullable()
+})
+export const ListMemberNotificationsResponse = zod.array(ListMemberNotificationsResponseItem)
+
+
+/**
+ * @summary Mark an own notification as read
+ */
+export const MarkMemberNotificationReadParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const MarkMemberNotificationReadResponse = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "readAt": zod.coerce.date().nullable()
 })
 
 

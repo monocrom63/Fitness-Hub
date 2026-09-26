@@ -20,11 +20,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  BookingCancellationInput,
   CheckIn,
   CheckInInput,
   Course,
   CourseBooking,
   CourseInput,
+  CourseRosterBooking,
   Dashboard,
   HealthStatus,
   Invitation,
@@ -36,7 +38,10 @@ import type {
   MemberCourse,
   MemberHome,
   MemberInput,
+  MemberInvitationAcceptInput,
+  MemberInvitationLink,
   MemberLinkInput,
+  MemberNotification,
   MemberUpdate,
   ModuleKey,
   ModuleSetting,
@@ -899,6 +904,83 @@ export const useCreateCourse = <TError = ErrorType<void>,
       return useMutation(getCreateCourseMutationOptions(options));
     }
 
+export const getListCourseBookingsUrl = (id: number,) => {
+
+
+
+
+  return `/api/courses/${id}/bookings`
+}
+
+/**
+ * @summary List confirmed and waitlisted members for an accessible course
+ */
+export const listCourseBookings = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CourseRosterBooking[]> => {
+
+  return customFetch<CourseRosterBooking[]>(getListCourseBookingsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCourseBookingsQueryKey = (id: number,) => {
+    return [
+    `/api/courses/${id}/bookings`
+    ] as const;
+    }
+
+
+export const getListCourseBookingsQueryOptions = <TData = Awaited<ReturnType<typeof listCourseBookings>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourseBookings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCourseBookingsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCourseBookings>>> = ({ signal }) => listCourseBookings(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCourseBookings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCourseBookingsQueryResult = NonNullable<Awaited<ReturnType<typeof listCourseBookings>>>
+export type ListCourseBookingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List confirmed and waitlisted members for an accessible course
+ */
+
+export function useListCourseBookings<TData = Awaited<ReturnType<typeof listCourseBookings>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourseBookings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCourseBookingsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getCreateStaffCourseBookingUrl = (id: number,) => {
 
 
@@ -986,6 +1068,171 @@ export const useCreateStaffCourseBooking = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateStaffCourseBookingMutationOptions(options));
+    }
+
+export const getCancelStaffCourseBookingUrl = (id: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/courses/${id}/bookings/${memberId}`
+}
+
+/**
+ * @summary Cancel a member booking as an authorized studio manager
+ */
+export const cancelStaffCourseBooking = async (id: number,
+    memberId: number,
+    bookingCancellationInput: BookingCancellationInput, options?: Parameters<typeof customFetch>[1]): Promise<CourseBooking> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CourseBooking>(getCancelStaffCourseBookingUrl(id,memberId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bookingCancellationInput)
+  }
+);}
+
+
+
+
+
+export const getCancelStaffCourseBookingMutationKey = () => ['cancelStaffCourseBooking'] as const;
+
+export const getCancelStaffCourseBookingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelStaffCourseBooking>>, TError,CancelStaffCourseBookingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelStaffCourseBooking>>, TError,CancelStaffCourseBookingMutationVariables, TContext> => {
+
+const mutationKey = getCancelStaffCourseBookingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelStaffCourseBooking>>, CancelStaffCourseBookingMutationVariables> = (props) => {
+          const {id,memberId,data} = props ?? {};
+
+          return  cancelStaffCourseBooking(id,memberId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelStaffCourseBookingMutationResult = NonNullable<Awaited<ReturnType<typeof cancelStaffCourseBooking>>>
+    export type CancelStaffCourseBookingMutationBody = BodyType<BookingCancellationInput>
+    export type CancelStaffCourseBookingMutationError = ErrorType<void>
+    export type CancelStaffCourseBookingMutationVariables = {id: number;memberId: number;data: BodyType<BookingCancellationInput>}
+
+    /**
+ * @summary Cancel a member booking as an authorized studio manager
+ */
+export const useCancelStaffCourseBooking = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelStaffCourseBooking>>, TError,CancelStaffCourseBookingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelStaffCourseBooking>>,
+        TError,
+        CancelStaffCourseBookingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelStaffCourseBookingMutationOptions(options));
+    }
+
+export const getCreateMemberInvitationUrl = (id: number,) => {
+
+
+
+
+  return `/api/members/${id}/invite`
+}
+
+/**
+ * @summary Generate a one-use member onboarding link
+ */
+export const createMemberInvitation = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<MemberInvitationLink> => {
+
+  return customFetch<MemberInvitationLink>(getCreateMemberInvitationUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateMemberInvitationMutationKey = () => ['createMemberInvitation'] as const;
+
+export const getCreateMemberInvitationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMemberInvitation>>, TError,CreateMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMemberInvitation>>, TError,CreateMemberInvitationMutationVariables, TContext> => {
+
+const mutationKey = getCreateMemberInvitationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMemberInvitation>>, CreateMemberInvitationMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  createMemberInvitation(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMemberInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof createMemberInvitation>>>
+
+    export type CreateMemberInvitationMutationError = ErrorType<void>
+    export type CreateMemberInvitationMutationVariables = {id: number}
+
+    /**
+ * @summary Generate a one-use member onboarding link
+ */
+export const useCreateMemberInvitation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMemberInvitation>>, TError,CreateMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMemberInvitation>>,
+        TError,
+        CreateMemberInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateMemberInvitationMutationOptions(options));
     }
 
 export const getListModulesUrl = () => {
@@ -1317,6 +1564,245 @@ export const useClaimMembership = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getClaimMembershipMutationOptions(options));
+    }
+
+export const getAcceptMemberInvitationUrl = () => {
+
+
+
+
+  return `/api/member/invitations/accept`
+}
+
+/**
+ * @summary Link a membership using a one-use invitation and verified email
+ */
+export const acceptMemberInvitation = async (memberInvitationAcceptInput: MemberInvitationAcceptInput, options?: Parameters<typeof customFetch>[1]): Promise<MemberHome> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MemberHome>(getAcceptMemberInvitationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(memberInvitationAcceptInput)
+  }
+);}
+
+
+
+
+
+export const getAcceptMemberInvitationMutationKey = () => ['acceptMemberInvitation'] as const;
+
+export const getAcceptMemberInvitationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptMemberInvitation>>, TError,AcceptMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptMemberInvitation>>, TError,AcceptMemberInvitationMutationVariables, TContext> => {
+
+const mutationKey = getAcceptMemberInvitationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptMemberInvitation>>, AcceptMemberInvitationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  acceptMemberInvitation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptMemberInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof acceptMemberInvitation>>>
+    export type AcceptMemberInvitationMutationBody = BodyType<MemberInvitationAcceptInput>
+    export type AcceptMemberInvitationMutationError = ErrorType<void>
+    export type AcceptMemberInvitationMutationVariables = {data: BodyType<MemberInvitationAcceptInput>}
+
+    /**
+ * @summary Link a membership using a one-use invitation and verified email
+ */
+export const useAcceptMemberInvitation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptMemberInvitation>>, TError,AcceptMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptMemberInvitation>>,
+        TError,
+        AcceptMemberInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAcceptMemberInvitationMutationOptions(options));
+    }
+
+export const getListMemberNotificationsUrl = () => {
+
+
+
+
+  return `/api/member/notifications`
+}
+
+/**
+ * @summary Recent waitlist promotion notifications for the signed-in member
+ */
+export const listMemberNotifications = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberNotification[]> => {
+
+  return customFetch<MemberNotification[]>(getListMemberNotificationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMemberNotificationsQueryKey = () => {
+    return [
+    `/api/member/notifications`
+    ] as const;
+    }
+
+
+export const getListMemberNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listMemberNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMemberNotificationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberNotifications>>> = ({ signal }) => listMemberNotifications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMemberNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof listMemberNotifications>>>
+export type ListMemberNotificationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent waitlist promotion notifications for the signed-in member
+ */
+
+export function useListMemberNotifications<TData = Awaited<ReturnType<typeof listMemberNotifications>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMemberNotificationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarkMemberNotificationReadUrl = (id: number,) => {
+
+
+
+
+  return `/api/member/notifications/${id}/read`
+}
+
+/**
+ * @summary Mark an own notification as read
+ */
+export const markMemberNotificationRead = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<MemberNotification> => {
+
+  return customFetch<MemberNotification>(getMarkMemberNotificationReadUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkMemberNotificationReadMutationKey = () => ['markMemberNotificationRead'] as const;
+
+export const getMarkMemberNotificationReadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markMemberNotificationRead>>, TError,MarkMemberNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markMemberNotificationRead>>, TError,MarkMemberNotificationReadMutationVariables, TContext> => {
+
+const mutationKey = getMarkMemberNotificationReadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markMemberNotificationRead>>, MarkMemberNotificationReadMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  markMemberNotificationRead(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkMemberNotificationReadMutationResult = NonNullable<Awaited<ReturnType<typeof markMemberNotificationRead>>>
+
+    export type MarkMemberNotificationReadMutationError = ErrorType<void>
+    export type MarkMemberNotificationReadMutationVariables = {id: number}
+
+    /**
+ * @summary Mark an own notification as read
+ */
+export const useMarkMemberNotificationRead = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markMemberNotificationRead>>, TError,MarkMemberNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markMemberNotificationRead>>,
+        TError,
+        MarkMemberNotificationReadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkMemberNotificationReadMutationOptions(options));
     }
 
 export const getListMemberCoursesUrl = () => {

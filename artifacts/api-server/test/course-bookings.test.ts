@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { eq } from "drizzle-orm";
 import {
-  courseBookingsTable, coursesTable, db, membersTable, organizationsTable, pool, studiosTable,
+  courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable,
+  organizationsTable, pool, studiosTable,
 } from "@workspace/db";
 import { bookCourse, cancelCourseBooking, BookingError } from "../src/lib/course-bookings";
 
@@ -54,12 +55,42 @@ test("capacity, duplicate prevention, waitlist promotion and studio isolation", 
       const [promoted] = await tx.select().from(courseBookingsTable)
         .where(eq(courseBookingsTable.id, eligibleWaiting.id));
       assert.equal(promoted.status, "confirmed");
+      const firstNotifications = await tx.select().from(memberNotificationsTable)
+        .where(eq(memberNotificationsTable.memberId, third.id));
+      assert.equal(firstNotifications.length, 1);
+      assert.equal(firstNotifications[0].bookingId, eligibleWaiting.id);
+      await assert.rejects(
+        cancelCourseBooking(course.id, third.id, database, { expectedStatus: "waitlisted" }),
+        (error) => error instanceof BookingError && error.status === 409,
+      );
+      const skippedNotifications = await tx.select().from(memberNotificationsTable)
+        .where(eq(memberNotificationsTable.memberId, second.id));
+      assert.equal(skippedNotifications.length, 0);
       const [full] = await tx.select().from(coursesTable).where(eq(coursesTable.id, course.id));
       assert.equal(full.enrolled, 1);
       await cancelCourseBooking(course.id, third.id, database);
       const [open] = await tx.select().from(coursesTable).where(eq(coursesTable.id, course.id));
       assert.equal(open.enrolled, 0);
       assert.equal(open.status, "scheduled");
+      await bookCourse(course.id, first.id, database);
+      await bookCourse(course.id, third.id, database);
+      await cancelCourseBooking(course.id, first.id, database);
+      const secondNotifications = await tx.select().from(memberNotificationsTable)
+        .where(eq(memberNotificationsTable.memberId, third.id));
+      assert.equal(secondNotifications.length, 2, "a later, separate promotion is a new notification");
+      await bookCourse(course.id, first.id, database);
+      await tx.update(coursesTable).set({ status: "cancelled" })
+        .where(eq(coursesTable.id, course.id));
+      await cancelCourseBooking(course.id, third.id, database);
+      const [notPromoted] = await tx.select().from(courseBookingsTable)
+        .where(eq(courseBookingsTable.id, booked.id));
+      assert.equal(notPromoted.status, "cancelled");
+      const staleNotifications = await tx.select().from(memberNotificationsTable)
+        .where(eq(memberNotificationsTable.memberId, third.id));
+      assert.equal(staleNotifications.some(item => item.title === "Dein Kursplatz ist bestätigt"), false);
+      const falseNotifications = await tx.select().from(memberNotificationsTable)
+        .where(eq(memberNotificationsTable.memberId, first.id));
+      assert.equal(falseNotifications.length, 0);
       throw rollback;
     });
   } catch (error) {

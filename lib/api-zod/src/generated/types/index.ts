@@ -6,12 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './bookingCancellationInput';
+export * from './bookingCancellationInputExpectedStatus';
 export * from './checkIn';
 export * from './checkInInput';
 export * from './course';
 export * from './courseBooking';
 export * from './courseBookingStatus';
 export * from './courseInput';
+export * from './courseRosterBooking';
+export * from './courseRosterBookingStatus';
 export * from './courseStatus';
 export * from './dashboard';
 export * from './dashboardActivity';
@@ -30,7 +34,10 @@ export * from './memberCourse';
 export * from './memberCourseBookingStatus';
 export * from './memberHome';
 export * from './memberInput';
+export * from './memberInvitationAcceptInput';
+export * from './memberInvitationLink';
 export * from './memberLinkInput';
+export * from './memberNotification';
 export * from './memberStatus';
 export * from './memberUpdate';
 export * from './moduleKey';

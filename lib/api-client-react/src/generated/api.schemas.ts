@@ -219,6 +219,18 @@ export interface StaffBookingInput {
   memberId: number;
 }
 
+export type BookingCancellationInputExpectedStatus = typeof BookingCancellationInputExpectedStatus[keyof typeof BookingCancellationInputExpectedStatus];
+
+
+export const BookingCancellationInputExpectedStatus = {
+  confirmed: 'confirmed',
+  waitlisted: 'waitlisted',
+} as const;
+
+export interface BookingCancellationInput {
+  expectedStatus: BookingCancellationInputExpectedStatus;
+}
+
 export type CourseBookingStatus = typeof CourseBookingStatus[keyof typeof CourseBookingStatus];
 
 
@@ -235,6 +247,50 @@ export interface CourseBooking {
   status: CourseBookingStatus;
   /** @nullable */
   waitlistPosition: number | null;
+}
+
+export type CourseRosterBookingStatus = typeof CourseRosterBookingStatus[keyof typeof CourseRosterBookingStatus];
+
+
+export const CourseRosterBookingStatus = {
+  confirmed: 'confirmed',
+  waitlisted: 'waitlisted',
+} as const;
+
+export interface CourseRosterBooking {
+  id: number;
+  courseId: number;
+  memberId: number;
+  memberName: string;
+  status: CourseRosterBookingStatus;
+  /** @nullable */
+  waitlistPosition: number | null;
+  createdAt: string;
+}
+
+export interface MemberInvitationLink {
+  inviteUrl: string;
+  expiresAt: string;
+  memberName: string;
+  memberEmail: string;
+}
+
+export interface MemberInvitationAcceptInput {
+  /**
+     * @minLength 32
+     * @maxLength 128
+     */
+  token: string;
+}
+
+export interface MemberNotification {
+  id: number;
+  courseId: number;
+  title: string;
+  body: string;
+  createdAt: string;
+  /** @nullable */
+  readAt: string | null;
 }
 
 export type ModuleKey = typeof ModuleKey[keyof typeof ModuleKey];

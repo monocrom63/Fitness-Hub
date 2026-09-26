@@ -5,9 +5,12 @@ import {
   CancelMemberCourseParams, CancelMemberCourseResponse,
   ClaimMembershipBody, ClaimMembershipResponse,
   GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesResponse,
+  ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
+  MarkMemberNotificationReadResponse,
 } from "@workspace/api-zod";
 import {
-  checkInsTable, courseBookingsTable, coursesTable, db, membersTable, studiosTable,
+  checkInsTable, courseBookingsTable, coursesTable, db, memberNotificationsTable,
+  membersTable, studiosTable,
 } from "@workspace/db";
 import { BookingError, bookCourse, cancelCourseBooking } from "../lib/course-bookings";
 import { getClerkIdentity, getRequestUserId } from "../lib/fiudia-access";
@@ -16,7 +19,7 @@ import { isModuleEnabled } from "../lib/module-access";
 
 const router: IRouter = Router();
 
-async function linkedMember(userId: string) {
+export async function linkedMember(userId: string) {
   const [member] = await db.select({
     id: membersTable.id,
     fullName: membersTable.fullName,
@@ -77,7 +80,7 @@ async function memberCourses(member: LinkedMember) {
   });
 }
 
-async function memberHome(member: LinkedMember | null) {
+export async function memberHome(member: LinkedMember | null) {
   if (!member) return {
     member: null, checkInCount: 0, nextCourse: null, upcomingBookings: 0,
     coursesEnabled: false, checkInsEnabled: false,
@@ -209,6 +212,53 @@ router.get("/member/check-ins", async (req, res): Promise<void> => {
     .where(eq(checkInsTable.memberId, member.id))
     .orderBy(desc(checkInsTable.checkedInAt)).limit(50);
   res.json(ListMemberCheckInsResponse.parse(checkIns));
+});
+
+router.get("/member/notifications", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Mitgliedschaft zuerst verbinden." }); return; }
+  if (!(await isModuleEnabled(member.organizationId, "courses"))) {
+    res.status(404).json({ error: "Kurse sind nicht verfügbar." }); return;
+  }
+  const notifications = await db.select({
+    id: memberNotificationsTable.id,
+    courseId: memberNotificationsTable.courseId,
+    title: memberNotificationsTable.title,
+    body: memberNotificationsTable.body,
+    createdAt: memberNotificationsTable.createdAt,
+    readAt: memberNotificationsTable.readAt,
+  }).from(memberNotificationsTable)
+    .where(eq(memberNotificationsTable.memberId, member.id))
+    .orderBy(desc(memberNotificationsTable.createdAt), desc(memberNotificationsTable.id))
+    .limit(50);
+  res.json(ListMemberNotificationsResponse.parse(notifications));
+});
+
+router.patch("/member/notifications/:id/read", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Mitgliedschaft zuerst verbinden." }); return; }
+  if (!(await isModuleEnabled(member.organizationId, "courses"))) {
+    res.status(404).json({ error: "Kurse sind nicht verfügbar." }); return;
+  }
+  const params = MarkMemberNotificationReadParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: "Ungültige Mitteilung." }); return; }
+  const [notification] = await db.update(memberNotificationsTable)
+    .set({ readAt: new Date() })
+    .where(and(
+      eq(memberNotificationsTable.id, params.data.id),
+      eq(memberNotificationsTable.memberId, member.id),
+    ))
+    .returning({
+      id: memberNotificationsTable.id, courseId: memberNotificationsTable.courseId,
+      title: memberNotificationsTable.title, body: memberNotificationsTable.body,
+      createdAt: memberNotificationsTable.createdAt, readAt: memberNotificationsTable.readAt,
+    });
+  if (!notification) { res.status(404).json({ error: "Mitteilung nicht gefunden." }); return; }
+  res.json(MarkMemberNotificationReadResponse.parse(notification));
 });
 
 export default router;
