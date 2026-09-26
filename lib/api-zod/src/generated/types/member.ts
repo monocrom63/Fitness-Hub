@@ -10,7 +10,8 @@ import type { MemberStatus } from './memberStatus';
 export interface Member {
   id: number;
   fullName: string;
-  email: string;
+  /** @nullable */
+  email: string | null;
   /** @nullable */
   phone: string | null;
   membershipType: string;

@@ -6,7 +6,7 @@ import {
   getGetDashboardQueryKey, getListPulseQueryKey, getListStudiosQueryKey, useCreatePulseMessage,
   useGetDashboard, useListPulse, useListStudios, useMarkPulseRead,
 } from '@workspace/api-client-react';
-import type { Me, PulseAudience, PulseMessage, PulsePriority } from '@workspace/api-client-react';
+import type { Me, ModuleKey, ModuleSetting, PulseAudience, PulseMessage, PulsePriority } from '@workspace/api-client-react';
 
 const berlin = 'Europe/Berlin';
 const berlinDate = new Intl.DateTimeFormat('de-DE', { timeZone: berlin, weekday: 'long', day: 'numeric', month: 'long' });
@@ -39,9 +39,13 @@ function Skeleton({ count = 2 }: { count?: number }) {
   return <div className="pulse-skeleton" aria-label="Inhalte werden geladen" role="status">{Array.from({ length: count }, (_, index) => <i key={index} />)}</div>;
 }
 
-export function TodayPage({ me }: { me: Me }) {
+function enabled(modules: ModuleSetting[], key: ModuleKey) {
+  return modules.some(module => module.key === key && module.enabled);
+}
+
+export function TodayPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const dashboard = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey(), refetchInterval: 60000 } });
-  const pulse = useListPulse({ query: { queryKey: getListPulseQueryKey(), refetchInterval: 60000 } });
+  const pulse = useListPulse({ query: { queryKey: getListPulseQueryKey(), enabled: enabled(modules, 'pulse'), refetchInterval: 60000 } });
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 60000); return () => window.clearInterval(timer); }, []);
 
@@ -51,7 +55,7 @@ export function TodayPage({ me }: { me: Me }) {
   const data = dashboard.data;
   const part = daypart(now);
   const today = berlinDay.format(now);
-  const todaysCourses = data.courses.filter(course => berlinDay.format(new Date(course.startsAt)) === today).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const todaysCourses = enabled(modules, 'courses') ? data.courses.filter(course => berlinDay.format(new Date(course.startsAt)) === today).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()) : [];
   const upcoming = todaysCourses.find(course => new Date(course.startsAt).getTime() >= now.getTime());
   const unread = (pulse.data || []).filter(message => !message.isRead);
   const lead = me.role === 'district_manager'
@@ -62,16 +66,25 @@ export function TodayPage({ me }: { me: Me }) {
   const detail = me.role === 'district_manager'
     ? 'Kennzahlen, Aktivitäten und Nachrichten aus deinem Verantwortungsbereich.'
     : me.role === 'studio_manager'
-      ? 'Kurse, Entwicklungen und Team-Informationen an einem Ort.'
-      : upcoming ? `${berlinTime.format(new Date(upcoming.startsAt))} Uhr · ${upcoming.room} · ${upcoming.instructor}` : 'Kurse, Nachrichten und die nächsten Schritte für deine Schicht.';
+      ? 'Entwicklungen und Informationen an einem Ort.'
+      : upcoming ? `${berlinTime.format(new Date(upcoming.startsAt))} Uhr · ${upcoming.room} · ${upcoming.instructor}` : 'Deine nächsten Schritte für die Schicht.';
+  const focusLink = me.role === 'district_manager' && enabled(modules, 'team') ? '/team' : enabled(modules, 'courses') ? '/courses' : enabled(modules, 'members') ? '/members' : enabled(modules, 'pulse') ? '/pulse' : '/settings';
+  const visibleActivities = data.activities.filter(item => item.category === 'check_in' ? enabled(modules, 'members') : item.category === 'member' || item.category === 'course' || item.category === 'team' ? enabled(modules, item.category === 'member' ? 'members' : item.category === 'course' ? 'courses' : 'team') : true);
+  const visibleMetrics = data.metrics.filter(metric => {
+    const label = metric.label.toLocaleLowerCase('de-DE');
+    if (/mitglied|check.in/.test(label)) return enabled(modules, 'members');
+    if (/kurs|buchung|auslastung/.test(label)) return enabled(modules, 'courses');
+    if (/team|einladung/.test(label)) return enabled(modules, 'team');
+    return true;
+  });
 
   return <div className="today-page">
     <div className="today-intro"><div><div className="eyebrow">Today / {roleName(me)}{me.studioName ? ` / ${me.studioName}` : ''}</div><h1>Guten {part}, {data.userName || me.userName}.</h1><p>Das ist heute für dich wichtig.</p></div><span className="today-date">{berlinDate.format(now)}</span></div>
-    <section className="today-spotlight" aria-label="Dein Fokus heute"><div><div className="eyebrow">{part === 'Morgen' ? 'Der Tag beginnt' : part === 'Tag' ? 'Mitten im Geschehen' : 'Zum Tagesausklang'}</div><h2>{lead}</h2><p>{detail}</p></div><div className="today-spotlight-side">{me.role === 'studio_employee' && upcoming ? <><span>Nächster Kurs</span><strong>{berlinTime.format(new Date(upcoming.startsAt))} Uhr</strong><Link href="/courses">Kursplan öffnen <ArrowRight size={15} /></Link></> : <><span>Dein Arbeitsbereich</span><strong>{me.role === 'district_manager' ? me.organizationName || 'Organisation' : me.studioName || 'Studio'}</strong><Link href={me.role === 'district_manager' ? '/team' : '/courses'}>{me.role === 'district_manager' ? 'Team öffnen' : 'Kurse öffnen'} <ArrowRight size={15} /></Link></>}</div></section>
-    {data.metrics.length > 0 && <section aria-label="Aktuelle Kennzahlen"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Im Studio' : me.role === 'district_manager' ? 'Im Netzwerk' : 'Dein Studio in Zahlen'}</h2><span className="eyebrow">Aktueller Stand</span></div><div className="today-metrics">{data.metrics.map((metric, index) => <div className={`today-metric ${metric.tone}`} key={`${metric.label}-${index}`}><span>{metric.label}</span><strong>{metric.value}</strong>{metric.delta && <small>{metric.delta}</small>}</div>)}</div></section>}
-    <div className="today-columns"><section className="today-column"><div className="today-section-head"><h2>{me.role === 'district_manager' ? 'Kurse im Blick' : 'Heute im Kursplan'}</h2><Link href="/courses">Alle Kurse <ArrowRight size={14} /></Link></div>{todaysCourses.length ? <div className="today-list">{todaysCourses.slice(0, 5).map(course => <div className="today-list-row" key={course.id}><time>{berlinTime.format(new Date(course.startsAt))}</time><div><strong>{course.title}</strong><small>{course.studioName && me.role === 'district_manager' ? `${course.studioName} · ` : ''}{course.instructor} · {course.room}</small></div><span className="pill pill-scheduled">{course.enrolled}/{course.capacity}</span></div>)}</div> : <p className="today-quiet">Für heute sind keine Kurse eingetragen.</p>}</section>
-      <section className="today-column"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Was zuletzt passiert ist' : 'Aktuelles im Arbeitsbereich'}</h2></div>{data.activities.length ? <div className="today-list">{data.activities.slice(0, 4).map(item => <div className="today-list-row" key={item.id}><span className="today-activity-mark"><Activity size={15} /></span><div><strong>{item.title}</strong><small>{item.description} · {dateTime(item.happenedAt)}</small></div></div>)}</div> : <p className="today-quiet">Noch keine Aktivitäten in deinem Arbeitsbereich.</p>}</section></div>
-    <section className="today-pulse"><div className="today-section-head"><h2>Pulse {unread.length > 0 && <span className="pulse-unread" aria-label={`${unread.length} ungelesen`} />}</h2><Link href="/pulse">Alle Nachrichten <ArrowRight size={14} /></Link></div>{pulse.isLoading ? <Skeleton count={1} /> : pulse.isError ? <StatusError label="Pulse konnte nicht geladen werden." retry={() => pulse.refetch()} /> : pulse.data?.length ? <div className="today-pulse-items">{[...pulse.data].sort((a, b) => Number(a.isRead) - Number(b.isRead) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 3).map(message => <Link href="/pulse" className="today-pulse-item" key={message.id}><small>{!message.isRead && <span className="pulse-unread" />} {priorityName(message.priority)} · {message.studioName || 'Organisation'}</small><strong>{message.title}</strong><small>{message.authorName} · {dateTime(message.createdAt)}</small></Link>)}</div> : <p className="today-quiet">Noch keine Nachrichten für deinen Arbeitsbereich.</p>}</section>
+    <section className="today-spotlight" aria-label="Dein Fokus heute"><div><div className="eyebrow">{part === 'Morgen' ? 'Der Tag beginnt' : part === 'Tag' ? 'Mitten im Geschehen' : 'Zum Tagesausklang'}</div><h2>{lead}</h2><p>{detail}</p></div><div className="today-spotlight-side">{me.role === 'studio_employee' && upcoming ? <><span>Nächster Kurs</span><strong>{berlinTime.format(new Date(upcoming.startsAt))} Uhr</strong><Link href="/courses">Kursplan öffnen <ArrowRight size={15} /></Link></> : <><span>Dein Arbeitsbereich</span><strong>{me.role === 'district_manager' ? me.organizationName || 'Organisation' : me.studioName || 'Studio'}</strong><Link href={focusLink}>{focusLink === '/team' ? 'Team' : focusLink === '/courses' ? 'Kurse' : focusLink === '/members' ? 'Mitglieder' : focusLink === '/pulse' ? 'Pulse' : 'Einstellungen'} öffnen <ArrowRight size={15} /></Link></>}</div></section>
+    {visibleMetrics.length > 0 && <section aria-label="Aktuelle Kennzahlen"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Im Studio' : me.role === 'district_manager' ? 'Im Netzwerk' : 'Dein Studio in Zahlen'}</h2><span className="eyebrow">Aktueller Stand</span></div><div className="today-metrics">{visibleMetrics.map((metric, index) => <div className={`today-metric ${metric.tone}`} key={`${metric.label}-${index}`}><span>{metric.label}</span><strong>{metric.value}</strong>{metric.delta && <small>{metric.delta}</small>}</div>)}</div></section>}
+    <div className="today-columns">{enabled(modules, 'courses') && <section className="today-column"><div className="today-section-head"><h2>{me.role === 'district_manager' ? 'Kurse im Blick' : 'Heute im Kursplan'}</h2><Link href="/courses">Alle Kurse <ArrowRight size={14} /></Link></div>{todaysCourses.length ? <div className="today-list">{todaysCourses.slice(0, 5).map(course => <div className="today-list-row" key={course.id}><time>{berlinTime.format(new Date(course.startsAt))}</time><div><strong>{course.title}</strong><small>{course.studioName && me.role === 'district_manager' ? `${course.studioName} · ` : ''}{course.instructor} · {course.room}</small></div><span className="pill pill-scheduled">{course.enrolled}/{course.capacity}</span></div>)}</div> : <p className="today-quiet">Für heute sind keine Kurse eingetragen.</p>}</section>}
+      <section className="today-column"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Was zuletzt passiert ist' : 'Aktuelles im Arbeitsbereich'}</h2></div>{visibleActivities.length ? <div className="today-list">{visibleActivities.slice(0, 4).map(item => <div className="today-list-row" key={item.id}><span className="today-activity-mark"><Activity size={15} /></span><div><strong>{item.title}</strong><small>{item.description} · {dateTime(item.happenedAt)}</small></div></div>)}</div> : <p className="today-quiet">Noch keine Aktivitäten in deinem Arbeitsbereich.</p>}</section></div>
+    {enabled(modules, 'pulse') && <section className="today-pulse"><div className="today-section-head"><h2>Pulse {unread.length > 0 && <span className="pulse-unread" aria-label={`${unread.length} ungelesen`} />}</h2><Link href="/pulse">Alle Nachrichten <ArrowRight size={14} /></Link></div>{pulse.isLoading ? <Skeleton count={1} /> : pulse.isError ? <StatusError label="Pulse konnte nicht geladen werden." retry={() => pulse.refetch()} /> : pulse.data?.length ? <div className="today-pulse-items">{[...pulse.data].sort((a, b) => Number(a.isRead) - Number(b.isRead) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 3).map(message => <Link href="/pulse" className="today-pulse-item" key={message.id}><small>{!message.isRead && <span className="pulse-unread" />} {priorityName(message.priority)} · {message.studioName || 'Organisation'}</small><strong>{message.title}</strong><small>{message.authorName} · {dateTime(message.createdAt)}</small></Link>)}</div> : <p className="today-quiet">Noch keine Nachrichten für deinen Arbeitsbereich.</p>}</section>}
   </div>;
 }
 
@@ -120,7 +133,7 @@ export function PulsePage({ me }: { me: Me }) {
   </div>;
 }
 
-export function ActionStrip({ me }: { me: Me }) {
+export function ActionStrip({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 60000); return () => window.clearInterval(timer); }, []);
@@ -133,5 +146,7 @@ export function ActionStrip({ me }: { me: Me }) {
     : part === 'Abend'
       ? [{ href: '/dashboard', label: 'Tagesstand ansehen', icon: Activity }, { href: '/pulse', label: 'Pulse lesen', icon: Bell }, { href: '/members', label: 'Check-in-Liste öffnen', icon: Check }]
       : [{ href: '/members', label: 'Check-in-Liste öffnen', icon: Check }, { href: '/courses', label: 'Kursplan öffnen', icon: CalendarDays }, { href: '/pulse', label: 'Pulse lesen', icon: Bell }];
-  return <div className="action-strip">{open && <nav className="action-strip-menu" aria-label="Schnellaktionen"><span><Clock3 size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {part === 'Morgen' ? 'Für deinen Morgen' : part === 'Tag' ? 'Für deinen Tag' : 'Für deinen Abend'}</span>{actions.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setOpen(false)} data-testid={`link-action-${href.split('?')[0].slice(1)}`}><Icon size={17} />{label}<ArrowRight size={14} style={{ marginLeft: 'auto' }} /></Link>)}</nav>}<button className="action-strip-trigger" aria-expanded={open} aria-label={open ? 'Schnellaktionen schließen' : 'Schnellaktionen öffnen'} onClick={() => setOpen(value => !value)} data-testid="button-action-strip"><Plus size={19} /> Schnellaktionen</button></div>;
+  const available = actions.filter(action => action.href === '/dashboard' || enabled(modules, action.href.split('?')[0].slice(1) as ModuleKey));
+  if (!available.length) return null;
+  return <div className="action-strip">{open && <nav className="action-strip-menu" aria-label="Schnellaktionen"><span><Clock3 size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> {part === 'Morgen' ? 'Für deinen Morgen' : part === 'Tag' ? 'Für deinen Tag' : 'Für deinen Abend'}</span>{available.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setOpen(false)} data-testid={`link-action-${href.split('?')[0].slice(1)}`}><Icon size={17} />{label}<ArrowRight size={14} style={{ marginLeft: 'auto' }} /></Link>)}</nav>}<button className="action-strip-trigger" aria-expanded={open} aria-label={open ? 'Schnellaktionen schließen' : 'Schnellaktionen öffnen'} onClick={() => setOpen(value => !value)} data-testid="button-action-strip"><Plus size={19} /> Schnellaktionen</button></div>;
 }

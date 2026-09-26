@@ -136,7 +136,8 @@ export interface Dashboard {
 export interface Member {
   id: number;
   fullName: string;
-  email: string;
+  /** @nullable */
+  email: string | null;
   /** @nullable */
   phone: string | null;
   membershipType: string;
@@ -212,6 +213,94 @@ export interface CourseInput {
      * @maxLength 80
      */
   room: string;
+}
+
+export interface StaffBookingInput {
+  memberId: number;
+}
+
+export type CourseBookingStatus = typeof CourseBookingStatus[keyof typeof CourseBookingStatus];
+
+
+export const CourseBookingStatus = {
+  confirmed: 'confirmed',
+  waitlisted: 'waitlisted',
+  cancelled: 'cancelled',
+} as const;
+
+export interface CourseBooking {
+  id: number;
+  courseId: number;
+  memberId: number;
+  status: CourseBookingStatus;
+  /** @nullable */
+  waitlistPosition: number | null;
+}
+
+export type ModuleKey = typeof ModuleKey[keyof typeof ModuleKey];
+
+
+export const ModuleKey = {
+  members: 'members',
+  courses: 'courses',
+  pulse: 'pulse',
+  team: 'team',
+} as const;
+
+export interface ModuleSetting {
+  key: ModuleKey;
+  title: string;
+  enabled: boolean;
+}
+
+export interface ModuleUpdate {
+  enabled: boolean;
+}
+
+export interface MemberLinkInput {
+  memberId: number;
+}
+
+/**
+ * @nullable
+ */
+export type MemberCourseBookingStatus = typeof MemberCourseBookingStatus[keyof typeof MemberCourseBookingStatus] | null;
+
+
+export const MemberCourseBookingStatus = {
+  confirmed: 'confirmed',
+  waitlisted: 'waitlisted',
+} as const;
+
+export interface MemberCourse {
+  id: number;
+  title: string;
+  instructor: string;
+  studioName: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  enrolled: number;
+  room: string;
+  /** @nullable */
+  bookingStatus: MemberCourseBookingStatus;
+  /** @nullable */
+  waitlistPosition: number | null;
+}
+
+export interface MemberHome {
+  member: Member | null;
+  checkInCount: number;
+  coursesEnabled: boolean;
+  checkInsEnabled: boolean;
+  nextCourse: MemberCourse | null;
+  upcomingBookings: number;
+}
+
+export interface MemberCheckIn {
+  id: number;
+  studioName: string;
+  checkedInAt: string;
 }
 
 export interface CheckInInput {

@@ -23,6 +23,7 @@ import type {
   CheckIn,
   CheckInInput,
   Course,
+  CourseBooking,
   CourseInput,
   Dashboard,
   HealthStatus,
@@ -31,12 +32,20 @@ import type {
   ListMembersParams,
   Me,
   Member,
+  MemberCheckIn,
+  MemberCourse,
+  MemberHome,
   MemberInput,
+  MemberLinkInput,
   MemberUpdate,
+  ModuleKey,
+  ModuleSetting,
+  ModuleUpdate,
   OnboardingInput,
   PulseInput,
   PulseMessage,
   PulseRead,
+  StaffBookingInput,
   StudioSummary
 } from './api.schemas';
 
@@ -889,6 +898,728 @@ export const useCreateCourse = <TError = ErrorType<void>,
       > => {
       return useMutation(getCreateCourseMutationOptions(options));
     }
+
+export const getCreateStaffCourseBookingUrl = (id: number,) => {
+
+
+
+
+  return `/api/courses/${id}/bookings`
+}
+
+/**
+ * @summary Book a member into an accessible course or join its waitlist
+ */
+export const createStaffCourseBooking = async (id: number,
+    staffBookingInput: StaffBookingInput, options?: Parameters<typeof customFetch>[1]): Promise<CourseBooking> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CourseBooking>(getCreateStaffCourseBookingUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(staffBookingInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStaffCourseBookingMutationKey = () => ['createStaffCourseBooking'] as const;
+
+export const getCreateStaffCourseBookingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffCourseBooking>>, TError,CreateStaffCourseBookingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStaffCourseBooking>>, TError,CreateStaffCourseBookingMutationVariables, TContext> => {
+
+const mutationKey = getCreateStaffCourseBookingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStaffCourseBooking>>, CreateStaffCourseBookingMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createStaffCourseBooking(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStaffCourseBookingMutationResult = NonNullable<Awaited<ReturnType<typeof createStaffCourseBooking>>>
+    export type CreateStaffCourseBookingMutationBody = BodyType<StaffBookingInput>
+    export type CreateStaffCourseBookingMutationError = ErrorType<void>
+    export type CreateStaffCourseBookingMutationVariables = {id: number;data: BodyType<StaffBookingInput>}
+
+    /**
+ * @summary Book a member into an accessible course or join its waitlist
+ */
+export const useCreateStaffCourseBooking = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffCourseBooking>>, TError,CreateStaffCourseBookingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStaffCourseBooking>>,
+        TError,
+        CreateStaffCourseBookingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateStaffCourseBookingMutationOptions(options));
+    }
+
+export const getListModulesUrl = () => {
+
+
+
+
+  return `/api/modules`
+}
+
+/**
+ * @summary List organization modules for navigation and permissions
+ */
+export const listModules = async ( options?: Parameters<typeof customFetch>[1]): Promise<ModuleSetting[]> => {
+
+  return customFetch<ModuleSetting[]>(getListModulesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListModulesQueryKey = () => {
+    return [
+    `/api/modules`
+    ] as const;
+    }
+
+
+export const getListModulesQueryOptions = <TData = Awaited<ReturnType<typeof listModules>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listModules>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListModulesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listModules>>> = ({ signal }) => listModules({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listModules>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListModulesQueryResult = NonNullable<Awaited<ReturnType<typeof listModules>>>
+export type ListModulesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List organization modules for navigation and permissions
+ */
+
+export function useListModules<TData = Awaited<ReturnType<typeof listModules>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listModules>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListModulesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateModuleUrl = (key: ModuleKey,) => {
+
+
+
+
+  return `/api/modules/${key}`
+}
+
+/**
+ * @summary Enable or disable an organization module as district manager
+ */
+export const updateModule = async (key: ModuleKey,
+    moduleUpdate: ModuleUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ModuleSetting> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ModuleSetting>(getUpdateModuleUrl(key),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moduleUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateModuleMutationKey = () => ['updateModule'] as const;
+
+export const getUpdateModuleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateModule>>, TError,UpdateModuleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateModule>>, TError,UpdateModuleMutationVariables, TContext> => {
+
+const mutationKey = getUpdateModuleMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateModule>>, UpdateModuleMutationVariables> = (props) => {
+          const {key,data} = props ?? {};
+
+          return  updateModule(key,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateModuleMutationResult = NonNullable<Awaited<ReturnType<typeof updateModule>>>
+    export type UpdateModuleMutationBody = BodyType<ModuleUpdate>
+    export type UpdateModuleMutationError = ErrorType<void>
+    export type UpdateModuleMutationVariables = {key: ModuleKey;data: BodyType<ModuleUpdate>}
+
+    /**
+ * @summary Enable or disable an organization module as district manager
+ */
+export const useUpdateModule = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateModule>>, TError,UpdateModuleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateModule>>,
+        TError,
+        UpdateModuleMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateModuleMutationOptions(options));
+    }
+
+export const getGetMemberHomeUrl = () => {
+
+
+
+
+  return `/api/member/me`
+}
+
+/**
+ * @summary Get the signed-in member's own profile and activity summary
+ */
+export const getMemberHome = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberHome> => {
+
+  return customFetch<MemberHome>(getGetMemberHomeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMemberHomeQueryKey = () => {
+    return [
+    `/api/member/me`
+    ] as const;
+    }
+
+
+export const getGetMemberHomeQueryOptions = <TData = Awaited<ReturnType<typeof getMemberHome>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberHome>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMemberHomeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemberHome>>> = ({ signal }) => getMemberHome({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemberHome>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMemberHomeQueryResult = NonNullable<Awaited<ReturnType<typeof getMemberHome>>>
+export type GetMemberHomeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in member's own profile and activity summary
+ */
+
+export function useGetMemberHome<TData = Awaited<ReturnType<typeof getMemberHome>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberHome>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMemberHomeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getClaimMembershipUrl = () => {
+
+
+
+
+  return `/api/member/claim`
+}
+
+/**
+ * @summary Link a membership to a signed-in, verified matching email account
+ */
+export const claimMembership = async (memberLinkInput: MemberLinkInput, options?: Parameters<typeof customFetch>[1]): Promise<MemberHome> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MemberHome>(getClaimMembershipUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(memberLinkInput)
+  }
+);}
+
+
+
+
+
+export const getClaimMembershipMutationKey = () => ['claimMembership'] as const;
+
+export const getClaimMembershipMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimMembership>>, TError,ClaimMembershipMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimMembership>>, TError,ClaimMembershipMutationVariables, TContext> => {
+
+const mutationKey = getClaimMembershipMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimMembership>>, ClaimMembershipMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimMembership(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimMembershipMutationResult = NonNullable<Awaited<ReturnType<typeof claimMembership>>>
+    export type ClaimMembershipMutationBody = BodyType<MemberLinkInput>
+    export type ClaimMembershipMutationError = ErrorType<void>
+    export type ClaimMembershipMutationVariables = {data: BodyType<MemberLinkInput>}
+
+    /**
+ * @summary Link a membership to a signed-in, verified matching email account
+ */
+export const useClaimMembership = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimMembership>>, TError,ClaimMembershipMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimMembership>>,
+        TError,
+        ClaimMembershipMutationVariables,
+        TContext
+      > => {
+      return useMutation(getClaimMembershipMutationOptions(options));
+    }
+
+export const getListMemberCoursesUrl = () => {
+
+
+
+
+  return `/api/member/courses`
+}
+
+/**
+ * @summary Upcoming courses and own booking states at the member's studio
+ */
+export const listMemberCourses = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberCourse[]> => {
+
+  return customFetch<MemberCourse[]>(getListMemberCoursesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMemberCoursesQueryKey = () => {
+    return [
+    `/api/member/courses`
+    ] as const;
+    }
+
+
+export const getListMemberCoursesQueryOptions = <TData = Awaited<ReturnType<typeof listMemberCourses>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMemberCoursesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberCourses>>> = ({ signal }) => listMemberCourses({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMemberCoursesQueryResult = NonNullable<Awaited<ReturnType<typeof listMemberCourses>>>
+export type ListMemberCoursesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Upcoming courses and own booking states at the member's studio
+ */
+
+export function useListMemberCourses<TData = Awaited<ReturnType<typeof listMemberCourses>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMemberCoursesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBookMemberCourseUrl = (id: number,) => {
+
+
+
+
+  return `/api/member/courses/${id}/book`
+}
+
+/**
+ * @summary Book the signed-in member or join the waitlist
+ */
+export const bookMemberCourse = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CourseBooking> => {
+
+  return customFetch<CourseBooking>(getBookMemberCourseUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getBookMemberCourseMutationKey = () => ['bookMemberCourse'] as const;
+
+export const getBookMemberCourseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookMemberCourse>>, TError,BookMemberCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bookMemberCourse>>, TError,BookMemberCourseMutationVariables, TContext> => {
+
+const mutationKey = getBookMemberCourseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookMemberCourse>>, BookMemberCourseMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  bookMemberCourse(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookMemberCourseMutationResult = NonNullable<Awaited<ReturnType<typeof bookMemberCourse>>>
+
+    export type BookMemberCourseMutationError = ErrorType<void>
+    export type BookMemberCourseMutationVariables = {id: number}
+
+    /**
+ * @summary Book the signed-in member or join the waitlist
+ */
+export const useBookMemberCourse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookMemberCourse>>, TError,BookMemberCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bookMemberCourse>>,
+        TError,
+        BookMemberCourseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBookMemberCourseMutationOptions(options));
+    }
+
+export const getCancelMemberCourseUrl = (id: number,) => {
+
+
+
+
+  return `/api/member/courses/${id}/book`
+}
+
+/**
+ * @summary Cancel an own booking and promote the next waitlisted member
+ */
+export const cancelMemberCourse = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CourseBooking> => {
+
+  return customFetch<CourseBooking>(getCancelMemberCourseUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelMemberCourseMutationKey = () => ['cancelMemberCourse'] as const;
+
+export const getCancelMemberCourseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelMemberCourse>>, TError,CancelMemberCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelMemberCourse>>, TError,CancelMemberCourseMutationVariables, TContext> => {
+
+const mutationKey = getCancelMemberCourseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelMemberCourse>>, CancelMemberCourseMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelMemberCourse(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelMemberCourseMutationResult = NonNullable<Awaited<ReturnType<typeof cancelMemberCourse>>>
+
+    export type CancelMemberCourseMutationError = ErrorType<void>
+    export type CancelMemberCourseMutationVariables = {id: number}
+
+    /**
+ * @summary Cancel an own booking and promote the next waitlisted member
+ */
+export const useCancelMemberCourse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelMemberCourse>>, TError,CancelMemberCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelMemberCourse>>,
+        TError,
+        CancelMemberCourseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelMemberCourseMutationOptions(options));
+    }
+
+export const getListMemberCheckInsUrl = () => {
+
+
+
+
+  return `/api/member/check-ins`
+}
+
+/**
+ * @summary Recent check-ins for the signed-in member only
+ */
+export const listMemberCheckIns = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberCheckIn[]> => {
+
+  return customFetch<MemberCheckIn[]>(getListMemberCheckInsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMemberCheckInsQueryKey = () => {
+    return [
+    `/api/member/check-ins`
+    ] as const;
+    }
+
+
+export const getListMemberCheckInsQueryOptions = <TData = Awaited<ReturnType<typeof listMemberCheckIns>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCheckIns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMemberCheckInsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberCheckIns>>> = ({ signal }) => listMemberCheckIns({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMemberCheckIns>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMemberCheckInsQueryResult = NonNullable<Awaited<ReturnType<typeof listMemberCheckIns>>>
+export type ListMemberCheckInsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent check-ins for the signed-in member only
+ */
+
+export function useListMemberCheckIns<TData = Awaited<ReturnType<typeof listMemberCheckIns>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCheckIns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMemberCheckInsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getCreateCheckInUrl = () => {
 

@@ -10,6 +10,7 @@
     "test:pulse": "node ./test/run-pulse.mjs && tsx --test test/pulse.test.ts",
     "test:members": "tsx --test test/member-access.test.ts",
     "test:team": "tsx --test test/team-invitations.test.ts",
+    "test:bookings": "node ./test/run-bookings.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

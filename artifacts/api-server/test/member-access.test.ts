@@ -2,20 +2,23 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import express from "express";
 import {
   checkInsTable,
+  coursesTable,
   db,
   membersTable,
+  organizationModulesTable,
   organizationsTable,
   pool,
+  pulseMessagesTable,
   staffTable,
   studiosTable,
 } from "@workspace/db";
 import portalRouter from "../src/routes/portal";
 
-type MemberView = { id: number; email: string; phone: string | null; studioId: number };
+type MemberView = { id: number; fullName: string; email: string | null; phone: string | null; studioId: number };
 
 test("member records remain inside the caller's studio and organization", async (t) => {
   const run = randomUUID();
@@ -48,6 +51,17 @@ test("member records remain inside the caller's studio and organization", async 
       { studioId: studioA2.id, fullName: "Member A2", email: `private-a2-${run}@example.com`, phone: "222", membershipType: "Standard" },
       { studioId: studioB.id, fullName: "Member B", email: `private-b-${run}@example.com`, phone: "333", membershipType: "Standard" },
     ]).returning();
+    const [fullCourse] = await db.insert(coursesTable).values({
+      studioId: studioA1.id,
+      title: `Full course ${run}`,
+      instructor: "Instructor",
+      startsAt: new Date(Date.now() + 60 * 60 * 1000),
+      endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      capacity: 10,
+      enrolled: 10,
+      room: "Main room",
+      status: "full",
+    }).returning();
 
     const app = express();
     app.use(express.json());
@@ -105,6 +119,17 @@ test("member records remain inside the caller's studio and organization", async 
       assert.deepEqual(ids(await list(districtB.clerkUserId)), [memberB.id]);
       assert.deepEqual(await list(managerA1.clerkUserId, `?search=${encodeURIComponent(memberA2.email)}`), []);
       assert.deepEqual(await list(districtA.clerkUserId, `?search=${encodeURIComponent(memberB.email)}`), []);
+      const employeeRows = await list(employeeA1.clerkUserId);
+      assert.equal(employeeRows[0]?.email, null);
+      assert.equal(employeeRows[0]?.phone, null);
+      assert.deepEqual(
+        ids(await list(employeeA1.clerkUserId, `?search=${encodeURIComponent(memberA1.fullName)}`)),
+        [memberA1.id],
+      );
+      assert.deepEqual(
+        await list(employeeA1.clerkUserId, `?search=${encodeURIComponent(memberA1.email)}`),
+        [],
+      );
       assert.deepEqual(ids(await list(districtA.clerkUserId, `?studioId=${studioA2.id}`)), [memberA2.id]);
       assert.equal((await api(managerA1.clerkUserId, "GET", `/members?studioId=${studioA2.id}`)).status, 403);
       assert.equal((await api(managerA1.clerkUserId, "GET", `/members?studioId=${studioB.id}`)).status, 403);
@@ -134,15 +159,28 @@ test("member records remain inside the caller's studio and organization", async 
       const district = await api<MemberView>(districtA.clerkUserId, "PATCH", `/members/${memberA2.id}`, { phone: "555" });
       assert.equal(district.status, 200);
       assert.equal(district.body.phone, "555");
+
+      const employeePatch = await api(
+        employeeA1.clerkUserId,
+        "PATCH",
+        `/members/${memberA1.id}`,
+        { phone: "666" },
+      );
+      assert.equal(employeePatch.status, 403);
+      const unchanged = await db.select({ phone: membersTable.phone })
+        .from(membersTable).where(eq(membersTable.id, memberA1.id));
+      assert.equal(unchanged[0]?.phone, "444");
     });
 
     await t.test("member creation and check-ins cannot target an inaccessible studio", async () => {
       assert.equal((await api(managerA1.clerkUserId, "POST", "/members", draft(studioA2.id))).status, 403);
       assert.equal((await api(managerA1.clerkUserId, "POST", "/members", draft(studioB.id))).status, 403);
       assert.equal((await api(districtA.clerkUserId, "POST", "/members", draft(studioB.id))).status, 403);
-      const own = await api<MemberView>(employeeA1.clerkUserId, "POST", "/members", draft(studioA1.id));
-      assert.equal(own.status, 201);
-      assert.equal(own.body.studioId, studioA1.id);
+      const employeeCreate = await api(employeeA1.clerkUserId, "POST", "/members", draft(studioA1.id));
+      assert.equal(employeeCreate.status, 403);
+      const createdByEmployee = await db.select({ id: membersTable.id })
+        .from(membersTable).where(eq(membersTable.email, `new-${run}@example.com`));
+      assert.deepEqual(createdByEmployee, []);
 
       assert.equal((await api(employeeA1.clerkUserId, "POST", "/check-ins", { memberId: memberA2.id, studioId: studioA2.id })).status, 403);
       assert.equal((await api(employeeA1.clerkUserId, "POST", "/check-ins", { memberId: memberA2.id, studioId: studioA1.id })).status, 404);
@@ -152,6 +190,190 @@ test("member records remain inside the caller's studio and organization", async 
         .from(checkInsTable).where(inArray(checkInsTable.memberId, [memberA2.id, memberB.id]));
       assert.deepEqual(foreignCheckIns, []);
       assert.equal((await api(employeeA1.clerkUserId, "POST", "/check-ins", { memberId: memberA1.id, studioId: studioA1.id })).status, 201);
+    });
+
+    await t.test("dashboard respects member/course modules and hides member names from employees", async () => {
+      const employeeDashboard = await api<{
+        metrics: Array<{ label: string }>;
+        activities: Array<{ description: string }>;
+        courses: Array<{ id: number; status: string }>;
+      }>(employeeA1.clerkUserId, "GET", "/dashboard");
+      assert.equal(employeeDashboard.status, 200);
+      assert.equal(
+        employeeDashboard.body.activities.some((item) => item.description.includes("Member A1")),
+        false,
+      );
+      assert.equal(employeeDashboard.body.courses.some((course) => course.id === fullCourse.id), true);
+
+      await db.insert(organizationModulesTable).values([
+        { organizationId: orgA.id, key: "members", enabled: 0 },
+        { organizationId: orgA.id, key: "courses", enabled: 0 },
+      ]).onConflictDoUpdate({
+        target: [organizationModulesTable.organizationId, organizationModulesTable.key],
+        set: { enabled: 0 },
+      });
+      const disabledDashboard = await api<{
+        metrics: Array<{ label: string }>;
+        activities: Array<{ description: string }>;
+        courses: Array<{ id: number }>;
+      }>(employeeA1.clerkUserId, "GET", "/dashboard");
+      assert.equal(disabledDashboard.status, 200);
+      assert.deepEqual(disabledDashboard.body.metrics, []);
+      assert.deepEqual(disabledDashboard.body.activities, []);
+      assert.deepEqual(disabledDashboard.body.courses, []);
+    });
+
+    await t.test("course creation commits a generic Pulse event with the course", async () => {
+      const startsAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+      const endsAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
+      const courseBody = {
+        title: `Pulse event course ${run}`,
+        instructor: "Instructor",
+        studioId: studioA1.id,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        capacity: 12,
+        room: "Studio room",
+      };
+      const created = await api(managerA1.clerkUserId, "POST", "/courses", courseBody);
+      assert.equal(created.status, 201);
+      const events = await db.select({
+        title: pulseMessagesTable.title,
+        body: pulseMessagesTable.body,
+        authorStaffId: pulseMessagesTable.authorStaffId,
+        studioId: pulseMessagesTable.studioId,
+      }).from(pulseMessagesTable).where(
+        and(
+          eq(pulseMessagesTable.organizationId, orgA.id),
+          eq(pulseMessagesTable.title, "Neuer Kurs geplant"),
+          eq(pulseMessagesTable.authorStaffId, managerA1.id),
+        ),
+      );
+      assert.equal(events.length, 1);
+      assert.equal(events[0]?.studioId, studioA1.id);
+      assert.equal(events[0]?.body.includes(memberA1.fullName), false);
+      assert.equal(events[0]?.body.includes(memberA1.email), false);
+      const failedCourse = await api(managerA1.clerkUserId, "POST", "/courses", {
+        ...courseBody,
+        endsAt: startsAt.toISOString(),
+      });
+      assert.equal(failedCourse.status, 400);
+      const afterFailure = await db.select({ id: pulseMessagesTable.id })
+        .from(pulseMessagesTable).where(
+          and(
+            eq(pulseMessagesTable.organizationId, orgA.id),
+            eq(pulseMessagesTable.title, "Neuer Kurs geplant"),
+            eq(pulseMessagesTable.authorStaffId, managerA1.id),
+          ),
+        );
+      assert.equal(afterFailure.length, 1);
+    });
+
+    await t.test("concurrent check-ins emit a milestone exactly once", async () => {
+      const existing = await db.select({ id: checkInsTable.id })
+        .from(checkInsTable).where(
+          and(
+            eq(checkInsTable.checkedInByStaffId, employeeA1.id),
+            eq(checkInsTable.studioId, studioA1.id),
+          ),
+        );
+      assert.ok(existing.length < 10);
+      const toSeed = 9 - existing.length;
+      if (toSeed > 0) {
+        await db.insert(checkInsTable).values(
+          Array.from({ length: toSeed }, () => ({
+            memberId: memberA1.id,
+            studioId: studioA1.id,
+            checkedInByStaffId: employeeA1.id,
+          })),
+        );
+      }
+
+      const responses = await Promise.all([
+        api(employeeA1.clerkUserId, "POST", "/check-ins", {
+          memberId: memberA1.id,
+          studioId: studioA1.id,
+        }),
+        api(employeeA1.clerkUserId, "POST", "/check-ins", {
+          memberId: memberA1.id,
+          studioId: studioA1.id,
+        }),
+      ]);
+      assert.deepEqual(responses.map((response) => response.status), [201, 201]);
+      const milestoneEvents = await db.select({
+        title: pulseMessagesTable.title,
+        body: pulseMessagesTable.body,
+        studioId: pulseMessagesTable.studioId,
+      }).from(pulseMessagesTable).where(
+        and(
+          eq(pulseMessagesTable.organizationId, orgA.id),
+          eq(pulseMessagesTable.authorStaffId, employeeA1.id),
+          eq(pulseMessagesTable.title, "Check-in-Meilenstein erreicht"),
+        ),
+      );
+      assert.equal(milestoneEvents.length, 1);
+      assert.equal(milestoneEvents[0]?.studioId, studioA1.id);
+      assert.equal(milestoneEvents[0]?.body.includes(memberA1.fullName), false);
+      assert.equal(milestoneEvents[0]?.body.includes(memberA1.email), false);
+      const finalCount = await db.select({ id: checkInsTable.id })
+        .from(checkInsTable).where(
+          and(
+            eq(checkInsTable.checkedInByStaffId, employeeA1.id),
+            eq(checkInsTable.studioId, studioA1.id),
+          ),
+        );
+      assert.equal(finalCount.length, 11);
+    });
+
+    await t.test("course and check-in writes succeed without Pulse events when disabled", async () => {
+      await db.insert(organizationModulesTable).values({
+        organizationId: orgA.id,
+        key: "pulse",
+        enabled: 0,
+      }).onConflictDoUpdate({
+        target: [organizationModulesTable.organizationId, organizationModulesTable.key],
+        set: { enabled: 0 },
+      });
+      const previousEvents = await db.select({ id: pulseMessagesTable.id })
+        .from(pulseMessagesTable).where(eq(pulseMessagesTable.organizationId, orgA.id));
+      const currentCheckIns = await db.select({ id: checkInsTable.id })
+        .from(checkInsTable).where(
+          and(
+            eq(checkInsTable.checkedInByStaffId, employeeA1.id),
+            eq(checkInsTable.studioId, studioA1.id),
+          ),
+        );
+      assert.ok(currentCheckIns.length < 25);
+      const toSeed = 24 - currentCheckIns.length;
+      if (toSeed > 0) {
+        await db.insert(checkInsTable).values(
+          Array.from({ length: toSeed }, () => ({
+            memberId: memberA1.id,
+            studioId: studioA1.id,
+            checkedInByStaffId: employeeA1.id,
+          })),
+        );
+      }
+      const checkInResponse = await api(employeeA1.clerkUserId, "POST", "/check-ins", {
+        memberId: memberA1.id,
+        studioId: studioA1.id,
+      });
+      assert.equal(checkInResponse.status, 201);
+
+      const startsAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
+      const courseResponse = await api(managerA1.clerkUserId, "POST", "/courses", {
+        title: `Pulse disabled course ${run}`,
+        instructor: "Instructor",
+        studioId: studioA1.id,
+        startsAt: startsAt.toISOString(),
+        endsAt: new Date(startsAt.getTime() + 60 * 60 * 1000).toISOString(),
+        capacity: 8,
+        room: "Studio room",
+      });
+      assert.equal(courseResponse.status, 201);
+      const afterEvents = await db.select({ id: pulseMessagesTable.id })
+        .from(pulseMessagesTable).where(eq(pulseMessagesTable.organizationId, orgA.id));
+      assert.equal(afterEvents.length, previousEvents.length);
     });
   } finally {
     try {

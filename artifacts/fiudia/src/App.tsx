@@ -10,18 +10,17 @@ import {
 } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
-  getListMembersQueryKey, useAcceptInvitation, useCompleteOnboarding, useCreateCheckIn,
-  useCreateCourse, useCreateInvitation, useCreateMember, useGetDashboard, useGetMe,
-  useListCourses, useListInvitations, useListMembers, useUpdateMember,
+  getListMembersQueryKey, getListModulesQueryKey, useAcceptInvitation, useCompleteOnboarding, useCreateCheckIn,
+  useCreateCourse, useCreateInvitation, useCreateMember, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
+  useListCourses, useListInvitations, useListMembers, useListModules, useUpdateMember, useUpdateModule,
 } from '@workspace/api-client-react';
-import type { Course, Dashboard, Invitation, Member, Me, Role } from '@workspace/api-client-react';
+import type { Course, Dashboard, Invitation, Member, Me, ModuleKey, ModuleSetting, Role } from '@workspace/api-client-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ActionStrip, PulsePage, TodayPage } from './TodayPulse';
 
-const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -127,16 +126,16 @@ function TextField({ label, name, value, onChange, type = 'text', placeholder }:
   return <label className="field"><span>{label}</span><input data-testid={`input-${name}`} type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required /></label>;
 }
 
-function AppShell({ children, me }: { children: React.ReactNode; me: Me }) {
+function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me; modules: ModuleSetting[] }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useClerk();
   const nav = [
     { href: '/dashboard', label: 'Today', icon: LayoutDashboard },
-    { href: '/pulse', label: 'Pulse', icon: Activity },
-    { href: '/members', label: 'Mitglieder', icon: Users },
-    { href: '/courses', label: 'Kurse', icon: CalendarDays },
-    ...(me.role !== 'studio_employee' ? [{ href: '/team', label: 'Team', icon: UserRound }] : []),
+    ...(moduleEnabled(modules, 'pulse') ? [{ href: '/pulse', label: 'Pulse', icon: Activity }] : []),
+    ...(moduleEnabled(modules, 'members') ? [{ href: '/members', label: 'Mitglieder', icon: Users }] : []),
+    ...(moduleEnabled(modules, 'courses') ? [{ href: '/courses', label: 'Kurse', icon: CalendarDays }] : []),
+    ...(me.role !== 'studio_employee' && moduleEnabled(modules, 'team') ? [{ href: '/team', label: 'Team', icon: UserRound }] : []),
   ];
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
@@ -146,16 +145,26 @@ function AppShell({ children, me }: { children: React.ReactNode; me: Me }) {
       <div className="sidebar-note"><Sparkles size={16} /><span>Ein guter Tag beginnt mit Übersicht.</span></div>
       <div className="sidebar-bottom"><Link href="/settings" className="nav-link" data-testid="link-nav-settings"><Settings2 size={18} /><span>Einstellungen</span></Link><button className="profile-row" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out"><span className="avatar avatar-small">{initials(me.userName)}</span><span className="profile-copy"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></span><LogOut size={16} /></button></div>
     </aside>
-     <div className="main-wrap"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} data-testid="button-open-navigation"><Menu size={20} /></button><div className="top-search"><Search size={17} /><span>Suche nach Mitgliedern, Kursen, Check-ins …</span><kbd>⌘ K</kbd></div><div className="top-actions"><span className="status-chip"><span className="status-dot" />Alles aktuell</span><button className="icon-button" data-testid="button-help"><CircleHelp size={18} /></button><span className="avatar">{initials(me.userName)}</span></div></header><main className="main-content">{children}</main></div><ActionStrip me={me} />
+      <div className="main-wrap"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} data-testid="button-open-navigation"><Menu size={20} /></button><div className="top-search"><Search size={17} /><span>Dein Fiudia Arbeitsbereich</span></div><div className="top-actions"><span className="status-chip"><span className="status-dot" />Alles aktuell</span><span className="avatar">{initials(me.userName)}</span></div></header><main className="main-content">{children}</main></div><ActionStrip me={me} modules={modules} />
   </div>;
 }
 
-function AuthenticatedData({ children }: { children: (me: Me) => React.ReactNode }) {
-  const meQuery = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
+function moduleEnabled(modules: ModuleSetting[], key: ModuleKey) {
+  return modules.some(module => module.key === key && module.enabled);
+}
+
+function AuthenticatedData({ children }: { children: (me: Me, modules: ModuleSetting[], retryModules: () => void, modulesError: boolean) => React.ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const meQuery = useGetMe({ query: { queryKey: getGetMeQueryKey(), enabled: isLoaded && !!isSignedIn } });
+  const modulesQuery = useListModules({ query: { queryKey: getListModulesQueryKey(), enabled: isLoaded && !!isSignedIn && !!meQuery.data?.isOnboarded, refetchInterval: 60000 } });
+  if (!isLoaded) return <LoadingBlock label="Anmeldung wird geprüft" />;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
   if (meQuery.isLoading) return <LoadingBlock label="Dein Fiudia workspace wird vorbereitet" />;
   if (meQuery.isError) return <ErrorBlock retry={() => meQuery.refetch()} />;
   if (!meQuery.data?.isOnboarded) return <Redirect to="/onboarding" />;
-  return <AppShell me={meQuery.data}>{children(meQuery.data)}</AppShell>;
+  if (modulesQuery.isLoading) return <LoadingBlock label="Module werden geladen" />;
+  const modules = modulesQuery.isError ? [] : modulesQuery.data || [];
+  return <AppShell me={meQuery.data} modules={modules}>{children(meQuery.data, modules, () => { void modulesQuery.refetch(); }, modulesQuery.isError)}</AppShell>;
 }
 
 function HomeRedirect() {
@@ -185,8 +194,8 @@ function OnboardingPage() {
   return <div className="onboarding-page"><div className="onboarding-card"><Brand /><div className="step-count">01 <span /> 01</div><div className="eyebrow">Dein Anfang bei Fiudia</div><h1>Erzähl uns von<br /><em>deinem Studio.</em></h1><p className="lead">Wir richten deinen Workspace passend zu deiner Organisation ein. Das dauert weniger als zwei Minuten.</p><form onSubmit={(e) => { e.preventDefault(); mutation.mutate({ data: form }, { onSuccess: () => setLocation('/dashboard') }); }}><TextField label="Name der Organisation" name="organization-name" value={form.organizationName} onChange={update('organizationName')} placeholder="z. B. Nordlicht Fitness" /><TextField label="Name des ersten Studios" name="studio-name" value={form.studioName} onChange={update('studioName')} placeholder="z. B. Berlin Mitte" /><TextField label="Stadt" name="city" value={form.city} onChange={update('city')} placeholder="z. B. Berlin" /><button className="button button-dark button-wide" disabled={mutation.isPending} data-testid="button-complete-onboarding">{mutation.isPending ? 'Workspace wird erstellt …' : 'Workspace einrichten'} <ArrowRight size={17} /></button>{mutation.isError && <p className="form-error" data-testid="status-onboarding-error">Bitte prüfe deine Angaben und versuche es erneut.</p>}</form></div><div className="onboarding-art"><div className="onboarding-orb" /><span>Menschen.<br />Bewegung.<br /><em>Gemeinschaft.</em></span></div></div>;
 }
 
-function DashboardPage({ me }: { me: Me }) {
-  return <TodayPage me={me} />;
+function DashboardPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
+  return <TodayPage me={me} modules={modules} />;
   /*
   const query = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey() } });
   if (query.isLoading) return <LoadingBlock label="Deine Übersicht wird geladen" />;
@@ -202,29 +211,50 @@ function MembersPage({ me }: { me: Me }) {
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [selected, setSelected] = useState<Member | null>(null);
-  const membersQuery = useListMembers(search ? { search } : undefined, { query: { queryKey: getListMembersQueryKey(search ? { search } : undefined) } });
+  const memberParams = me.role !== 'studio_employee' && search ? { search } : undefined;
+  const membersQuery = useListMembers(memberParams, { query: { queryKey: getListMembersQueryKey(memberParams) } });
   const checkIn = useCreateCheckIn();
   const create = useCreateMember();
   const updateMember = useUpdateMember();
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', membershipType: 'Standard', status: 'active' });
   const updateForm = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
   const openCreate = () => { setSelected(null); setForm({ fullName: '', email: '', phone: '', membershipType: 'Standard', status: 'active' }); setModal('create'); };
-  const openEdit = (member: Member) => { setSelected(member); setForm({ fullName: member.fullName, email: member.email, phone: member.phone || '', membershipType: member.membershipType, status: member.status }); setModal('edit'); };
-  const submit = (e: React.FormEvent) => { e.preventDefault(); if (modal === 'create') create.mutate({ data: { ...form, studioId: me.studioId || 0, status: form.status as 'active' | 'trial' | 'paused' } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); setModal(null); } }); else if (selected) updateMember.mutate({ id: selected.id, data: { ...form, phone: form.phone || null, status: form.status as 'active' | 'trial' | 'paused' } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); setModal(null); } }); };
-  const members = membersQuery.data || [];
-  return <><PageHeader eyebrow={`${me.studioName || 'Workspace'} / Menschen`} title="Mitglieder" description="Behalte Beziehungen im Blick — nicht nur Datensätze." action={<button className="button button-dark" onClick={openCreate} data-testid="button-create-member"><Plus size={17} /> Mitglied anlegen</button>} /><div className="toolbar"><div className="input-search"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nach Name, E-Mail oder Mitgliedsnummer suchen …" data-testid="input-member-search" /></div><button className="filter-button" data-testid="button-member-filter">Alle Status <ChevronDown size={15} /></button><span className="toolbar-count">{members.length} Mitglieder</span></div>{membersQuery.isLoading ? <LoadingBlock label="Mitglieder werden geladen" /> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : members.length === 0 ? <div className="empty-state" data-testid="status-members-empty"><div className="empty-icon"><Users size={22} /></div><h3>Noch keine Mitglieder</h3><p>Lege das erste Mitglied an, um deinen Studio-Tag zu starten.</p><button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-member"><Plus size={16} /> Erstes Mitglied anlegen</button></div> : <div className="table-card"><div className="member-table-head"><span>Mitglied</span><span>Kontakt</span><span>Mitgliedschaft</span><span>Status</span><span>Letzter Check-in</span><span /></div>{members.map((member) => <div className="member-row" key={member.id} data-testid={`member-row-${member.id}`}><div className="member-name"><span className="avatar avatar-violet">{initials(member.fullName)}</span><span><strong>{member.fullName}</strong><small>seit {new Intl.DateTimeFormat('de-DE', { month: 'short', year: 'numeric' }).format(new Date(member.joinedAt))}</small></span></div><div className="member-contact"><strong>{member.email}</strong><small>{member.phone || 'Keine Telefonnummer'}</small></div><span className="membership-type">{member.membershipType}</span><span className={`status-label status-${member.status}`}><i />{member.status === 'active' ? 'Aktiv' : member.status === 'trial' ? 'Probetraining' : 'Pausiert'}</span><span className="last-checkin">{member.lastCheckIn ? timeAgo(member.lastCheckIn) : 'Noch nicht'}</span><div className="row-actions"><button className="icon-button" onClick={() => checkIn.mutate({ data: { memberId: member.id, studioId: member.studioId } }, { onSuccess: () => client.invalidateQueries({ queryKey: getListMembersQueryKey() }) })} title="Check-in" data-testid={`button-checkin-member-${member.id}`}><Check size={16} /></button><button className="icon-button" onClick={() => openEdit(member)} title="Bearbeiten" data-testid={`button-edit-member-${member.id}`}><Pencil size={16} /></button></div></div>)}</div>}{modal && <Modal title={modal === 'create' ? 'Neues Mitglied' : 'Mitglied bearbeiten'} onClose={() => setModal(null)}><form onSubmit={submit} className="modal-form"><TextField label="Vollständiger Name" name="member-name" value={form.fullName} onChange={updateForm('fullName')} /><TextField label="E-Mail-Adresse" name="member-email" value={form.email} onChange={updateForm('email')} type="email" /><TextField label="Telefon" name="member-phone" value={form.phone} onChange={updateForm('phone')} /><TextField label="Mitgliedschaft" name="member-membership" value={form.membershipType} onChange={updateForm('membershipType')} /><label className="field"><span>Status</span><select value={form.status} onChange={(e) => updateForm('status')(e.target.value)} data-testid="select-member-status"><option value="active">Aktiv</option><option value="trial">Probetraining</option><option value="paused">Pausiert</option></select></label><button className="button button-dark button-wide" disabled={create.isPending || updateMember.isPending} data-testid="button-save-member"><Check size={16} /> Speichern</button></form></Modal>}</>;
+  const openEdit = (member: Member) => { setSelected(member); setForm({ fullName: member.fullName, email: member.email || '', phone: member.phone || '', membershipType: member.membershipType, status: member.status }); setModal('edit'); };
+  const submit = (e: React.FormEvent) => { e.preventDefault(); if (me.role === 'studio_employee') return; if (modal === 'create') create.mutate({ data: { ...form, studioId: me.studioId || 0, status: form.status as 'active' | 'trial' | 'paused' } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setModal(null); } }); else if (selected) updateMember.mutate({ id: selected.id, data: { ...form, phone: form.phone || null, status: form.status as 'active' | 'trial' | 'paused' } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setModal(null); } }); };
+  const members = me.role === 'studio_employee' && search ? (membersQuery.data || []).filter(member => member.fullName.toLocaleLowerCase('de-DE').includes(search.toLocaleLowerCase('de-DE'))) : membersQuery.data || [];
+  const manager = me.role !== 'studio_employee';
+  return <><PageHeader eyebrow={`${me.studioName || 'Workspace'} / Menschen`} title="Mitglieder" description="Behalte Beziehungen im Blick — nicht nur Datensätze." action={manager && <button className="button button-dark" onClick={openCreate} data-testid="button-create-member"><Plus size={17} /> Mitglied anlegen</button>} /><div className="toolbar"><div className="input-search"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={manager ? 'Nach Name, E-Mail oder Mitgliedsnummer suchen …' : 'Nach Namen suchen …'} data-testid="input-member-search" /></div><span className="toolbar-count">{members.length} Mitglieder</span></div>{membersQuery.isLoading ? <LoadingBlock label="Mitglieder werden geladen" /> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : members.length === 0 ? <div className="empty-state" data-testid="status-members-empty"><div className="empty-icon"><Users size={22} /></div><h3>Noch keine Mitglieder</h3><p>Hier erscheinen die Mitglieder deines Studios.</p>{manager && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-member"><Plus size={16} /> Erstes Mitglied anlegen</button>}</div> : <div className={`table-card ${manager ? '' : 'employee-members'}`}><div className="member-table-head"><span>Mitglied</span>{manager && <span>Kontakt</span>}<span>Mitgliedschaft</span><span>Status</span><span>Letzter Check-in</span><span /></div>{members.map((member) => <div className="member-row" key={member.id} data-testid={`member-row-${member.id}`}><div className="member-name"><span className="avatar avatar-violet">{initials(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{manager && <span data-testid={`text-member-id-${member.id}`}>Mitglieds-ID: {member.id} · </span>}seit {new Intl.DateTimeFormat('de-DE', { month: 'short', year: 'numeric' }).format(new Date(member.joinedAt))}</small></span></div>{manager && <div className="member-contact"><strong>{member.email || 'Keine E-Mail'}</strong><small>{member.phone || 'Keine Telefonnummer'}</small></div>}<span className="membership-type">{member.membershipType}</span><span className={`status-label status-${member.status}`}><i />{member.status === 'active' ? 'Aktiv' : member.status === 'trial' ? 'Probetraining' : 'Pausiert'}</span><span className="last-checkin">{member.lastCheckIn ? timeAgo(member.lastCheckIn) : 'Noch nicht'}</span><div className="row-actions"><button className="icon-button" disabled={checkIn.isPending} onClick={() => checkIn.mutate({ data: { memberId: member.id, studioId: member.studioId } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} title="Check-in" data-testid={`button-checkin-member-${member.id}`}><Check size={16} /></button>{manager && <button className="icon-button" onClick={() => openEdit(member)} title="Bearbeiten" data-testid={`button-edit-member-${member.id}`}><Pencil size={16} /></button>}</div></div>)}</div>}{checkIn.isError && <p className="form-error" role="alert">Check-in fehlgeschlagen. Bitte erneut versuchen.</p>}{manager && modal && <Modal title={modal === 'create' ? 'Neues Mitglied' : 'Mitglied bearbeiten'} onClose={() => setModal(null)}><form onSubmit={submit} className="modal-form">{modal === 'edit' && selected && <p data-testid={`text-edit-member-id-${selected.id}`}>Mitglieds-ID für die Konto-Verknüpfung: <strong>{selected.id}</strong></p>}<TextField label="Vollständiger Name" name="member-name" value={form.fullName} onChange={updateForm('fullName')} /><TextField label="E-Mail-Adresse" name="member-email" value={form.email} onChange={updateForm('email')} type="email" /><TextField label="Telefon" name="member-phone" value={form.phone} onChange={updateForm('phone')} /><TextField label="Mitgliedschaft" name="member-membership" value={form.membershipType} onChange={updateForm('membershipType')} /><label className="field"><span>Status</span><select value={form.status} onChange={(e) => updateForm('status')(e.target.value)} data-testid="select-member-status"><option value="active">Aktiv</option><option value="trial">Probetraining</option><option value="paused">Pausiert</option></select></label>{(create.isError || updateMember.isError) && <p className="form-error" role="alert">Mitglied konnte nicht gespeichert werden.</p>}<button className="button button-dark button-wide" disabled={create.isPending || updateMember.isPending} data-testid="button-save-member"><Check size={16} /> Speichern</button></form></Modal>}</>;
 }
 
-function CoursesPage({ me }: { me: Me }) {
+function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const client = useQueryClient();
+  const canBookMembers = moduleEnabled(modules, 'members');
   const query = useListCourses({ query: { queryKey: getListCoursesQueryKey() } });
   const create = useCreateCourse();
+  const booking = useCreateStaffCourseBooking();
+  const [bookingCourse, setBookingCourse] = useState<Course | null>(null);
+  const [bookingMemberId, setBookingMemberId] = useState('');
+  const [bookingResult, setBookingResult] = useState<string | null>(null);
+  const membersQuery = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey(), enabled: !!bookingCourse && canBookMembers } });
+  useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: '', instructor: '', startsAt: '', endsAt: '', capacity: '20', room: '' });
   const update = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = (e: React.FormEvent) => { e.preventDefault(); create.mutate({ data: { ...form, capacity: Number(form.capacity), studioId: me.studioId || 0, startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); setOpen(false); } }); };
+  const submit = (e: React.FormEvent) => { e.preventDefault(); create.mutate({ data: { ...form, capacity: Number(form.capacity), studioId: me.studioId || 0, startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setOpen(false); } }); };
+  const book = (e: React.FormEvent) => { e.preventDefault(); if (!bookingCourse || !bookingMemberId || !canBookMembers) return; setBookingResult(null); booking.mutate({ id: bookingCourse.id, data: { memberId: Number(bookingMemberId) } }, { onSuccess: result => { setBookingResult(result.status === 'confirmed' ? 'Platz bestätigt.' : result.status === 'waitlisted' ? `Auf der Warteliste${result.waitlistPosition ? ` · Position ${result.waitlistPosition}` : ''}.` : 'Buchungsstatus: ' + result.status); client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } }); };
   const courses = query.data || [];
-  return <><PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Plane Energie, Räume und Plätze — an einem Ort." action={<button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button>} />{query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Plane den ersten Kurs und gib deinem Studio-Rhythmus eine Form.</p><button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button></div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}><div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span><button className="icon-button" data-testid={`button-course-menu-${course.id}`}><MoreHorizontal size={17} /></button></div><div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{course.instructor} · {course.room}</p><div className="course-card-bottom"><span><Users size={15} /> {course.enrolled} / {course.capacity}</span><span className={course.enrolled / course.capacity > .8 ? 'warning-text' : 'positive-text'}>{Math.round((course.enrolled / course.capacity) * 100)}% belegt</span></div><div className="capacity-bar"><i style={{ width: `${Math.min(100, (course.enrolled / course.capacity) * 100)}%` }} /></div></div>)}</div>}{open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}><form onSubmit={submit} className="modal-form"><TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" /><TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} /><div className="field-grid"><TextField label="Beginn" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" /><TextField label="Ende" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" /></div><div className="field-grid"><TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" /><TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} /></div><button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button></form></Modal>}</>;
+  return <>
+    <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button>} />
+    {query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
+      <div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span></div>
+      <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{course.instructor} · {course.room}</p>
+      <div className="course-card-bottom"><span><Users size={15} /> {course.enrolled} / {course.capacity}</span><span className={course.enrolled / course.capacity > .8 ? 'warning-text' : 'positive-text'}>{Math.round((course.enrolled / course.capacity) * 100)}% belegt</span></div>
+      <div className="capacity-bar"><i style={{ width: `${Math.min(100, (course.enrolled / course.capacity) * 100)}%` }} /></div>
+      {canBookMembers && course.status !== 'cancelled' && new Date(course.startsAt).getTime() > Date.now() && <button className="button button-outline course-book-button" onClick={() => { setBookingCourse(course); setBookingMemberId(''); setBookingResult(null); booking.reset(); }} data-testid={`button-book-course-${course.id}`}>Mitglied buchen <ArrowRight size={15} /></button>}
+    </div>)}</div>}
+    {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}
+    {me.role !== 'studio_employee' && open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}><form onSubmit={submit} className="modal-form"><TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" /><TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} /><div className="field-grid"><TextField label="Beginn" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" /><TextField label="Ende" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" /></div><div className="field-grid"><TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" /><TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} /></div>{create.isError && <p className="form-error" role="alert">Kurs konnte nicht gespeichert werden.</p>}<button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button></form></Modal>}
+  </>;
 }
 
 function TeamPage({ me }: { me: Me }) {
@@ -247,14 +277,21 @@ function InvitePage() {
   return <div className="invite-page"><Brand /><div className="invite-card"><div className="invite-symbol"><Users size={24} /></div><div className="eyebrow">Deine Einladung</div><h1>Gemeinsam wird<br /><em>mehr daraus.</em></h1><p>Du wurdest eingeladen, einem Fiudia-Workspace beizutreten. Nimm deinen Platz im Studio ein.</p><button className="button button-dark button-wide" onClick={accept} disabled={mutation.isPending} data-testid="button-accept-invitation">{mutation.isPending ? 'Einladung wird angenommen …' : isSignedIn ? 'Einladung annehmen' : 'Anmelden und beitreten'} <ArrowRight size={17} /></button>{mutation.isError && <p className="form-error">Diese Einladung ist nicht mehr gültig. Bitte frage die Studioleitung nach einem neuen Link.</p>}</div></div>;
 }
 
-function SettingsPage() {
+function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; modules: ModuleSetting[]; retryModules: () => void; modulesError: boolean }) {
   const { user } = useUser();
   const { openUserProfile } = useClerk();
-  return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Deine persönlichen Details und die Sprache deines Workspace." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div></>;
+  const client = useQueryClient();
+  const update = useUpdateModule();
+  return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Dein Profil und die Module deiner Organisation." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div><section className="module-settings"><div className="eyebrow">Organisation / Zugang</div><h2>Module</h2><p>{me.role === 'district_manager' ? 'Bestimme, welche Bereiche deiner Organisation zur Verfügung stehen.' : 'Für deinen Workspace verfügbare Bereiche.'}</p>{modulesError ? <ErrorBlock retry={retryModules} /> : <div className="module-list">{modules.filter(module => me.role === 'district_manager' || module.enabled).map(module => <div className="module-row" key={module.key} data-testid={`module-${module.key}`}><div><strong>{module.title}</strong><span>{module.enabled ? 'Aktiv' : 'Deaktiviert'}</span></div>{me.role === 'district_manager' && <button type="button" role="switch" aria-checked={module.enabled} aria-label={`${module.title} ${module.enabled ? 'deaktivieren' : 'aktivieren'}`} className={`module-switch ${module.enabled ? 'on' : ''}`} disabled={update.isPending} onClick={() => update.mutate({ key: module.key, data: { enabled: !module.enabled } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListModulesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} data-testid={`switch-module-${module.key}`}><i /></button>}</div>)}{!modules.some(module => module.enabled) && me.role !== 'district_manager' && <p>Keine weiteren Bereiche sind derzeit aktiviert.</p>}</div>}{update.isError && <p className="form-error" role="alert">Modul konnte nicht aktualisiert werden. Bitte erneut versuchen.</p>}</section></>;
 }
 
 function ProtectedRoute({ page }: { page: 'dashboard' | 'pulse' | 'members' | 'courses' | 'team' | 'settings' }) {
-  return <AuthenticatedData>{(me) => page === 'dashboard' ? <DashboardPage me={me} /> : page === 'pulse' ? <PulsePage me={me} /> : page === 'members' ? <MembersPage me={me} /> : page === 'courses' ? <CoursesPage me={me} /> : page === 'team' ? me.role === 'studio_employee' ? <Redirect to="/dashboard" /> : <TeamPage me={me} /> : <SettingsPage />}</AuthenticatedData>;
+  return <AuthenticatedData>{(me, modules, retryModules, modulesError) => {
+    if (page === 'settings') return <SettingsPage me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />;
+    if (page === 'dashboard') return <DashboardPage me={me} modules={modules} />;
+    if (!moduleEnabled(modules, page) || (page === 'team' && me.role === 'studio_employee')) return <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Dieses Modul ist für deinen Workspace nicht aktiviert.</p>{modulesError && <button className="button button-outline" onClick={retryModules}>Module erneut laden</button>}<Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
+    return page === 'pulse' ? <PulsePage me={me} /> : page === 'members' ? <MembersPage me={me} /> : page === 'courses' ? <CoursesPage me={me} modules={modules} /> : <TeamPage me={me} />;
+  }}</AuthenticatedData>;
 }
 
 function NotFoundPage() {
@@ -265,16 +302,21 @@ function Router() {
   return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route component={NotFoundPage} /></Switch>;
 }
 
-function ClerkQueryClientCacheInvalidator() {
-  const { addListener } = useClerk();
-  const client = useQueryClient();
-  useEffect(() => addListener(({ user }) => { if (!user) client.clear(); }), [addListener, client]);
-  return null;
+function IdentityQueryProvider() {
+  const [client] = useState(() => new QueryClient());
+  return <QueryClientProvider client={client}><Router /><Toaster /></QueryClientProvider>;
+}
+
+function ClerkQueryScope() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  if (!isLoaded || (isSignedIn && !userId)) return <LoadingBlock label="Anmeldung wird geprüft" />;
+  // A different Clerk identity must never inherit the previous identity's query cache.
+  return <IdentityQueryProvider key={userId ?? 'signed-out'} />;
 }
 
 function ClerkApp() {
   const [, setLocation] = useLocation();
-  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Willkommen zurück', subtitle: 'Melde dich an, um weiterzumachen' } }, signUp: { start: { title: 'Erstelle deinen Workspace', subtitle: 'Starte mit Fiudia' } } }} routerPush={(to: string) => setLocation(stripBase(to))} routerReplace={(to: string) => setLocation(stripBase(to), { replace: true })}><QueryClientProvider client={queryClient}><ClerkQueryClientCacheInvalidator /><Router /><Toaster /></QueryClientProvider></ClerkProvider>;
+  return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={clerkAppearance} signInUrl={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} localization={{ signIn: { start: { title: 'Willkommen zurück', subtitle: 'Melde dich an, um weiterzumachen' } }, signUp: { start: { title: 'Erstelle deinen Workspace', subtitle: 'Starte mit Fiudia' } } }} routerPush={(to: string) => setLocation(stripBase(to))} routerReplace={(to: string) => setLocation(stripBase(to), { replace: true })}><ClerkQueryScope /></ClerkProvider>;
 }
 
 function App() {

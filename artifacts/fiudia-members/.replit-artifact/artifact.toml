@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/fiudia-members/"
+title = "Fiudia Mitglieder"
+description = "Eigenständige Mitglieder-App für Fiudia: persönliche Kursübersicht, Buchungen und eigene Check-ins mit sicherem Mitgliedszugang."
+version = "1.0.0"
+id = "artifacts/fiudia-members"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/fiudia-members/" ]
+localPort = 19216
+
+[services.development]
+run = "pnpm --filter @workspace/fiudia-members run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fiudia-members", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fiudia-members/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19216"
+BASE_PATH = "/fiudia-members/"

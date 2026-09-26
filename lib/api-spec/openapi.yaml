@@ -16,6 +16,10 @@ tags:
     description: Staff roles and invitations
   - name: pulse
     description: Role- and studio-scoped team updates
+  - name: member-app
+    description: Private member self-service
+  - name: modules
+    description: Organization feature availability
 paths:
   /healthz:
     get:
@@ -227,6 +231,158 @@ paths:
           description: Sign-in required
         "403":
           description: Insufficient role or studio access
+  /courses/{id}/bookings:
+    post:
+      operationId: createStaffCourseBooking
+      tags: [portal]
+      summary: Book a member into an accessible course or join its waitlist
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffBookingInput" }
+      responses:
+        "201":
+          description: Booking or waitlist place created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseBooking" }
+        "400": { description: Invalid booking }
+        "403": { description: Studio access denied }
+        "404": { description: Course or member not found }
+        "409": { description: Already booked or course unavailable }
+  /modules:
+    get:
+      operationId: listModules
+      tags: [modules]
+      summary: List organization modules for navigation and permissions
+      responses:
+        "200":
+          description: Available modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ModuleSetting" }
+  /modules/{key}:
+    patch:
+      operationId: updateModule
+      tags: [modules]
+      summary: Enable or disable an organization module as district manager
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { $ref: "#/components/schemas/ModuleKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleUpdate" }
+      responses:
+        "200":
+          description: Updated module
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleSetting" }
+        "403": { description: District manager required }
+  /member/me:
+    get:
+      operationId: getMemberHome
+      tags: [member-app]
+      summary: Get the signed-in member's own profile and activity summary
+      responses:
+        "200":
+          description: Member profile, or null until linked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberHome" }
+        "401": { description: Sign-in required }
+  /member/claim:
+    post:
+      operationId: claimMembership
+      tags: [member-app]
+      summary: Link a membership to a signed-in, verified matching email account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberLinkInput" }
+      responses:
+        "200":
+          description: Linked membership
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberHome" }
+        "403": { description: Email not verified or does not match }
+        "404": { description: Membership not found }
+        "409": { description: Membership already linked }
+  /member/courses:
+    get:
+      operationId: listMemberCourses
+      tags: [member-app]
+      summary: Upcoming courses and own booking states at the member's studio
+      responses:
+        "200":
+          description: Accessible upcoming courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MemberCourse" }
+  /member/courses/{id}/book:
+    post:
+      operationId: bookMemberCourse
+      tags: [member-app]
+      summary: Book the signed-in member or join the waitlist
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Booking or waitlist place
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseBooking" }
+        "403": { description: Module unavailable or membership inactive }
+        "404": { description: Course not found }
+        "409": { description: Already booked or course unavailable }
+    delete:
+      operationId: cancelMemberCourse
+      tags: [member-app]
+      summary: Cancel an own booking and promote the next waitlisted member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Booking cancelled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseBooking" }
+        "404": { description: Active booking not found }
+  /member/check-ins:
+    get:
+      operationId: listMemberCheckIns
+      tags: [member-app]
+      summary: Recent check-ins for the signed-in member only
+      responses:
+        "200":
+          description: Own check-ins
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MemberCheckIn" }
   /check-ins:
     post:
       operationId: createCheckIn
@@ -462,7 +618,7 @@ components:
       properties:
         id: { type: integer }
         fullName: { type: string }
-        email: { type: string, format: email }
+        email: { type: ["string", "null"], format: email }
         phone: { type: ["string", "null"] }
         membershipType: { type: string }
         status: { $ref: "#/components/schemas/MemberStatus" }
@@ -514,6 +670,78 @@ components:
         endsAt: { type: string, format: date-time }
         capacity: { type: integer, minimum: 1, maximum: 200 }
         room: { type: string, minLength: 1, maxLength: 80 }
+    StaffBookingInput:
+      type: object
+      required: [memberId]
+      properties:
+        memberId: { type: integer }
+    CourseBooking:
+      type: object
+      required: [id, courseId, memberId, status, waitlistPosition]
+      properties:
+        id: { type: integer }
+        courseId: { type: integer }
+        memberId: { type: integer }
+        status: { type: string, enum: [confirmed, waitlisted, cancelled] }
+        waitlistPosition: { type: ["integer", "null"] }
+    ModuleKey:
+      type: string
+      enum: [members, courses, pulse, team]
+    ModuleSetting:
+      type: object
+      required: [key, title, enabled]
+      properties:
+        key: { $ref: "#/components/schemas/ModuleKey" }
+        title: { type: string }
+        enabled: { type: boolean }
+    ModuleUpdate:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    MemberLinkInput:
+      type: object
+      required: [memberId]
+      properties:
+        memberId: { type: integer }
+    MemberHome:
+      type: object
+      required: [member, checkInCount, nextCourse, upcomingBookings, coursesEnabled, checkInsEnabled]
+      properties:
+        member:
+          oneOf:
+            - { $ref: "#/components/schemas/Member" }
+            - { type: "null" }
+        checkInCount: { type: integer }
+        coursesEnabled: { type: boolean }
+        checkInsEnabled: { type: boolean }
+        nextCourse:
+          oneOf:
+            - { $ref: "#/components/schemas/MemberCourse" }
+            - { type: "null" }
+        upcomingBookings: { type: integer }
+    MemberCourse:
+      type: object
+      required: [id, title, instructor, studioName, startsAt, endsAt, capacity, enrolled, room, bookingStatus, waitlistPosition]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        instructor: { type: string }
+        studioName: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer }
+        enrolled: { type: integer }
+        room: { type: string }
+        bookingStatus: { type: ["string", "null"], enum: [confirmed, waitlisted, null] }
+        waitlistPosition: { type: ["integer", "null"] }
+    MemberCheckIn:
+      type: object
+      required: [id, studioName, checkedInAt]
+      properties:
+        id: { type: integer }
+        studioName: { type: string }
+        checkedInAt: { type: string, format: date-time }
     CheckInInput:
       type: object
       required: [memberId, studioId]

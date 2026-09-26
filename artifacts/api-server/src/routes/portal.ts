@@ -37,6 +37,7 @@ import {
   db,
   membersTable,
   organizationsTable,
+  pulseMessagesTable,
   staffTable,
   studiosTable,
 } from "@workspace/db";
@@ -49,8 +50,10 @@ import {
   getStaffContext,
   type StaffContext,
 } from "../lib/fiudia-access";
+import { isModuleEnabled } from "../lib/module-access";
 
 const router: IRouter = Router();
+const CHECK_IN_MILESTONES = new Set([10, 25, 50, 100, 250, 500]);
 
 async function requireStaff(
   req: Request,
@@ -257,8 +260,12 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   if (!staff) return;
   const studioIds = await getAccessibleStudioIds(staff);
   const { start, end } = berlinDayRange();
+  const [membersEnabled, coursesEnabled] = await Promise.all([
+    isModuleEnabled(staff.organizationId, "members"),
+    isModuleEnabled(staff.organizationId, "courses"),
+  ]);
 
-  const [activeMembers] = studioIds.length
+  const [activeMembers] = membersEnabled && studioIds.length
     ? await db
         .select({ total: count() })
         .from(membersTable)
@@ -269,7 +276,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
           ),
         )
     : [{ total: 0 }];
-  const todayCheckIns = studioIds.length
+  const todayCheckIns = membersEnabled && studioIds.length
     ? await db
         .select({ id: checkInsTable.id })
         .from(checkInsTable)
@@ -281,7 +288,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
           ),
         )
     : [];
-  const courseRows = studioIds.length
+  const courseRows = coursesEnabled && studioIds.length
     ? await db
         .select({
           id: coursesTable.id,
@@ -303,12 +310,12 @@ router.get("/dashboard", async (req, res): Promise<void> => {
             inArray(coursesTable.studioId, studioIds),
             gte(coursesTable.startsAt, start),
             lt(coursesTable.startsAt, end),
-            eq(coursesTable.status, "scheduled"),
+            inArray(coursesTable.status, ["scheduled", "full"]),
           ),
         )
         .orderBy(asc(coursesTable.startsAt))
     : [];
-  const recentCheckIns = studioIds.length
+  const recentCheckIns = membersEnabled && studioIds.length
     ? await db
         .select({
           id: checkInsTable.id,
@@ -329,11 +336,14 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   const activities = recentCheckIns.map((checkIn) => ({
     id: checkIn.id,
     title: "Mitglied eingecheckt",
-    description: checkIn.memberName,
+    description:
+      staff.role === "studio_employee"
+        ? "Ein Check-in wurde erfasst."
+        : checkIn.memberName,
     happenedAt: checkIn.checkedInAt.toISOString(),
     category: "check_in" as const,
   }));
-  const nextCourses = studioIds.length
+  const nextCourses = coursesEnabled && studioIds.length
     ? await db
         .select({
           id: coursesTable.id,
@@ -354,7 +364,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
           and(
             inArray(coursesTable.studioId, studioIds),
             gte(coursesTable.startsAt, start),
-            eq(coursesTable.status, "scheduled"),
+            inArray(coursesTable.status, ["scheduled", "full"]),
           ),
         )
         .orderBy(asc(coursesTable.startsAt))
@@ -370,24 +380,32 @@ router.get("/dashboard", async (req, res): Promise<void> => {
           ? staff.organizationName
           : staff.studioName ?? staff.organizationName,
       metrics: [
-        {
-          label: "Aktive Mitglieder",
-          value: String(activeMembers.total),
-          delta: "im Bestand",
-          tone: "neutral",
-        },
-        {
-          label: "Check-ins heute",
-          value: String(todayCheckIns.length),
-          delta: "live erfasst",
-          tone: "positive",
-        },
-        {
-          label: "Kursauslastung",
-          value: `${utilization} %`,
-          delta: `${courseRows.length} Kurse heute`,
-          tone: utilization >= 90 ? "warning" : "positive",
-        },
+        ...(membersEnabled
+          ? [
+              {
+                label: "Aktive Mitglieder",
+                value: String(activeMembers.total),
+                delta: "im Bestand",
+                tone: "neutral",
+              },
+            {
+              label: "Check-ins heute",
+              value: String(todayCheckIns.length),
+              delta: "live erfasst",
+              tone: "positive",
+            },
+          ]
+          : []),
+        ...(coursesEnabled
+          ? [
+              {
+                label: "Kursauslastung",
+                value: `${utilization} %`,
+                delta: `${courseRows.length} Kurse heute`,
+                tone: utilization >= 90 ? "warning" : "positive",
+              },
+          ]
+          : []),
       ],
       activities,
       courses: nextCourses.map(serializeCourse),
@@ -424,7 +442,9 @@ router.get("/members", async (req, res): Promise<void> => {
     const term = `%${query.data.search.trim()}%`;
     const searchFilter = or(
       ilike(membersTable.fullName, term),
-      ilike(membersTable.email, term),
+      ...(staff.role === "studio_employee"
+        ? []
+        : [ilike(membersTable.email, term)]),
     );
     if (searchFilter) conditions.push(searchFilter);
   }
@@ -469,6 +489,9 @@ router.get("/members", async (req, res): Promise<void> => {
     ListMembersResponse.parse(
       rows.map((member) => ({
         ...member,
+        ...(staff.role === "studio_employee"
+          ? { email: null, phone: null }
+          : {}),
         joinedAt: member.joinedAt.toISOString(),
         lastCheckIn: latestCheckIn.get(member.id)?.toISOString() ?? null,
       })),
@@ -479,6 +502,10 @@ router.get("/members", async (req, res): Promise<void> => {
 router.post("/members", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
+  if (staff.role === "studio_employee") {
+    res.status(403).json({ error: "Deine Rolle darf keine Mitglieder verwalten." });
+    return;
+  }
   const body = CreateMemberBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
@@ -519,6 +546,10 @@ router.post("/members", async (req, res): Promise<void> => {
 router.patch("/members/:id", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
+  if (staff.role === "studio_employee") {
+    res.status(403).json({ error: "Deine Rolle darf keine Mitglieder verwalten." });
+    return;
+  }
   const params = UpdateMemberParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -646,15 +677,32 @@ router.post("/courses", async (req, res): Promise<void> => {
     return;
   }
 
-  const [course] = await db
-    .insert(coursesTable)
-    .values({ ...body.data, startsAt, endsAt })
-    .returning();
-  const [studio] = await db
-    .select({ name: studiosTable.name })
-    .from(studiosTable)
-    .where(eq(studiosTable.id, course.studioId))
-    .limit(1);
+  const { course, studio } = await db.transaction(async (tx) => {
+    const [createdCourse] = await tx
+      .insert(coursesTable)
+      .values({ ...body.data, startsAt, endsAt })
+      .returning();
+    const [courseStudio] = await tx
+      .select({
+        name: studiosTable.name,
+        organizationId: studiosTable.organizationId,
+      })
+      .from(studiosTable)
+      .where(eq(studiosTable.id, createdCourse.studioId))
+      .limit(1);
+    if (await isModuleEnabled(courseStudio.organizationId, "pulse", tx)) {
+      await tx.insert(pulseMessagesTable).values({
+        organizationId: courseStudio.organizationId,
+        studioId: createdCourse.studioId,
+        authorStaffId: staff.id,
+        title: "Neuer Kurs geplant",
+        body: "Ein neuer Kurs wurde im Studio geplant.",
+        priority: "info",
+        audience: "all",
+      });
+    }
+    return { course: createdCourse, studio: courseStudio };
+  });
   res.status(201).json(
     CreateCourseResponse.parse(serializeCourse({ ...course, studioName: studio.name })),
   );
@@ -688,14 +736,46 @@ router.post("/check-ins", async (req, res): Promise<void> => {
     return;
   }
 
-  const [checkIn] = await db
-    .insert(checkInsTable)
-    .values({
-      memberId: member.id,
-      studioId: body.data.studioId,
-      checkedInByStaffId: staff.id,
-    })
-    .returning();
+  const checkIn = await db.transaction(async (tx) => {
+    // Serializing per staff record prevents concurrent check-ins from skipping milestones.
+    await tx
+      .select({ id: staffTable.id })
+      .from(staffTable)
+      .where(eq(staffTable.id, staff.id))
+      .for("update");
+    const [createdCheckIn] = await tx
+      .insert(checkInsTable)
+      .values({
+        memberId: member.id,
+        studioId: body.data.studioId,
+        checkedInByStaffId: staff.id,
+      })
+      .returning();
+    const [staffCheckInCount] = await tx
+      .select({ total: count() })
+      .from(checkInsTable)
+      .where(
+        and(
+          eq(checkInsTable.checkedInByStaffId, staff.id),
+          eq(checkInsTable.studioId, createdCheckIn.studioId),
+        ),
+      );
+    if (
+      CHECK_IN_MILESTONES.has(staffCheckInCount.total) &&
+      (await isModuleEnabled(staff.organizationId, "pulse", tx))
+    ) {
+      await tx.insert(pulseMessagesTable).values({
+        organizationId: staff.organizationId,
+        studioId: createdCheckIn.studioId,
+        authorStaffId: staff.id,
+        title: "Check-in-Meilenstein erreicht",
+        body: `Ein Teammitglied hat ${staffCheckInCount.total} Check-ins erfasst.`,
+        priority: "info",
+        audience: "all",
+      });
+    }
+    return createdCheckIn;
+  });
   res.status(201).json(
     CreateCheckInResponse.parse({
       id: checkIn.id,

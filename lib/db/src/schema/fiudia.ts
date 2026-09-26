@@ -15,6 +15,19 @@ export const organizationsTable = pgTable("fiudia_organizations", {
     .defaultNow(),
 });
 
+export const organizationModulesTable = pgTable(
+  "fiudia_organization_modules",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    enabled: integer("enabled").notNull().default(1),
+  },
+  (table) => [unique("fiudia_organization_module_key").on(table.organizationId, table.key)],
+);
+
 export const studiosTable = pgTable("fiudia_studios", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id")
@@ -71,6 +84,7 @@ export const invitationsTable = pgTable("fiudia_invitations", {
 
 export const membersTable = pgTable("fiudia_members", {
   id: serial("id").primaryKey(),
+  clerkUserId: text("clerk_user_id").unique(),
   studioId: integer("studio_id")
     .notNull()
     .references(() => studiosTable.id, { onDelete: "cascade" }),
@@ -101,6 +115,22 @@ export const coursesTable = pgTable("fiudia_courses", {
     .notNull()
     .defaultNow(),
 });
+
+export const courseBookingsTable = pgTable(
+  "fiudia_course_bookings",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => coursesTable.id, { onDelete: "cascade" }),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => membersTable.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("confirmed"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("fiudia_course_booking_member").on(table.courseId, table.memberId)],
+);
 
 export const checkInsTable = pgTable("fiudia_check_ins", {
   id: serial("id").primaryKey(),
