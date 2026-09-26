@@ -429,6 +429,16 @@ button { cursor: pointer; }
 .top-search { display: flex; align-items: center; gap: 10px; width: min(410px, 45%); color: hsl(var(--muted-foreground)); font-size: .77rem; }
 .top-search kbd { margin-left: auto; padding: 3px 6px; border: 1px solid hsl(var(--border)); border-radius: 5px; font-size: .64rem; }
 .top-actions { display: flex; align-items: center; gap: 14px; }
+.profile-menu { position: relative; }
+.profile-trigger { display: flex; align-items: center; gap: 6px; padding: 4px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
+.profile-trigger:hover, .profile-trigger[aria-expanded="true"] { background: hsl(var(--muted)); }
+.profile-trigger:focus-visible, .profile-dropdown button:focus-visible { outline: 2px solid #6554c0; outline-offset: 2px; }
+.profile-dropdown { position: absolute; z-index: 40; top: calc(100% + 10px); right: 0; width: 205px; padding: 7px; border: 1px solid hsl(var(--border)); border-radius: 12px; background: #fff; box-shadow: 0 14px 35px rgba(32,41,61,.16); }
+.profile-dropdown-user { display: grid; gap: 3px; padding: 10px 11px 12px; border-bottom: 1px solid hsl(var(--border)); }
+.profile-dropdown-user strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
+.profile-dropdown-user small { color: hsl(var(--muted-foreground)); font-size: .68rem; }
+.profile-dropdown button { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 4px; padding: 10px 11px; border: 0; border-radius: 7px; background: transparent; color: #30335b; font: inherit; font-size: .78rem; text-align: left; cursor: pointer; }
+.profile-dropdown button:hover { background: hsl(var(--muted)); }
 .status-chip { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: .72rem; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #55bb91; box-shadow: 0 0 0 4px rgba(85,187,145,.12); }
 .main-content { max-width: 1440px; margin: 0 auto; padding: 43px 42px 70px; }

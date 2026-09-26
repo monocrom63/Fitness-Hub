@@ -90,7 +90,13 @@ router.get("/team/invitations", async (req, res): Promise<void> => {
       expiresAt: invitationsTable.expiresAt,
     })
     .from(invitationsTable)
-    .innerJoin(studiosTable, eq(invitationsTable.studioId, studiosTable.id))
+    .innerJoin(
+      studiosTable,
+      and(
+        eq(invitationsTable.studioId, studiosTable.id),
+        eq(studiosTable.organizationId, staff.organizationId),
+      ),
+    )
     .where(
       and(
         eq(invitationsTable.organizationId, staff.organizationId),
@@ -245,6 +251,18 @@ router.post(
 
     const role = invitation.role as FiudiaRole;
     const created = await database.transaction(async (tx) => {
+      // Never consume an invitation if its studio no longer belongs to its organization.
+      const [targetStudio] = await tx
+        .select({ id: studiosTable.id })
+        .from(studiosTable)
+        .where(
+          and(
+            eq(studiosTable.id, invitation.studioId),
+            eq(studiosTable.organizationId, invitation.organizationId),
+          ),
+        )
+        .limit(1);
+      if (!targetStudio) return null;
       const [accepted] = await tx
         .update(invitationsTable)
         .set({ status: "accepted" })

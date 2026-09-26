@@ -84,7 +84,9 @@ export async function getAccessibleStudioIds(
   database: Pick<typeof db, "select"> = db,
 ): Promise<number[]> {
   if (staff.role !== "district_manager") {
-    return staff.studioId === null ? [] : [staff.studioId];
+    return staff.studioId !== null && await canAccessStudio(staff, staff.studioId, database)
+      ? [staff.studioId]
+      : [];
   }
 
   const studios = await database

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
@@ -12,7 +12,7 @@ import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCourseBookingsQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
   getListMembersQueryKey, getListModulesQueryKey, useAcceptInvitation, useCompleteOnboarding, useCreateCheckIn,
   useCancelStaffCourseBooking, useCreateCourse, useCreateInvitation, useCreateMember, useCreateMemberInvitation, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
-  useListCourseBookings, useListCourses, useListInvitations, useListMembers, useListModules, useUpdateMember, useUpdateModule,
+  getListStudiosQueryKey, useListCourseBookings, useListCourses, useListInvitations, useListMembers, useListModules, useListStudios, useUpdateMember, useUpdateModule,
 } from '@workspace/api-client-react';
 import type { Course, CourseRosterBooking, Dashboard, Invitation, Member, MemberInvitationLink, Me, ModuleKey, ModuleSetting, Role } from '@workspace/api-client-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
@@ -129,7 +129,25 @@ function TextField({ label, name, value, onChange, type = 'text', placeholder }:
 function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me; modules: ModuleSetting[] }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const { signOut } = useClerk();
+  const logOut = () => signOut({ redirectUrl: `${basePath}/sign-in` });
+  useEffect(() => {
+    if (!profileOpen) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
   const nav = [
     { href: '/dashboard', label: 'Today', icon: LayoutDashboard },
     ...(moduleEnabled(modules, 'pulse') ? [{ href: '/pulse', label: 'Pulse', icon: Activity }] : []),
@@ -143,9 +161,9 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
       <div className="workspace-switcher"><div className="workspace-dot">{initials(me.studioName || me.organizationName || 'F')}</div><div><strong>{me.studioName || 'Dein Workspace'}</strong><span>{me.organizationName || 'Neue Organisation'}</span></div><ChevronDown size={16} /></div>
       <nav className="main-nav">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`nav-link ${location === href ? 'nav-link-active' : ''}`} data-testid={`link-nav-${label.toLowerCase()}`}><Icon size={18} /><span>{label}</span>{href === '/members' && <span className="nav-count">live</span>}</Link>)}</nav>
       <div className="sidebar-note"><Sparkles size={16} /><span>Ein guter Tag beginnt mit Übersicht.</span></div>
-      <div className="sidebar-bottom"><Link href="/settings" className="nav-link" data-testid="link-nav-settings"><Settings2 size={18} /><span>Einstellungen</span></Link><button className="profile-row" onClick={() => signOut({ redirectUrl: basePath || '/' })} data-testid="button-sign-out"><span className="avatar avatar-small">{initials(me.userName)}</span><span className="profile-copy"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></span><LogOut size={16} /></button></div>
+      <div className="sidebar-bottom"><Link href="/settings" className="nav-link" data-testid="link-nav-settings"><Settings2 size={18} /><span>Einstellungen</span></Link><button className="profile-row" onClick={logOut} data-testid="button-sign-out"><span className="avatar avatar-small">{initials(me.userName)}</span><span className="profile-copy"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></span><LogOut size={16} /></button></div>
     </aside>
-      <div className="main-wrap"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} data-testid="button-open-navigation"><Menu size={20} /></button><div className="top-search"><Search size={17} /><span>Dein Fiudia Arbeitsbereich</span></div><div className="top-actions"><span className="status-chip"><span className="status-dot" />Alles aktuell</span><span className="avatar">{initials(me.userName)}</span></div></header><main className="main-content">{children}</main></div><ActionStrip me={me} modules={modules} />
+      <div className="main-wrap"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} data-testid="button-open-navigation"><Menu size={20} /></button><div className="top-search"><Search size={17} /><span>Dein Fiudia Arbeitsbereich</span></div><div className="top-actions"><span className="status-chip"><span className="status-dot" />Alles aktuell</span><div className="profile-menu" ref={profileRef}><button type="button" className="profile-trigger" aria-label="Profilmenü öffnen" aria-expanded={profileOpen} aria-controls="profile-menu" onClick={() => setProfileOpen(open => !open)} data-testid="button-profile-menu"><span className="avatar">{initials(me.userName)}</span><ChevronDown size={14} /></button>{profileOpen && <div className="profile-dropdown" id="profile-menu"><div className="profile-dropdown-user"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></div><button type="button" onClick={logOut} data-testid="button-top-sign-out"><LogOut size={16} /> Abmelden</button></div>}</div></div></header><main className="main-content">{children}</main></div><ActionStrip me={me} modules={modules} />
   </div>;
 }
 
@@ -360,12 +378,18 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
 function TeamPage({ me }: { me: Me }) {
   const client = useQueryClient();
   const query = useListInvitations({ query: { queryKey: getListInvitationsQueryKey() } });
+  const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: me.role === 'district_manager' } });
   const create = useCreateInvitation();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: '', role: 'studio_employee', studioId: String(me.studioId || '') });
   const invitations = query.data || [];
-  const submit = (e: React.FormEvent) => { e.preventDefault(); create.mutate({ data: { email: form.email, role: form.role as Role, studioId: Number(form.studioId) } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListInvitationsQueryKey() }); setOpen(false); } }); };
-  return <><PageHeader eyebrow={`${me.organizationName || 'Organisation'} / Zusammenarbeit`} title="Team" description="Die richtigen Menschen, mit der richtigen Verantwortung." action={<button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-invitation"><Mail size={17} /> Einladung senden</button>} /><div className="team-intro"><div className="team-intro-icon"><ShieldCheck size={23} /></div><div><strong>Rollen geben Orientierung.</strong><p>Fiudia lädt jede Person automatisch in die passende Perspektive ein. Du vergibst nur Verantwortung — keine Zugriffsrechte per Hand.</p></div></div>{query.isLoading ? <LoadingBlock label="Team wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : <div className="table-card invitation-table"><div className="member-table-head"><span>E-Mail</span><span>Rolle</span><span>Studio</span><span>Status</span><span>Gültig bis</span><span /></div>{invitations.length ? invitations.map((invite: Invitation) => <div className="member-row" key={invite.id} data-testid={`invitation-row-${invite.id}`}><div className="member-name"><span className="avatar avatar-mint"><Mail size={16} /></span><span><strong>{invite.email}</strong><small>Einladung #{invite.id}</small></span></div><span className="membership-type">{roleLabel(invite.role)}</span><span className="member-contact">{invite.studioName}</span><span className={`status-label status-${invite.status === 'pending' ? 'trial' : invite.status === 'accepted' ? 'active' : 'paused'}`}><i />{invite.status === 'pending' ? 'Ausstehend' : invite.status === 'accepted' ? 'Angenommen' : 'Abgelaufen'}</span><span className="last-checkin">{new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(invite.expiresAt))}</span><button className="icon-button" onClick={() => navigator.clipboard?.writeText(invite.inviteUrl)} data-testid={`button-copy-invitation-${invite.id}`}><ArrowRight size={16} /></button></div>) : <div className="empty-inline"><Users size={18} /> Noch keine Einladungen.</div>}</div>}{open && <Modal title="Teammitglied einladen" onClose={() => setOpen(false)}><form onSubmit={submit} className="modal-form"><TextField label="E-Mail-Adresse" name="invitation-email" value={form.email} onChange={(value) => setForm((f) => ({ ...f, email: value }))} type="email" placeholder="name@studio.de" /><label className="field"><span>Rolle</span><select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} data-testid="select-invitation-role"><option value="studio_employee">Studio-Team</option><option value="studio_manager">Studioleitung</option>{me.role === 'district_manager' && <option value="district_manager">Bezirksleitung</option>}</select></label><button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-send-invitation"><Mail size={16} /> Einladung senden</button></form></Modal>}</>;
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const studioId = me.role === 'district_manager' ? Number(form.studioId) : me.studioId;
+    if (!studioId || (me.role === 'district_manager' && !studios.data?.some(studio => studio.id === studioId))) return;
+    create.mutate({ data: { email: form.email, role: form.role as Role, studioId } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListInvitationsQueryKey() }); setOpen(false); setForm(current => ({ ...current, email: '' })); } });
+  };
+  return <><PageHeader eyebrow={`${me.organizationName || 'Organisation'} / Zusammenarbeit`} title="Team" description="Die richtigen Menschen, mit der richtigen Verantwortung." action={<button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-invitation"><Mail size={17} /> Einladung senden</button>} /><div className="team-intro"><div className="team-intro-icon"><ShieldCheck size={23} /></div><div><strong>Rollen geben Orientierung.</strong><p>Fiudia lädt jede Person automatisch in die passende Perspektive ein. Du vergibst nur Verantwortung — keine Zugriffsrechte per Hand.</p></div></div>{query.isLoading ? <LoadingBlock label="Team wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : <div className="table-card invitation-table"><div className="member-table-head"><span>E-Mail</span><span>Rolle</span><span>Studio</span><span>Status</span><span>Gültig bis</span><span /></div>{invitations.length ? invitations.map((invite: Invitation) => <div className="member-row" key={invite.id} data-testid={`invitation-row-${invite.id}`}><div className="member-name"><span className="avatar avatar-mint"><Mail size={16} /></span><span><strong>{invite.email}</strong><small>Einladung #{invite.id}</small></span></div><span className="membership-type">{roleLabel(invite.role)}</span><span className="member-contact">{invite.studioName}</span><span className={`status-label status-${invite.status === 'pending' ? 'trial' : invite.status === 'accepted' ? 'active' : 'paused'}`}><i />{invite.status === 'pending' ? 'Ausstehend' : invite.status === 'accepted' ? 'Angenommen' : 'Abgelaufen'}</span><span className="last-checkin">{new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(invite.expiresAt))}</span><button className="icon-button" onClick={() => navigator.clipboard?.writeText(invite.inviteUrl)} data-testid={`button-copy-invitation-${invite.id}`}><ArrowRight size={16} /></button></div>) : <div className="empty-inline"><Users size={18} /> Noch keine Einladungen.</div>}</div>}{open && <Modal title="Teammitglied einladen" onClose={() => setOpen(false)}><form onSubmit={submit} className="modal-form"><TextField label="E-Mail-Adresse" name="invitation-email" value={form.email} onChange={(value) => setForm((f) => ({ ...f, email: value }))} type="email" placeholder="name@studio.de" /><label className="field"><span>Rolle</span><select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} data-testid="select-invitation-role"><option value="studio_employee">Studio-Team</option><option value="studio_manager">Studioleitung</option>{me.role === 'district_manager' && <option value="district_manager">Bezirksleitung</option>}</select></label>{me.role === 'district_manager' ? <label className="field"><span>Zielstudio</span><select required value={form.studioId} onChange={(e) => setForm(f => ({ ...f, studioId: e.target.value }))} data-testid="select-invitation-studio"><option value="">Studio auswählen</option>{(studios.data || []).map(studio => <option key={studio.id} value={studio.id}>{studio.name}</option>)}</select></label> : <p className="booking-hint">Zielstudio: <strong>{me.studioName}</strong></p>}{studios.isError && me.role === 'district_manager' && <p className="form-error" role="alert">Studios konnten nicht geladen werden. Bitte erneut versuchen.</p>}{create.isError && <p className="form-error" role="alert">Einladung konnte nicht erstellt werden. Bitte prüfe Studio und E-Mail-Adresse.</p>}<button className="button button-dark button-wide" disabled={create.isPending || (me.role === 'district_manager' && (!studios.data || studios.isError))} data-testid="button-send-invitation"><Mail size={16} /> Einladung senden</button></form></Modal>}</>;
 }
 
 function InvitePage() {
