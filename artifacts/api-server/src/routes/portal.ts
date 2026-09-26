@@ -421,6 +421,13 @@ router.get("/members", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
+  if (
+    query.data.studioId !== undefined &&
+    !(await canAccessStudio(staff, query.data.studioId))
+  ) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
   const studioIds = await getAccessibleStudioIds(staff);
   if (studioIds.length === 0) {
     res.json([]);
@@ -429,10 +436,6 @@ router.get("/members", async (req, res): Promise<void> => {
 
   const conditions: SQL[] = [inArray(membersTable.studioId, studioIds)];
   if (query.data.studioId !== undefined) {
-    if (!(await canAccessStudio(staff, query.data.studioId))) {
-      res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
-      return;
-    }
     conditions.push(eq(membersTable.studioId, query.data.studioId));
   }
   if (query.data.status) {

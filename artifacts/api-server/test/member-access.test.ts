@@ -38,13 +38,15 @@ test("member records remain inside the caller's studio and organization", async 
       { organizationId: orgA.id, name: `A2 ${run}`, city: "Berlin" },
       { organizationId: orgB.id, name: `B ${run}`, city: "Hamburg" },
     ]).returning();
-    const [districtA, managerA1, managerA2, employeeA1, districtB] =
+    const [districtA, managerA1, managerA2, employeeA1, districtB, mismatchedManager] =
       await db.insert(staffTable).values([
         { clerkUserId: `member-district-a-${run}`, organizationId: orgA.id, studioId: null, fullName: "District A", email: `district-a-${run}@example.com`, role: "district_manager" },
         { clerkUserId: `member-manager-a1-${run}`, organizationId: orgA.id, studioId: studioA1.id, fullName: "Manager A1", email: `manager-a1-${run}@example.com`, role: "studio_manager" },
         { clerkUserId: `member-manager-a2-${run}`, organizationId: orgA.id, studioId: studioA2.id, fullName: "Manager A2", email: `manager-a2-${run}@example.com`, role: "studio_manager" },
         { clerkUserId: `member-employee-a1-${run}`, organizationId: orgA.id, studioId: studioA1.id, fullName: "Employee A1", email: `employee-a1-${run}@example.com`, role: "studio_employee" },
         { clerkUserId: `member-district-b-${run}`, organizationId: orgB.id, studioId: null, fullName: "District B", email: `district-b-${run}@example.com`, role: "district_manager" },
+        // A stale or incorrectly imported assignment must not grant access to another organization's studio.
+        { clerkUserId: `member-mismatched-${run}`, organizationId: orgA.id, studioId: studioB.id, fullName: "Mismatched Manager", email: `mismatched-${run}@example.com`, role: "studio_manager" },
       ]).returning();
     const [memberA1, memberA2, memberB] = await db.insert(membersTable).values([
       { studioId: studioA1.id, fullName: "Member A1", email: `private-a1-${run}@example.com`, phone: "111", membershipType: "Standard" },
@@ -134,6 +136,20 @@ test("member records remain inside the caller's studio and organization", async 
       assert.equal((await api(managerA1.clerkUserId, "GET", `/members?studioId=${studioA2.id}`)).status, 403);
       assert.equal((await api(managerA1.clerkUserId, "GET", `/members?studioId=${studioB.id}`)).status, 403);
       assert.equal((await api(districtA.clerkUserId, "GET", `/members?studioId=${studioB.id}`)).status, 403);
+    });
+
+    await t.test("a staff assignment pointing to a different organization cannot open private records", async () => {
+      assert.deepEqual(await list(mismatchedManager.clerkUserId), []);
+      assert.deepEqual(await list(mismatchedManager.clerkUserId, `?search=${encodeURIComponent(memberB.email)}`), []);
+      const filtered = await api(mismatchedManager.clerkUserId, "GET", `/members?studioId=${studioB.id}`);
+      assert.equal(filtered.status, 403);
+      assert.equal(JSON.stringify(filtered.body).includes(memberB.email), false);
+      const edit = await api(mismatchedManager.clerkUserId, "PATCH", `/members/${memberB.id}`, { phone: "999" });
+      assert.equal(edit.status, 403);
+      assert.equal(JSON.stringify(edit.body).includes(memberB.email), false);
+      const [unchanged] = await db.select({ phone: membersTable.phone })
+        .from(membersTable).where(eq(membersTable.id, memberB.id));
+      assert.equal(unchanged.phone, "333");
     });
 
     await t.test("a foreign member ID cannot be edited or returned", async () => {
