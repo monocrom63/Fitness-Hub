@@ -4,3 +4,4 @@
 - [Member account linking](member-linking.md) — never auto-select a membership by email alone when one address may belong to multiple studios.
 - [Organization modules](module-availability.md) — operational switches preserve existing access by default; they are not proof of a paid entitlement.
 - [Managed Clerk publishing](managed-clerk-publishing.md) — development-key warnings do not imply live keys need manual replacement; managed tenants switch automatically on publish.
+- [Publish readiness checks](publish-readiness.md) — successful Publish status alone does not prove that new routes and managed schema are live; verify both.
