@@ -5,7 +5,7 @@ import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
 import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
-import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
+import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
 import type { Member, MemberCourse, MemberHome } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -99,7 +99,7 @@ function TodayPage({ member, home }: { member: Member; home: MemberHome }) {
     <div className="footer-line">Fiudia Mitglieder · Ein Ort für deinen eigenen Rhythmus.</div>
   </div>;
 }
-function CourseRow({ course }: { course: MemberCourse }) {
+function CourseRow({ course, targeted = false }: { course: MemberCourse; targeted?: boolean }) {
   const { book, cancel } = useMemberActions();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [message, setMessage] = useState('');
@@ -117,7 +117,7 @@ function CourseRow({ course }: { course: MemberCourse }) {
     try { await cancel.mutateAsync({ id: course.id }); setConfirmCancel(false); setMessage('Deine Buchung wurde storniert.'); }
     catch (failure) { setError(errorMessage(failure)); }
   };
-  return <article className="course-row" data-testid={`card-course-${course.id}`}>
+  return <article id={`course-${course.id}`} tabIndex={-1} className={`course-row${targeted ? ' course-row--targeted' : ''}`} data-testid={`card-course-${course.id}`}>
     <div className="course-day"><strong>{dayNumber(course.startsAt)}</strong><span>{monthLabel(course.startsAt)}</span></div>
     <div className="course-detail"><div className="eyebrow">{new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(course.startsAt))} · {timeLabel(course.startsAt)} – {timeLabel(course.endsAt)} Uhr</div><h3 data-testid={`text-course-title-${course.id}`}>{course.title}</h3><p>mit {course.instructor} · {course.studioName}</p></div>
     <div className="course-meta"><p><MapPin /> {course.room}</p><p><Users /> {course.enrolled} / {course.capacity} Plätze belegt</p></div>
@@ -128,12 +128,27 @@ function CourseRow({ course }: { course: MemberCourse }) {
 }
 function CoursesPage() {
   const courses = useListMemberCourses();
+  const search = useSearch();
+  const requestedId = new URLSearchParams(search).get('courseId');
+  const targetId = requestedId && /^[1-9]\d*$/.test(requestedId) ? Number(requestedId) : null;
   const [filter, setFilter] = useState<'all' | 'mine'>('all');
+  useEffect(() => {
+    if (targetId !== null) setFilter('all');
+  }, [targetId]);
+  useEffect(() => {
+    if (targetId === null || filter !== 'all' || !courses.data) return;
+    const course = document.getElementById(`course-${targetId}`);
+    if (course) {
+      course.focus({ preventScroll: true });
+      course.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [targetId, filter, courses.data]);
   const visible = (courses.data || []).filter(course => filter === 'all' || course.bookingStatus === 'confirmed' || course.bookingStatus === 'waitlisted').sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   return <div className="page"><PageHeader eyebrow="Kurse" title="Finde deinen Moment." description="Alle kommenden Kurse in deinem Studio. Such dir aus, was zu deinem Tag passt." />
     {courses.isLoading ? <div className="skeleton-page"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> : courses.isError ? <ErrorView onRetry={() => { void courses.refetch(); }} /> : <>
+      {targetId !== null && !courses.data?.some(course => course.id === targetId) && <div className="course-feedback" role="status" data-testid="status-course-unavailable">Dieser Kurs ist nicht mehr im aktuellen Kursplan verfügbar.</div>}
       <div className="course-toolbar"><div className="filter-group" role="group" aria-label="Kurse filtern"><button type="button" className={filter === 'all' ? 'selected' : ''} onClick={() => setFilter('all')} data-testid="button-filter-all">Alle Kurse</button><button type="button" className={filter === 'mine' ? 'selected' : ''} onClick={() => setFilter('mine')} data-testid="button-filter-mine">Meine Plätze</button></div><span data-testid="text-course-count">{visible.length} {visible.length === 1 ? 'Kurs' : 'Kurse'}</span></div>
-      {visible.length ? <div className="course-list">{visible.map(course => <CourseRow key={course.id} course={course} />)}</div> : <EmptyView icon={<CalendarDays size={22} />} title={filter === 'mine' ? 'Noch kein Platz gebucht.' : 'Gerade keine Kurse geplant.'} description={filter === 'mine' ? 'Schau dich im Kursplan um und sichere dir deinen ersten Platz.' : 'Dein Studio hat im Moment keine kommenden Kurse eingetragen.'} action={filter === 'mine' ? <button type="button" className="button button-secondary" onClick={() => setFilter('all')} data-testid="button-show-all-courses">Alle Kurse ansehen <ArrowRight size={15} /></button> : undefined} />}
+      {visible.length ? <div className="course-list">{visible.map(course => <CourseRow key={course.id} course={course} targeted={course.id === targetId} />)}</div> : <EmptyView icon={<CalendarDays size={22} />} title={filter === 'mine' ? 'Noch kein Platz gebucht.' : 'Gerade keine Kurse geplant.'} description={filter === 'mine' ? 'Schau dich im Kursplan um und sichere dir deinen ersten Platz.' : 'Dein Studio hat im Moment keine kommenden Kurse eingetragen.'} action={filter === 'mine' ? <button type="button" className="button button-secondary" onClick={() => setFilter('all')} data-testid="button-show-all-courses">Alle Kurse ansehen <ArrowRight size={15} /></button> : undefined} />}
     </>}
     <div className="footer-line">Dein Kursplan · {new Date().getFullYear()} Fiudia</div>
   </div>;
@@ -161,7 +176,7 @@ function NotificationsPage() {
       notifications.isError ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
       items.length ? <div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
         <div className="notification-icon"><Bell size={20} /></div><div className="notification-content"><div className="eyebrow">{item.readAt ? 'Gelesen' : 'Neu'}</div><h3>{item.title}</h3><p>{item.body}</p><time dateTime={item.createdAt}>{dateLabel(item.createdAt)} · {timeLabel(item.createdAt)} Uhr</time>
-          <div className="notification-actions"><Link href="/courses" className="text-link" data-testid={`link-notification-courses-${item.id}`}>Meine Kurse <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
+          <div className="notification-actions"><Link href={`/courses?courseId=${item.courseId}`} className="text-link" data-testid={`link-notification-courses-${item.id}`}>Kurs ansehen <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
           {actionError?.id === item.id && <div className="form-error" role="alert" data-testid={`status-notification-error-${item.id}`}>{actionError.message}</div>}
         </div></article>)}</div> :
       <EmptyView icon={<Bell size={22} />} title="Alles auf dem Laufenden." description="Noch keine Hinweise. Änderungen an deinen Kursbuchungen und Wartelistenplätzen erscheinen hier." action={<Link href="/courses" className="button button-secondary" data-testid="link-notification-empty-courses">Kurse ansehen <ArrowRight size={15} /></Link>} />}
