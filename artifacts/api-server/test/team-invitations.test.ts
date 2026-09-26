@@ -52,6 +52,7 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         guestA2: `team-guest-a2-${run}`,
         guestB: `team-guest-b-${run}`,
         foreignStudio: `team-foreign-studio-${run}`,
+        expiredGuest: `team-expired-${run}`,
         wrongEmail: `team-wrong-email-${run}`,
         unverified: `team-unverified-${run}`,
       };
@@ -67,6 +68,7 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         a2: `invite-a2-${run}@example.com`,
         b: `invite-b-${run}@example.com`,
         foreignStudio: `invite-foreign-studio-${run}@example.com`,
+        expired: `invite-expired-${run}@example.com`,
       };
       const identities = new Map([
         [users.guestA1, { fullName: "New A1", email: emails.a1, emailVerified: true }],
@@ -74,6 +76,7 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
         [users.guestA2, { fullName: "New A2", email: emails.a2, emailVerified: true }],
         [users.guestB, { fullName: "New B", email: emails.b, emailVerified: true }],
         [users.foreignStudio, { fullName: "Wrong studio", email: emails.foreignStudio, emailVerified: true }],
+        [users.expiredGuest, { fullName: "Expired invitee", email: emails.expired, emailVerified: true }],
         [users.wrongEmail, { fullName: "Wrong address", email: `wrong-${run}@example.com`, emailVerified: true }],
         [users.unverified, { fullName: "Unverified", email: emails.a1, emailVerified: false }],
       ]);
@@ -239,6 +242,35 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
           ]);
           assert.deepEqual(ids(await list(users.districtA)), [a1.id, a2.id].sort((x, y) => x - y));
           assert.ok((await list(users.districtA)).every((invitation) => invitation.status === "accepted"));
+        });
+
+        await t.test("expired invitations never grant access and do not block a fresh invitation", async () => {
+          const oldToken = randomUUID();
+          const [expired] = await tx.insert(invitationsTable).values({
+            organizationId: orgA.id,
+            studioId: studioA1.id,
+            invitedByStaffId: managerA1.id,
+            email: emails.expired,
+            role: "studio_employee",
+            tokenHash: createHash("sha256").update(oldToken).digest("hex"),
+            expiresAt: new Date(Date.now() - 60_000),
+          }).returning();
+          const displayed = (await list(users.managerA1)).find((item) => item.id === expired.id);
+          assert.equal(displayed?.status, "expired");
+          assert.equal((await api(users.expiredGuest, "POST", `/team/invitations/${oldToken}/accept`)).status, 404);
+          const [stillPending] = await tx.select({ status: invitationsTable.status })
+            .from(invitationsTable).where(eq(invitationsTable.id, expired.id));
+          assert.equal(stillPending.status, "pending");
+          assert.deepEqual(await tx.select({ id: staffTable.id }).from(staffTable)
+            .where(eq(staffTable.clerkUserId, users.expiredGuest)), []);
+
+          const fresh = await invite(users.managerA1, studioA1.id, "studio_employee", emails.expired);
+          assert.equal((await api(users.expiredGuest, "POST", `/team/invitations/${oldToken}/accept`)).status, 404);
+          const accepted = await api<{ studioId: number; role: string }>(
+            users.expiredGuest, "POST", `/team/invitations/${fresh.inviteUrl.split("/").at(-1)}/accept`);
+          assert.equal(accepted.status, 200);
+          assert.equal(accepted.body.studioId, studioA1.id);
+          assert.equal(accepted.body.role, "studio_employee");
         });
       } finally {
         await new Promise<void>((resolve, reject) =>

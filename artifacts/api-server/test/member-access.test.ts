@@ -50,16 +50,11 @@ test("member records remain inside the caller's studio and organization", async 
         { clerkUserId: `member-manager-b-${run}`, organizationId: orgB.id, studioId: studioB.id, fullName: "Manager B", email: `manager-b-${run}@example.com`, role: "studio_manager" },
         { clerkUserId: `member-employee-b-${run}`, organizationId: orgB.id, studioId: studioB.id, fullName: "Employee B", email: `employee-b-${run}@example.com`, role: "studio_employee" },
       ]).returning();
-    const [districtA, managerA1, managerA2, employeeA1, districtB, mismatchedManager] =
-      await db.insert(staffTable).values([
-        { clerkUserId: `member-district-a-${run}`, organizationId: orgA.id, studioId: null, fullName: "District A", email: `district-a-${run}@example.com`, role: "district_manager" },
-        { clerkUserId: `member-manager-a1-${run}`, organizationId: orgA.id, studioId: studioA1.id, fullName: "Manager A1", email: `manager-a1-${run}@example.com`, role: "studio_manager" },
-        { clerkUserId: `member-manager-a2-${run}`, organizationId: orgA.id, studioId: studioA2.id, fullName: "Manager A2", email: `manager-a2-${run}@example.com`, role: "studio_manager" },
-        { clerkUserId: `member-employee-a1-${run}`, organizationId: orgA.id, studioId: studioA1.id, fullName: "Employee A1", email: `employee-a1-${run}@example.com`, role: "studio_employee" },
-        { clerkUserId: `member-district-b-${run}`, organizationId: orgB.id, studioId: null, fullName: "District B", email: `district-b-${run}@example.com`, role: "district_manager" },
-        // A stale or incorrectly imported assignment must not grant access to another organization's studio.
-        { clerkUserId: `member-mismatched-${run}`, organizationId: orgA.id, studioId: studioB.id, fullName: "Mismatched Manager", email: `mismatched-${run}@example.com`, role: "studio_manager" },
-      ]).returning();
+    // A stale or incorrectly imported assignment must not grant access to another organization's studio.
+    const [mismatchedManager] = await db.insert(staffTable).values({
+      clerkUserId: `member-mismatched-${run}`, organizationId: orgA.id, studioId: studioB.id,
+      fullName: "Mismatched Manager", email: `mismatched-${run}@example.com`, role: "studio_manager",
+    }).returning();
     const [memberA1, memberA2, memberB] = await db.insert(membersTable).values([
       { studioId: studioA1.id, fullName: "Member A1", email: `private-a1-${run}@example.com`, phone: "111", membershipType: "Standard" },
       { studioId: studioA2.id, fullName: "Member A2", email: `private-a2-${run}@example.com`, phone: "222", membershipType: "Standard" },
@@ -180,8 +175,8 @@ test("member records remain inside the caller's studio and organization", async 
         [districtA.clerkUserId, memberB.id],
         [districtB.clerkUserId, memberA1.id],
       ] as const) {
-        const response = await api(staff.clerkUserId, "PATCH", `/members/${id}`, { phone: "999" });
-        assert.equal(response.status, 403, `${staff.role} must not edit member ${id}`);
+        const response = await api(user, "PATCH", `/members/${id}`, { phone: "999" });
+        assert.equal(response.status, 403, `${user} must not edit member ${id}`);
         assert.equal(JSON.stringify(response.body).includes("private-"), false);
       }
       const protectedRows = await db.select({ id: membersTable.id, phone: membersTable.phone })
@@ -264,7 +259,7 @@ test("member records remain inside the caller's studio and organization", async 
 
     await t.test("course creation commits a generic Pulse event with the course", async () => {
       const startsAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
-      const endsAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
+      const endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
       const courseBody = {
         title: `Pulse event course ${run}`,
         instructor: "Instructor",
@@ -317,7 +312,7 @@ test("member records remain inside the caller's studio and organization", async 
           ),
         );
       assert.ok(existing.length < 10);
-      const toSeed = 24 - currentCheckIns.length;
+      const toSeed = 9 - existing.length;
       if (toSeed > 0) {
         await db.insert(checkInsTable).values(
           Array.from({ length: toSeed }, () => ({
@@ -413,6 +408,31 @@ test("member records remain inside the caller's studio and organization", async 
       const afterEvents = await db.select({ id: pulseMessagesTable.id })
         .from(pulseMessagesTable).where(eq(pulseMessagesTable.organizationId, orgA.id));
       assert.equal(afterEvents.length, previousEvents.length);
+    });
+
+    await t.test("moving staff to another studio revokes old member access on the next request", async () => {
+      assert.deepEqual(ids(await list(managerA1.clerkUserId)), [memberA1.id]);
+      assert.deepEqual(ids(await list(employeeA1.clerkUserId)), [memberA1.id]);
+      await db.update(staffTable).set({ studioId: studioA2.id })
+        .where(inArray(staffTable.id, [managerA1.id, employeeA1.id]));
+
+      for (const staff of [managerA1, employeeA1]) {
+        assert.deepEqual(ids(await list(staff.clerkUserId)), [memberA2.id]);
+        assert.deepEqual(await list(staff.clerkUserId, `?search=${encodeURIComponent(memberA1.fullName)}`), []);
+        const foreign = await api(staff.clerkUserId, "GET", `/members?studioId=${studioA1.id}`);
+        assert.equal(foreign.status, 403);
+        assert.equal(JSON.stringify(foreign.body).includes(memberA1.email), false);
+      }
+      const oldEdit = await api(managerA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { phone: "999" });
+      assert.equal(oldEdit.status, 403);
+      assert.equal(JSON.stringify(oldEdit.body).includes(memberA1.email), false);
+      assert.equal((await api(managerA1.clerkUserId, "POST", "/members", draft(studioA1.id))).status, 403);
+      const newEdit = await api<MemberView>(managerA1.clerkUserId, "PATCH", `/members/${memberA2.id}`, { phone: "777" });
+      assert.equal(newEdit.status, 200);
+      assert.equal(newEdit.body.phone, "777");
+      const [oldMember] = await db.select({ phone: membersTable.phone })
+        .from(membersTable).where(eq(membersTable.id, memberA1.id));
+      assert.equal(oldMember.phone, "444");
     });
   } finally {
     try {
