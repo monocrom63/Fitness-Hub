@@ -14,6 +14,8 @@ tags:
     description: Fiudia studio operations and member management
   - name: team
     description: Staff roles and invitations
+  - name: pulse
+    description: Role- and studio-scoped team updates
 paths:
   /healthz:
     get:
@@ -231,6 +233,71 @@ paths:
           description: Sign-in required
         "403":
           description: Insufficient role or studio access
+  /pulse:
+    get:
+      operationId: listPulse
+      tags: [pulse]
+      summary: List Pulse messages visible to the signed-in staff member
+      responses:
+        "200":
+          description: Recent visible messages with read state
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PulseMessage"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Fiudia access has not been assigned
+    post:
+      operationId: createPulseMessage
+      tags: [pulse]
+      summary: Publish a role- and studio-scoped Pulse message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PulseInput"
+      responses:
+        "201":
+          description: Pulse message created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PulseMessage"
+        "400":
+          description: Invalid message details
+        "401":
+          description: Sign-in required
+        "403":
+          description: Insufficient role or studio access
+  /pulse/{id}/read:
+    post:
+      operationId: markPulseRead
+      tags: [pulse]
+      summary: Record that the signed-in staff member read a Pulse message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Read receipt recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PulseRead"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Message is not visible to this staff member
+        "404":
+          description: Message not found
   /team/invitations:
     get:
       operationId: listInvitations
@@ -456,4 +523,41 @@ components:
         email: { type: string, format: email, maxLength: 320 }
         role: { $ref: "#/components/schemas/Role" }
         studioId: { type: integer }
+    PulsePriority:
+      type: string
+      enum: [info, important, urgent]
+    PulseAudience:
+      type: string
+      enum: [all, managers, employees]
+    PulseMessage:
+      type: object
+      required:
+        [id, title, body, priority, audience, studioId, studioName, authorName, createdAt, isRead, readCount]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        body: { type: string }
+        priority: { $ref: "#/components/schemas/PulsePriority" }
+        audience: { $ref: "#/components/schemas/PulseAudience" }
+        studioId: { type: ["integer", "null"] }
+        studioName: { type: ["string", "null"] }
+        authorName: { type: string }
+        createdAt: { type: string, format: date-time }
+        isRead: { type: boolean }
+        readCount: { type: integer }
+    PulseInput:
+      type: object
+      required: [title, body, priority, audience, studioId]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 140 }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+        priority: { $ref: "#/components/schemas/PulsePriority" }
+        audience: { $ref: "#/components/schemas/PulseAudience" }
+        studioId: { type: ["integer", "null"] }
+    PulseRead:
+      type: object
+      required: [messageId, readAt]
+      properties:
+        messageId: { type: integer }
+        readAt: { type: string, format: date-time }
 

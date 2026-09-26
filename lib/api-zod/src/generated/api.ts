@@ -282,6 +282,71 @@ export const CreateCheckInResponse = zod.object({
 
 
 /**
+ * @summary List Pulse messages visible to the signed-in staff member
+ */
+export const ListPulseResponseItem = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "priority": zod.enum(['info', 'important', 'urgent']),
+  "audience": zod.enum(['all', 'managers', 'employees']),
+  "studioId": zod.number().int().nullable(),
+  "studioName": zod.string().nullable(),
+  "authorName": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "isRead": zod.boolean(),
+  "readCount": zod.number().int()
+})
+export const ListPulseResponse = zod.array(ListPulseResponseItem)
+
+
+/**
+ * @summary Publish a role- and studio-scoped Pulse message
+ */
+export const createPulseMessageBodyTitleMin = 2;
+export const createPulseMessageBodyTitleMax = 140;
+
+export const createPulseMessageBodyBodyMax = 2000;
+
+
+
+export const CreatePulseMessageBody = zod.object({
+  "title": zod.string().min(createPulseMessageBodyTitleMin).max(createPulseMessageBodyTitleMax),
+  "body": zod.string().min(1).max(createPulseMessageBodyBodyMax),
+  "priority": zod.enum(['info', 'important', 'urgent']),
+  "audience": zod.enum(['all', 'managers', 'employees']),
+  "studioId": zod.number().int().nullable()
+})
+
+export const CreatePulseMessageResponse = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "priority": zod.enum(['info', 'important', 'urgent']),
+  "audience": zod.enum(['all', 'managers', 'employees']),
+  "studioId": zod.number().int().nullable(),
+  "studioName": zod.string().nullable(),
+  "authorName": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "isRead": zod.boolean(),
+  "readCount": zod.number().int()
+})
+
+
+/**
+ * @summary Record that the signed-in staff member read a Pulse message
+ */
+export const MarkPulseReadParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const MarkPulseReadResponse = zod.object({
+  "messageId": zod.number().int(),
+  "readAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List invitations available to the signed-in manager
  */
 export const ListInvitationsResponseItem = zod.object({

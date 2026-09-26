@@ -33,7 +33,10 @@ import type {
   Member,
   MemberInput,
   MemberUpdate,
-  OnboardingInput
+  OnboardingInput,
+  PulseInput,
+  PulseMessage,
+  PulseRead
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -895,6 +898,245 @@ export const useCreateCheckIn = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateCheckInMutationOptions(options));
+    }
+
+export const getListPulseUrl = () => {
+
+
+
+
+  return `/api/pulse`
+}
+
+/**
+ * @summary List Pulse messages visible to the signed-in staff member
+ */
+export const listPulse = async ( options?: Parameters<typeof customFetch>[1]): Promise<PulseMessage[]> => {
+
+  return customFetch<PulseMessage[]>(getListPulseUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPulseQueryKey = () => {
+    return [
+    `/api/pulse`
+    ] as const;
+    }
+
+
+export const getListPulseQueryOptions = <TData = Awaited<ReturnType<typeof listPulse>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPulse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPulseQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPulse>>> = ({ signal }) => listPulse({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPulse>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPulseQueryResult = NonNullable<Awaited<ReturnType<typeof listPulse>>>
+export type ListPulseQueryError = ErrorType<void>
+
+
+/**
+ * @summary List Pulse messages visible to the signed-in staff member
+ */
+
+export function useListPulse<TData = Awaited<ReturnType<typeof listPulse>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPulse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPulseQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePulseMessageUrl = () => {
+
+
+
+
+  return `/api/pulse`
+}
+
+/**
+ * @summary Publish a role- and studio-scoped Pulse message
+ */
+export const createPulseMessage = async (pulseInput: PulseInput, options?: Parameters<typeof customFetch>[1]): Promise<PulseMessage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PulseMessage>(getCreatePulseMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pulseInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePulseMessageMutationKey = () => ['createPulseMessage'] as const;
+
+export const getCreatePulseMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPulseMessage>>, TError,CreatePulseMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPulseMessage>>, TError,CreatePulseMessageMutationVariables, TContext> => {
+
+const mutationKey = getCreatePulseMessageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPulseMessage>>, CreatePulseMessageMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPulseMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePulseMessageMutationResult = NonNullable<Awaited<ReturnType<typeof createPulseMessage>>>
+    export type CreatePulseMessageMutationBody = BodyType<PulseInput>
+    export type CreatePulseMessageMutationError = ErrorType<void>
+    export type CreatePulseMessageMutationVariables = {data: BodyType<PulseInput>}
+
+    /**
+ * @summary Publish a role- and studio-scoped Pulse message
+ */
+export const useCreatePulseMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPulseMessage>>, TError,CreatePulseMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPulseMessage>>,
+        TError,
+        CreatePulseMessageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePulseMessageMutationOptions(options));
+    }
+
+export const getMarkPulseReadUrl = (id: number,) => {
+
+
+
+
+  return `/api/pulse/${id}/read`
+}
+
+/**
+ * @summary Record that the signed-in staff member read a Pulse message
+ */
+export const markPulseRead = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PulseRead> => {
+
+  return customFetch<PulseRead>(getMarkPulseReadUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkPulseReadMutationKey = () => ['markPulseRead'] as const;
+
+export const getMarkPulseReadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markPulseRead>>, TError,MarkPulseReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markPulseRead>>, TError,MarkPulseReadMutationVariables, TContext> => {
+
+const mutationKey = getMarkPulseReadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markPulseRead>>, MarkPulseReadMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  markPulseRead(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkPulseReadMutationResult = NonNullable<Awaited<ReturnType<typeof markPulseRead>>>
+
+    export type MarkPulseReadMutationError = ErrorType<void>
+    export type MarkPulseReadMutationVariables = {id: number}
+
+    /**
+ * @summary Record that the signed-in staff member read a Pulse message
+ */
+export const useMarkPulseRead = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markPulseRead>>, TError,MarkPulseReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markPulseRead>>,
+        TError,
+        MarkPulseReadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkPulseReadMutationOptions(options));
     }
 
 export const getListInvitationsUrl = () => {

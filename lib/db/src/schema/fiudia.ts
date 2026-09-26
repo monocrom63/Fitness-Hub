@@ -117,3 +117,45 @@ export const checkInsTable = pgTable("fiudia_check_ins", {
     .notNull()
     .defaultNow(),
 });
+
+export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id")
+    .notNull()
+    .references(() => organizationsTable.id, { onDelete: "cascade" }),
+  studioId: integer("studio_id").references(() => studiosTable.id, {
+    onDelete: "cascade",
+  }),
+  authorStaffId: integer("author_staff_id")
+    .notNull()
+    .references(() => staffTable.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  priority: text("priority").notNull().default("info"),
+  audience: text("audience").notNull().default("all"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const pulseReadsTable = pgTable(
+  "fiudia_pulse_reads",
+  {
+    id: serial("id").primaryKey(),
+    messageId: integer("message_id")
+      .notNull()
+      .references(() => pulseMessagesTable.id, { onDelete: "cascade" }),
+    staffId: integer("staff_id")
+      .notNull()
+      .references(() => staffTable.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("fiudia_pulse_reads_message_staff").on(
+      table.messageId,
+      table.staffId,
+    ),
+  ],
+);

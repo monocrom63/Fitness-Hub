@@ -248,6 +248,62 @@ export interface InvitationInput {
   studioId: number;
 }
 
+export type PulsePriority = typeof PulsePriority[keyof typeof PulsePriority];
+
+
+export const PulsePriority = {
+  info: 'info',
+  important: 'important',
+  urgent: 'urgent',
+} as const;
+
+export type PulseAudience = typeof PulseAudience[keyof typeof PulseAudience];
+
+
+export const PulseAudience = {
+  all: 'all',
+  managers: 'managers',
+  employees: 'employees',
+} as const;
+
+export interface PulseMessage {
+  id: number;
+  title: string;
+  body: string;
+  priority: PulsePriority;
+  audience: PulseAudience;
+  /** @nullable */
+  studioId: number | null;
+  /** @nullable */
+  studioName: string | null;
+  authorName: string;
+  createdAt: string;
+  isRead: boolean;
+  readCount: number;
+}
+
+export interface PulseInput {
+  /**
+     * @minLength 2
+     * @maxLength 140
+     */
+  title: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  body: string;
+  priority: PulsePriority;
+  audience: PulseAudience;
+  /** @nullable */
+  studioId: number | null;
+}
+
+export interface PulseRead {
+  messageId: number;
+  readAt: string;
+}
+
 export type ListMembersParams = {
 search?: string;
 status?: MemberStatus;
