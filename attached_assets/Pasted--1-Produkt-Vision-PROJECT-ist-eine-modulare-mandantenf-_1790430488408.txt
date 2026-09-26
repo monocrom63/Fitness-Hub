@@ -1,0 +1,333 @@
+## 1. Produkt & Vision
+
+%PROJECT% ist eine modulare, mandantenfähige Plattform zur Verwaltung und Digitalisierung von Fitnessstudios, Studioketten, Franchiseorganisationen und größeren Betreiberstrukturen.
+
+Der zentrale Gedanke: Organisationen sind verschieden. %PROJECT% passt sich ihrer Struktur an — nicht umgekehrt.
+
+Die Plattform ist kein klassisches Admin-Dashboard. Funktionen, Ansichten, Rollen und Prozesse werden abhängig von Organisation, Standort, Benutzerrolle und gebuchten Modulen individuell zusammengestellt.
+
+### 1.1 Zielgruppen
+- Einzelstudio — fokussiert, einfach, schnell
+- Kette / mehrere Standorte — standortübergreifend, vergleichbar
+- Franchise — Standards setzen, Qualität sichern
+- Enterprise — Regionen, Reporting, Compliance
+
+Ein Kunde soll mit einer kleinen Konfiguration beginnen und später wachsen können, ohne die Plattform wechseln zu müssen.
+
+### 1.2 Drei Grundsätze
+- Modular statt monolithisch — nur was gebucht ist, ist sichtbar
+- Rollen- und kontextbezogen statt für alle gleich — jede Rolle hat ihren eigenen Arbeitsplatz
+- Einfach in der Bedienung, ohne gewöhnlich auszusehen — hoher Anspruch an UX und Design
+
+---
+
+## 2. KI als integrierter Bestandteil
+
+KI ist bei %PROJECT% kein aufgesetztes Feature, sondern ein natürlicher Teil der Plattform. Sie unterstützt im Hintergrund — ohne den Benutzer zu überfordern oder zu ersetzen.
+
+### 2.1 Wie KI eingesetzt wird
+- Intelligente Vorschläge — z.B. optimale Kurszeiten basierend auf Auslastungsdaten
+- Automatische Erkennung — Abwanderungsrisiko bei Mitgliedern frühzeitig erkennen
+- Kontextbezogene Aktionen — passende Schnellaktionen je nach Tageszeit und Rolle
+- Pulse-Zusammenfassung — wichtige Ereignisse automatisch priorisieren
+- Anomalie-Erkennung — ungewöhnliche Login-Muster oder Zugriffsversuche
+- Kampagnen-Optimierung — Zielgruppen und Zeitpunkte automatisch vorschlagen
+- Freund-Empfehlung — KI erkennt wer wahrscheinlich Freunde einlädt
+
+### 2.2 Design-Prinzip für KI
+
+KI-Funktionen sollen dezent und vertrauenswürdig wirken. Kein aggressives "AI"-Branding. Stattdessen hilfreiche Vorschläge die sich natürlich anfühlen. Der Benutzer behält immer die Kontrolle.
+
+> Beispiel: Statt "KI empfiehlt..." → einfach einen intelligenten Vorschlag anzeigen den der User annehmen oder ignorieren kann.
+
+---
+
+## 3. Kernkonzepte UI/UX
+
+### 3.1 Today — die Startseite
+
+Die Startseite heißt "Today", nicht "Dashboard". Sie zeigt was für den jeweiligen Benutzer heute relevant ist: Termine, Aufgaben, Kurse, Check-ins, wichtige Kennzahlen und direkte Aktionen.
+
+- Morgens: Was steht heute an? Nächster Kurs in X Minuten?
+- Tagsüber: Live Check-ins, Auslastung, Aufgaben
+- Abends: Tagesbilanz, offene Punkte
+
+> Today verändert sich im Tagesverlauf. Es ist kein statisches Dashboard.
+
+### 3.2 Pulse — interne Kommunikation
+
+Pulse ist die integrierte Kommunikationsebene. Studioleitung, Teams und die Plattform selbst können Informationen einspielen.
+
+- Standort-spezifische Nachrichten (nur Berlin Mitte sieht das)
+- Team-Nachrichten (nur Trainer)
+- Schicht-Nachrichten (nur aktuelle Schicht)
+- Automatische Ereignisse (Kursänderung, Check-in-Meilenstein)
+- Lesebestätigung bei wichtigen Meldungen
+
+### 3.3 Action Strip
+
+Floating Button (unten rechts) öffnet kontextuelle Schnellaktionen. Diese ändern sich je nach Rolle und Tageszeit. Morgens: Kasse öffnen, Check-in starten. Abends: Tagesabschluss, Report.
+
+### 3.4 Modulares System sichtbar machen
+
+Nicht gebuchte Module erscheinen nicht — weder ausgegraut noch mit Lock-Icon. Sie existieren für den Benutzer nicht. Wird ein Modul aktiviert, integriert es sich automatisch in Navigation, Today und Pulse.
+
+---
+
+## 4. Rollenbasierte Ansichten
+
+Alle Rollen arbeiten auf derselben Plattform mit denselben Daten — aber aus unterschiedlichen Perspektiven.
+
+### Frontdesk / Empfang
+- Today: Nächster Kurs, Check-in Liste, Aufgaben
+- Schnellaktionen: Einchecken, Gast anlegen, QR Code
+- Pulse: Studio-Nachrichten, Schicht-Infos
+- Keine Finanzen, keine PII, keine Verwaltung
+
+### Manager
+- Today: KPIs, Trainer-Übersicht, offene Aufgaben, Alerts
+- Schnellaktionen: Kampagne vorbereiten, Pulse schreiben
+- Kurse, Buchungen, Mitglieder verwalten
+- Keine Finanzen, keine Module-Verwaltung
+
+### Owner
+- Today: Umsatz, Mitglieder-Entwicklung, Security Log, Module
+- Schnellaktionen: Flash Kampagne, Token senden, Report
+- Alles — inkl. Finanzen, DSGVO, Mitarbeiter
+- Mobile: Flash Kampagne und Gutscheine per Handy
+
+### Franchise / Enterprise
+- Today: Alle Standorte im Überblick, Compliance-Status
+- Standort-Vergleiche, Regionen, Wachstum
+- Franchise-Standards setzen und überwachen
+- NIS2 Compliance-Dashboard
+
+---
+
+## 5. Mitglieder-App — Zentraler digitaler Begleiter
+
+Die Mitglieder-App ist kein einfaches Self-Service-Portal zur Stammdatenverwaltung. Sie ist der zentrale digitale Begleiter des Mitglieds — vom ersten Kontakt bis zur langfristigen Bindung ans Studio.
+
+**Kerngedanke: Die App begleitet das Mitglied — sie verwaltet es nicht.**
+
+Die App verbindet vier Bereiche die bisher getrennt gedacht wurden: Community, Engagement, Belohnung und Service. Alles in einer Oberfläche — ohne dass es sich nach "Software" anfühlt.
+
+### 5.1 Community & Soziales
+
+- Freunde einladen — mit persönlichem Link oder QR Code
+  - Freund kommt ins Studio → Einladender bekommt Token
+  - Erinnerung: "Anna hat deinen Link genutzt! Sie ist jetzt Mitglied 🎉"
+- Gemeinsam trainieren — Freunde als "Training Buddy" markieren
+  - Sehen wann Buddy heute ins Studio kommt
+  - Gemeinsamen Kurs buchen mit einem Klick
+- Studio-Community Feed — nicht-öffentlich, nur für Mitglieder
+  - Meilensteine feiern (100. Check-in, 1 Jahr Mitglied)
+  - Trainer-Inhalte (Tipps, Workouts, Ernährung)
+
+### 5.2 Wallet & Token-System
+
+Das Wallet ist das Herzstück der App. Es macht greifbar was das Mitglied hat und was es tun kann.
+
+- Guest Pass — 3x im Monat einen Freund mitbringen
+  - Direkt aus der App teilen (WhatsApp, Link, QR)
+  - Freund bucht selbst über den Pass — kein Anruf nötig
+- PunchCard — 10er Karte digital im Wallet
+  - Jeder Check-in stempelt automatisch
+  - Visuell sichtbar wie viele Eintritte noch übrig
+- ThankYou Token — vom Studio persönlich gesendet
+  - "Lisa, du warst heute zum 100. Mal da! 🎁"
+- Kampagnen Token — zeitlich begrenzte Angebote
+- VoucherToken — einlösbar für Produkte oder Kurse
+- Founding Token — NFT-basiert für Gründungsmitglieder (Phase 3)
+
+### 5.3 Check-in & Kurse
+
+- QR Code — groß, sofort sichtbar, kein Suchen
+  - Funktioniert offline (QR wird lokal gecacht)
+- Streak-Anzeige — wie viele Tage in Folge?
+  - "Du trainierst seit 14 Tagen in Folge! 🔥"
+- Kurse buchen — mit 1-2 Klicks
+  - Warteliste beitreten und automatisch benachrichtigt werden
+  - Buchung mit Training Buddy zusammen
+- Nächster Kurs prominent auf Today
+  - "Dein Yoga Flow startet in 45 Minuten — Raum 1"
+
+### 5.4 Loyalty & Status
+
+Mitglieder werden nicht in Tarifen eingeteilt — sie entwickeln einen Status der ihre Treue widerspiegelt.
+
+- Starter → Regular → Dedicated → Legend
+  - Status basiert auf Check-ins, Dauer, Engagement
+  - Sichtbar in der App als Badge
+- Status-Vorteile (je nach Studio-Konfiguration):
+  - Legend: 72h früheres Buchungsfenster für Kurse
+  - Dedicated: bevorzugte Plätze bei Warteliste
+  - Regular: monatlicher Bonus Token
+- Fortschrittsanzeige: "Noch 3 Check-ins bis Dedicated"
+
+### 5.5 Persönlicher Bereich
+
+- Profil — Name, Foto, Status, Mitglied seit
+- Meine Verträge — Laufzeit, nächste Zahlung, Kündigung
+- Meine Zahlungen — Rechnungen als PDF
+- DSGVO — "Meine Daten" mit einem Klick anfragen
+  - Kein E-Mail-Versand — sicherer Download im Portal
+- Einstellungen — Benachrichtigungen, Sprache, Theme
+- White Label — Mitglied sieht primär die Studiomarke
+
+### 5.6 Benachrichtigungen (Smart)
+
+Nicht jede Information ist eine Push-Notification. Die App unterscheidet zwischen dringend, wichtig und informativ.
+
+- Sofort: "Dein Wartelisten-Platz ist frei! 30 Min zum Bestätigen"
+- Wichtig: "Anna hat deinen Freundeslink genutzt 🎉"
+- Info: "Neuer Kurs ab Montag: HIIT mit Mike"
+- Erinnerung: "Yoga Flow in 1 Stunde — bist du dabei?"
+- Kein Spam: Mitglied steuert selbst was es empfängt
+
+### 5.7 Aggregatoren (USC, Wellhub)
+
+Mitglieder die über Urban Sports Club oder Wellhub ins Studio kommen nutzen dieselbe App-Oberfläche für Check-in — nur ohne Wallet und Loyalty.
+
+- Check-in per QR funktioniert identisch
+- Kurs-Buchung möglich (wenn Kontingent vorhanden)
+- Kein Zugriff auf Studio-Community
+- Einladung zum direkten Mitglied werden
+
+### 5.8 Design-Prinzipien der App
+
+- Gleiche Designsprache wie Admin Portal — ein System
+- Mobile First — kein Desktop-Layout das verkleinert wurde
+- Bottom Navigation — max. 5 Tabs, klar beschriftet
+- Keine Login-Mauer für öffentliche Inhalte (Kursplan einsehbar)
+- Dark Theme als Standard — Light Theme optional
+- Haptic Feedback bei wichtigen Aktionen (Check-in, Buchung)
+- Animations: Wallet-Karten blättern, Token erscheinen mit Effekt
+
+### 5.9 PWA — Progressive Web App
+
+Die App wird als PWA entwickelt — installierbar auf iPhone und Android, ohne App Store. In Phase 3 folgen native Apps.
+
+- Installierbar via "Zum Homescreen hinzufügen"
+- Offline-fähig für QR Code und Kursplan
+- Push Notifications via Service Worker
+- Kein App Store — sofort verfügbar
+
+---
+
+## 6. Design System
+
+### 6.1 Grundprinzipien
+- Hochwertig und ruhig — kein buntes Feature-Marketing
+- Editorial und räumlich — große Typografie, viel Weißraum
+- Dark Theme als Standard — hell als Option
+- Organische Formen als visuelles Markenzeichen der Website
+- Keine ausgegrauten Elemente — was nicht erlaubt ist, ist nicht sichtbar
+
+### 6.2 Farben
+```
+Background:  #090C14  (fast schwarz, leicht blau)
+Surface:     #111520  (Karten-Hintergrund)
+Card:        #171D2E  (erhöhte Karten)
+Border:      #222B42  (Trennlinien, 0.5px)
+Accent:      #6C47FF  (Primärfarbe — tiefes Lila)
+Accent2:     #9B6FFF  (helleres Lila für Hover)
+Live:        #00D4A0  (Echtzeit / Aktiv — Türkis-Grün)
+Warning:     #F5A623  (Warnungen — Orange)
+Danger:      #FF4D6A  (Fehler / Kritisch — Rot)
+Text:        #E8EAF0  (Haupttext)
+Muted:       #5A6380  (Nebentext / Labels)
+```
+
+### 6.3 Typografie
+- Display / Headlines: **"Outfit"** — für Zahlen, große Überschriften, KPIs
+- Body / Navigation: **"Inter"** — für Labels, Fließtext, Buttons
+- Beide via Google Fonts verfügbar
+
+### 6.4 Abstände & Radien
+```
+Cards:         border-radius 10-12px
+Buttons:       border-radius 8px
+Chips / Tags:  border-radius 999px (pill)
+Borders:       0.5px (fein, nicht dominant)
+Spacing:       8px Grid
+```
+
+### 6.5 Animationen
+- Langsam und hochwertig — keine schnellen Übergänge
+- Live-Puls: Grüner Punkt pulsiert bei Echtzeit-Events
+- Zahlen zählen beim ersten Laden hoch (einmalig, WOW-Moment)
+- Action Strip öffnet sich nach oben (floating menu)
+- Wallet-Karten: blättern wie echte Karten
+- Token erscheinen mit kleinem Effekt beim Empfang
+- Transition: 0.15-0.2s ease — niemals bounce oder elastic
+
+---
+
+## 7. Frontend Tech Stack
+
+### 7.1 Admin Portal (aktuell)
+- React 18 + Vite
+- Tailwind CSS v4
+- TypeScript
+- Axios mit JWT Interceptor
+- react-oidc-context (Authentik OIDC Login)
+
+### 7.2 Mitglieder-App (PWA)
+- React 18 + Vite (gleiches Setup)
+- Tailwind CSS v4 (gleiches Design System)
+- TypeScript
+- Workbox (Service Worker / Offline)
+- Web Push API
+
+### 7.3 API
+- Base URL: `https://api.[domain]/v1`
+- Auth: Bearer JWT Token (via Authentik OIDC)
+- Format: JSON
+- Swagger/OpenAPI Dokumentation wird bereitgestellt
+
+> API Gateway ist in Entwicklung. Zugang und Docs folgen zeitnah.
+
+### 7.4 Authentifizierung
+- Authentik als Identity Provider (OIDC)
+- JWT Token enthält: user_id, role, org_id, location_ids
+- Token via react-oidc-context automatisch verwaltet
+- Rolle bestimmt welche Komponenten gerendert werden
+
+---
+
+## 8. UI Komponenten — Priorität
+
+### Admin Portal
+- Today View — pro Rolle unterschiedlich
+- Pulse Feed — Filter, Lesebestätigung, Auto-Events
+- Action Strip — floating, kontextuell, rollenbasiert
+- Check-in Flow — QR Scanner Integration
+- Mitglieder-Suche — mit Masking by Default
+- Kursplan — Buchung, Warteliste, Fairness-Anzeige
+- Modul-Übersicht — "Erweitern +" Button
+- Security Dashboard — Login-Log für Owner
+- Compliance Portal — DSGVO Anfragen verwalten
+- Mitarbeiter-Verwaltung — mit CSV Import UI
+
+### Mitglieder-App
+- Today — Nächster Kurs, Streak, Community-Highlights
+- QR Code Screen — groß, sofort sichtbar, offline
+- Wallet — Karten-Design, blätterbar, visuell ansprechend
+- Freund einladen — Share Sheet, persönlicher Link
+- Kurs-Buchung — mit Buddy-Funktion
+- Loyalty Status — Badge, Fortschritt, Vorteile
+- Benachrichtigungen — mit Zeitlimit-Anzeige bei Warteliste
+
+---
+
+## 9. Nächste Schritte & Koordination
+
+- API Gateway wird aufgesetzt — dann Zugang + Swagger Docs
+.....
+- Wir entwickeln eine eigene Designsprache — kein Copy
+
+### Wichtige Hinweise
+- NDA gilt für alle technischen Details und Implementierungen
+- Keine Screenshots oder Code an Dritte
+- Fragen und Ideen immer willkommen — wir bauen das gemeinsam
