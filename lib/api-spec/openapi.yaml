@@ -532,15 +532,21 @@ paths:
           in: query
           description: Load messages older than this message ID
           schema: { type: integer, minimum: 1 }
+        - name: unreadOnly
+          in: query
+          description: Show only messages not yet read by the signed-in staff member
+          schema: { type: boolean }
       responses:
         "200":
-          description: Up to 30 visible messages with read state, newest first
+          description: Up to 30 visible messages matching the filter, with read state, newest first
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/PulseMessage"
+        "400":
+          description: Invalid filter or message cursor
         "401":
           description: Sign-in required
         "403":

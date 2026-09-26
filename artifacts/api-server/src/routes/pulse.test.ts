@@ -241,6 +241,67 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
             .where(eq(pulseReadsTable.staffId, staffByKey.get("employeeA1")!.id));
           assert.equal(hiddenReceipts.length, 1);
         });
+
+        await t.test("pages beyond the first 60 and finds older unread notices without leaking other audiences", async () => {
+          const older = await tx.insert(pulseMessagesTable).values({
+            organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id,
+            audience: "employees", title: "Older unread", body: "Still available",
+            priority: "info",
+          }).returning();
+          const newer = await tx.insert(pulseMessagesTable).values(
+            Array.from({ length: 100 }, (_, index) => ({
+              organizationId: index % 7 === 0 ? orgB.id : orgA.id,
+              studioId: index % 7 === 0 ? studioB1.id : index % 5 === 0 ? studioA2.id : studioA1.id,
+              authorStaffId: index % 7 === 0 ? authorB.id : authorA.id,
+              audience: index % 3 === 0 ? "managers" : "employees",
+              title: `Newer ${index}`, body: "Recent notice", priority: "info" as const,
+            })),
+          ).returning();
+          const ownStaffId = staffByKey.get("employeeA1")!.id;
+          await tx.insert(pulseReadsTable).values(
+            newer.filter((row, index) => index % 4 === 0 && row.audience === "employees" && row.studioId === studioA1.id && row.organizationId === orgA.id)
+              .map(row => ({ staffId: ownStaffId, messageId: row.id })),
+          );
+          const page = async (path: string) => {
+            const result = await call<PulseRow[]>(users.employeeA1, path);
+            assert.equal(result.status, 200);
+            return result.data;
+          };
+          let beforeId: number | undefined;
+          const all: PulseRow[] = [];
+          do {
+            const batch = await page(`/pulse${beforeId ? `?beforeId=${beforeId}` : ""}`);
+            assert.ok(batch.length <= 30);
+            assert.ok(batch.every(row => beforeId === undefined || row.id < beforeId));
+            all.push(...batch);
+            beforeId = batch.length === 30 ? batch[batch.length - 1].id : undefined;
+          } while (beforeId);
+          assert.ok(all.length > 30);
+          assert.equal(new Set(all.map(row => row.id)).size, all.length);
+          assert.ok(all.some(row => row.id === older[0].id && !row.isRead));
+          assert.ok(all.every(row => !row.title.startsWith("Newer ") ||
+            newer.some(created => created.id === row.id && created.organizationId === orgA.id &&
+              created.studioId === studioA1.id && created.audience === "employees")));
+
+          const unreadFirst = await page("/pulse?unreadOnly=true");
+          assert.equal(unreadFirst.length, 30);
+          const unreadOlder = await page(`/pulse?unreadOnly=true&beforeId=${unreadFirst[29].id}`);
+          const unread = [...unreadFirst, ...unreadOlder];
+          assert.ok(unreadOlder.some(row => row.id === older[0].id && !row.isRead));
+          assert.equal(new Set(unread.map(row => row.id)).size, unread.length);
+          assert.ok(unread.every(row => !row.isRead && all.some(visible => visible.id === row.id)));
+          const readPage = await page("/pulse?unreadOnly=false");
+          assert.ok(readPage.some(row => row.isRead));
+          assert.equal((await call(users.employeeA1, "/pulse?unreadOnly=maybe")).status, 400);
+          assert.equal((await call(users.employeeA1, "/pulse?beforeId=0")).status, 400);
+          assert.equal((await call(users.employeeA1, "/pulse?beforeId=invalid")).status, 400);
+
+          assert.equal((await call(users.employeeA1, `/pulse/${older[0].id}/read`, "POST")).status, 200);
+          assert.equal((await page("/pulse?unreadOnly=true")).some(row => row.id === older[0].id), false);
+          const readOld = (await page(`/pulse?beforeId=${newer[0].id}`)).find(row => row.id === older[0].id);
+          assert.equal(readOld?.isRead, true);
+          assert.equal(readOld?.readCount, 1);
+        });
       } finally {
         await new Promise<void>((resolve, reject) => {
           server.close((error) => error ? reject(error) : resolve());

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, notExists, or } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreatePulseMessageBody,
@@ -102,8 +102,10 @@ router.get("/pulse", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
   const params = ListPulseQueryParams.safeParse(req.query);
-  if (!params.success) {
-    res.status(400).json({ error: "Ungültiger Nachrichten-Cursor." });
+  // Zod's boolean coercion treats the string "false" as true; accept only literal query values.
+  if (!params.success || (req.query.unreadOnly !== undefined &&
+      req.query.unreadOnly !== "true" && req.query.unreadOnly !== "false")) {
+    res.status(400).json({ error: "Ungültiger Nachrichtenfilter oder Cursor." });
     return;
   }
 
@@ -129,6 +131,12 @@ router.get("/pulse", async (req, res): Promise<void> => {
       visibleMessages(staff, studioIds),
       isNull(pulseMessagesTable.retractedAt),
       params.data.beforeId ? lt(pulseMessagesTable.id, params.data.beforeId) : undefined,
+      req.query.unreadOnly === "true" ? notExists(
+        database.select({ id: pulseReadsTable.id }).from(pulseReadsTable).where(and(
+          eq(pulseReadsTable.messageId, pulseMessagesTable.id),
+          eq(pulseReadsTable.staffId, staff.id),
+        )),
+      ) : undefined,
     ))
     .orderBy(desc(pulseMessagesTable.id))
     .limit(30);

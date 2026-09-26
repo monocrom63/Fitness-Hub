@@ -12,4 +12,8 @@ export type ListPulseParams = {
  * @minimum 1
  */
 beforeId?: number;
+/**
+ * Show only messages not yet read by the signed-in staff member
+ */
+unreadOnly?: boolean;
 };
