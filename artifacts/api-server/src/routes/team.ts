@@ -26,29 +26,6 @@ import {
   type StaffContext,
 } from "../lib/fiudia-access";
 
-const router: IRouter = Router();
-
-async function requireManager(
-  req: Request,
-  res: Response,
-): Promise<StaffContext | null> {
-  const userId = getRequestUserId(req);
-  if (!userId) {
-    res.status(401).json({ error: "Bitte melde dich an." });
-    return null;
-  }
-  const staff = await getStaffContext(userId);
-  if (!staff) {
-    res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
-    return null;
-  }
-  if (!canManageTeam(staff)) {
-    res.status(403).json({ error: "Deine Rolle darf keine Teamzugänge verwalten." });
-    return null;
-  }
-  return staff;
-}
-
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -58,16 +35,51 @@ function invitationStatus(status: string, expiresAt: Date) {
   return status;
 }
 
+type TeamDependencies = {
+  database: typeof db;
+  userIdFromRequest: (req: Request) => string | null;
+  identityForUser: typeof getClerkIdentity;
+};
+
+export function createTeamRouter(
+  dependencies: Partial<TeamDependencies> = {},
+): IRouter {
+  const router: IRouter = Router();
+  const database = dependencies.database ?? db;
+  const userIdFromRequest = dependencies.userIdFromRequest ?? getRequestUserId;
+  const identityForUser = dependencies.identityForUser ?? getClerkIdentity;
+
+  async function requireManager(
+    req: Request,
+    res: Response,
+  ): Promise<StaffContext | null> {
+    const userId = userIdFromRequest(req);
+    if (!userId) {
+      res.status(401).json({ error: "Bitte melde dich an." });
+      return null;
+    }
+    const staff = await getStaffContext(userId, database);
+    if (!staff) {
+      res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
+      return null;
+    }
+    if (!canManageTeam(staff)) {
+      res.status(403).json({ error: "Deine Rolle darf keine Teamzugänge verwalten." });
+      return null;
+    }
+    return staff;
+  }
+
 router.get("/team/invitations", async (req, res): Promise<void> => {
   const staff = await requireManager(req, res);
   if (!staff) return;
-  const studioIds = await getAccessibleStudioIds(staff);
+  const studioIds = await getAccessibleStudioIds(staff, database);
   if (studioIds.length === 0) {
     res.json([]);
     return;
   }
 
-  const invitations = await db
+  const invitations = await database
     .select({
       id: invitationsTable.id,
       email: invitationsTable.email,
@@ -117,13 +129,13 @@ router.post("/team/invitations", async (req, res): Promise<void> => {
     });
     return;
   }
-  if (!(await canAccessStudio(staff, body.data.studioId))) {
+  if (!(await canAccessStudio(staff, body.data.studioId, database))) {
     res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
     return;
   }
 
   const email = body.data.email.trim().toLowerCase();
-  const [existingStaff] = await db
+  const [existingStaff] = await database
     .select({ id: staffTable.id })
     .from(staffTable)
     .where(
@@ -137,7 +149,7 @@ router.post("/team/invitations", async (req, res): Promise<void> => {
     res.status(409).json({ error: "Diese Person hat bereits einen Teamzugang." });
     return;
   }
-  const [existingInvitation] = await db
+  const [existingInvitation] = await database
     .select({ id: invitationsTable.id })
     .from(invitationsTable)
     .where(
@@ -156,7 +168,7 @@ router.post("/team/invitations", async (req, res): Promise<void> => {
 
   const rawToken = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const [invitation] = await db
+  const [invitation] = await database
     .insert(invitationsTable)
     .values({
       organizationId: staff.organizationId,
@@ -168,7 +180,7 @@ router.post("/team/invitations", async (req, res): Promise<void> => {
       expiresAt,
     })
     .returning();
-  const [studio] = await db
+  const [studio] = await database
     .select({ name: studiosTable.name })
     .from(studiosTable)
     .where(eq(studiosTable.id, invitation.studioId))
@@ -191,7 +203,7 @@ router.post("/team/invitations", async (req, res): Promise<void> => {
 router.post(
   "/team/invitations/:token/accept",
   async (req, res): Promise<void> => {
-    const userId = getRequestUserId(req);
+    const userId = userIdFromRequest(req);
     if (!userId) {
       res.status(401).json({ error: "Bitte melde dich an." });
       return;
@@ -201,17 +213,17 @@ router.post(
       res.status(404).json({ error: "Einladung nicht gefunden." });
       return;
     }
-    const identity = await getClerkIdentity(userId);
+    const identity = await identityForUser(userId);
     if (!identity.emailVerified) {
       res.status(403).json({ error: "Bestätige zuerst deine E-Mail-Adresse." });
       return;
     }
-    if (await getStaffContext(userId)) {
+    if (await getStaffContext(userId, database)) {
       res.status(409).json({ error: "Für dieses Konto besteht bereits ein Fiudia-Zugang." });
       return;
     }
 
-    const [invitation] = await db
+    const [invitation] = await database
       .select()
       .from(invitationsTable)
       .where(eq(invitationsTable.tokenHash, hashToken(params.data.token)))
@@ -232,7 +244,7 @@ router.post(
     }
 
     const role = invitation.role as FiudiaRole;
-    const created = await db.transaction(async (tx) => {
+    const created = await database.transaction(async (tx) => {
       const [accepted] = await tx
         .update(invitationsTable)
         .set({ status: "accepted" })
@@ -292,4 +304,7 @@ router.post(
   },
 );
 
-export default router;
+  return router;
+}
+
+export default createTeamRouter();
