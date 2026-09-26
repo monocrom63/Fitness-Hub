@@ -165,25 +165,34 @@ function CourseRow({ course, targeted = false }: { course: MemberCourse; targete
 }
 function CoursesPage() {
   const courses = useListMemberCourses();
+  const [, navigate] = useLocation();
   const search = useSearch();
-  const requestedId = new URLSearchParams(search).get('courseId');
-  const targetId = requestedId && /^[1-9]\d*$/.test(requestedId) ? Number(requestedId) : null;
-  const [filter, setFilter] = useState<'all' | 'mine'>('all');
+  const params = new URLSearchParams(search);
+  const requestedId = params.get('courseId');
+  const parsedId = requestedId && /^[1-9]\d*$/.test(requestedId) ? Number(requestedId) : null;
+  const targetId = parsedId !== null && Number.isSafeInteger(parsedId) ? parsedId : null;
+  const filter = params.get('filter') === 'mine' ? 'mine' : 'all';
+  const setFilter = (next: 'all' | 'mine') => {
+    const nextParams = new URLSearchParams(search);
+    if (next === 'mine') nextParams.set('filter', 'mine');
+    else nextParams.delete('filter');
+    navigate(`/courses${nextParams.size ? `?${nextParams}` : ''}`);
+  };
+  const visible = (courses.data || []).filter(course => filter === 'all' || course.bookingStatus === 'confirmed' || course.bookingStatus === 'waitlisted').sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const targetVisible = targetId !== null && visible.some(course => course.id === targetId);
+  const targetExists = targetId !== null && courses.data?.some(course => course.id === targetId);
   useEffect(() => {
-    if (targetId !== null) setFilter('all');
-  }, [targetId]);
-  useEffect(() => {
-    if (targetId === null || filter !== 'all' || !courses.data) return;
+    if (!targetVisible) return;
     const course = document.getElementById(`course-${targetId}`);
     if (course) {
       course.focus({ preventScroll: true });
       course.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [targetId, filter, courses.data]);
-  const visible = (courses.data || []).filter(course => filter === 'all' || course.bookingStatus === 'confirmed' || course.bookingStatus === 'waitlisted').sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  }, [targetId, filter, targetVisible, courses.data]);
   return <div className="page"><PageHeader eyebrow="Kurse" title="Finde deinen Moment." description="Alle kommenden Kurse in deinem Studio. Such dir aus, was zu deinem Tag passt." />
     {courses.isLoading ? <div className="skeleton-page"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> : courses.isError ? <ErrorView onRetry={() => { void courses.refetch(); }} /> : <>
-      {targetId !== null && !courses.data?.some(course => course.id === targetId) && <div className="course-feedback" role="status" data-testid="status-course-unavailable">Dieser Kurs ist nicht mehr im aktuellen Kursplan verfügbar.</div>}
+      {targetId !== null && !targetExists && <div className="course-feedback" role="status" data-testid="status-course-unavailable">Dieser Kurs ist nicht mehr im aktuellen Kursplan verfügbar.</div>}
+      {targetExists && !targetVisible && <div className="course-feedback" role="status" data-testid="status-course-filtered">Dieser Kurs ist nicht unter „Meine Plätze“ zu finden. <button type="button" className="text-link" onClick={() => setFilter('all')} data-testid="button-show-target-course">Alle Kurse ansehen</button></div>}
       <div className="course-toolbar"><div className="filter-group" role="group" aria-label="Kurse filtern"><button type="button" className={filter === 'all' ? 'selected' : ''} onClick={() => setFilter('all')} data-testid="button-filter-all">Alle Kurse</button><button type="button" className={filter === 'mine' ? 'selected' : ''} onClick={() => setFilter('mine')} data-testid="button-filter-mine">Meine Plätze</button></div><span data-testid="text-course-count">{visible.length} {visible.length === 1 ? 'Kurs' : 'Kurse'}</span></div>
       {visible.length ? <div className="course-list">{visible.map(course => <CourseRow key={course.id} course={course} targeted={course.id === targetId} />)}</div> : <EmptyView icon={<CalendarDays size={22} />} title={filter === 'mine' ? 'Noch kein Platz gebucht.' : 'Gerade keine Kurse geplant.'} description={filter === 'mine' ? 'Schau dich im Kursplan um und sichere dir deinen ersten Platz.' : 'Dein Studio hat im Moment keine kommenden Kurse eingetragen.'} action={filter === 'mine' ? <button type="button" className="button button-secondary" onClick={() => setFilter('all')} data-testid="button-show-all-courses">Alle Kurse ansehen <ArrowRight size={15} /></button> : undefined} />}
     </>}

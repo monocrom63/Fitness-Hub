@@ -161,6 +161,7 @@ button:disabled { cursor: not-allowed; }
 .section-head h2 { margin: 7px 0 0; font: 600 25px/1.15 'Space Grotesk', sans-serif; letter-spacing: -.055em; }
 .text-link { display: inline-flex; align-items: center; gap: 6px; color: #695595; text-decoration: none; font-size: 12px; font-weight: 700; }
 .text-link:hover { text-decoration: underline; }
+.course-feedback .text-link { border: 0; padding: 0; background: none; font: inherit; color: #695595; text-decoration: underline; }
 .next-card { background: #fdfbf7; border: 1px solid #e5e0d4; border-radius: 20px; display: grid; grid-template-columns: 135px minmax(0,1fr) auto; align-items: center; gap: 25px; padding: 19px 25px; }
 .date-block { border-right: 1px solid #e5e0d4; padding: 8px 20px 8px 5px; color: #28334a; }
 .date-block strong { display: block; font: 600 43px/.95 'Space Grotesk', sans-serif; letter-spacing: -.085em; }
