@@ -50,8 +50,9 @@ export async function getClerkIdentity(userId: string) {
 
 export async function getStaffContext(
   clerkUserId: string,
+  database: Pick<typeof db, "select"> = db,
 ): Promise<StaffContext | null> {
-  const [row] = await db
+  const [row] = await database
     .select({
       id: staffTable.id,
       clerkUserId: staffTable.clerkUserId,
@@ -80,12 +81,13 @@ export async function getStaffContext(
 
 export async function getAccessibleStudioIds(
   staff: StaffContext,
+  database: Pick<typeof db, "select"> = db,
 ): Promise<number[]> {
   if (staff.role !== "district_manager") {
     return staff.studioId === null ? [] : [staff.studioId];
   }
 
-  const studios = await db
+  const studios = await database
     .select({ id: studiosTable.id })
     .from(studiosTable)
     .where(eq(studiosTable.organizationId, staff.organizationId));
@@ -95,8 +97,9 @@ export async function getAccessibleStudioIds(
 export async function canAccessStudio(
   staff: StaffContext,
   studioId: number,
+  database: Pick<typeof db, "select"> = db,
 ): Promise<boolean> {
-  const [studio] = await db
+  const [studio] = await database
     .select({ id: studiosTable.id })
     .from(studiosTable)
     .where(

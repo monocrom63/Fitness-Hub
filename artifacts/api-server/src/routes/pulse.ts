@@ -23,26 +23,6 @@ import {
   type StaffContext,
 } from "../lib/fiudia-access";
 
-const router: IRouter = Router();
-
-async function requireStaff(
-  req: Request,
-  res: Response,
-): Promise<StaffContext | null> {
-  const userId = getRequestUserId(req);
-  if (!userId) {
-    res.status(401).json({ error: "Bitte melde dich an." });
-    return null;
-  }
-
-  const staff = await getStaffContext(userId);
-  if (!staff) {
-    res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
-    return null;
-  }
-  return staff;
-}
-
 function visibleMessages(staff: StaffContext, studioIds: number[]) {
   const locationFilter = studioIds.length
     ? or(
@@ -64,12 +44,42 @@ function visibleMessages(staff: StaffContext, studioIds: number[]) {
   );
 }
 
+type PulseDependencies = {
+  database: typeof db;
+  userIdFromRequest: (req: Request) => string | null;
+};
+
+export function createPulseRouter(
+  dependencies: Partial<PulseDependencies> = {},
+): IRouter {
+  const router: IRouter = Router();
+  const database = dependencies.database ?? db;
+  const userIdFromRequest = dependencies.userIdFromRequest ?? getRequestUserId;
+
+  async function requireStaff(
+    req: Request,
+    res: Response,
+  ): Promise<StaffContext | null> {
+    const userId = userIdFromRequest(req);
+    if (!userId) {
+      res.status(401).json({ error: "Bitte melde dich an." });
+      return null;
+    }
+
+    const staff = await getStaffContext(userId, database);
+    if (!staff) {
+      res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
+      return null;
+    }
+    return staff;
+  }
+
 router.get("/pulse", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
 
-  const studioIds = await getAccessibleStudioIds(staff);
-  const messages = await db
+  const studioIds = await getAccessibleStudioIds(staff, database);
+  const messages = await database
     .select({
       id: pulseMessagesTable.id,
       title: pulseMessagesTable.title,
@@ -90,7 +100,7 @@ router.get("/pulse", async (req, res): Promise<void> => {
 
   const messageIds = messages.map((message) => message.id);
   const readCounts = messageIds.length
-    ? await db
+    ? await database
         .select({
           messageId: pulseReadsTable.messageId,
           total: count(),
@@ -100,7 +110,7 @@ router.get("/pulse", async (req, res): Promise<void> => {
         .groupBy(pulseReadsTable.messageId)
     : [];
   const ownReads = messageIds.length
-    ? await db
+    ? await database
         .select({ messageId: pulseReadsTable.messageId })
         .from(pulseReadsTable)
         .where(
@@ -149,12 +159,12 @@ router.post("/pulse", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Nur Bezirksleitungen können organisationsweit schreiben." });
     return;
   }
-  if (studioId !== null && !(await canAccessStudio(staff, studioId))) {
+  if (studioId !== null && !(await canAccessStudio(staff, studioId, database))) {
     res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
     return;
   }
 
-  const message = await db.transaction(async (tx) => {
+  const message = await database.transaction(async (tx) => {
     const [created] = await tx
       .insert(pulseMessagesTable)
       .values({
@@ -174,7 +184,7 @@ router.post("/pulse", async (req, res): Promise<void> => {
   });
   const [studio] = studioId === null
     ? [null]
-    : await db
+    : await database
         .select({ name: studiosTable.name })
         .from(studiosTable)
         .where(eq(studiosTable.id, studioId))
@@ -206,8 +216,8 @@ router.post("/pulse/:id/read", async (req, res): Promise<void> => {
     return;
   }
 
-  const studioIds = await getAccessibleStudioIds(staff);
-  const [message] = await db
+  const studioIds = await getAccessibleStudioIds(staff, database);
+  const [message] = await database
     .select({ id: pulseMessagesTable.id })
     .from(pulseMessagesTable)
     .where(
@@ -222,11 +232,11 @@ router.post("/pulse/:id/read", async (req, res): Promise<void> => {
     return;
   }
 
-  await db
+  await database
     .insert(pulseReadsTable)
     .values({ messageId: message.id, staffId: staff.id })
     .onConflictDoNothing();
-  const [receipt] = await db
+  const [receipt] = await database
     .select({ readAt: pulseReadsTable.readAt })
     .from(pulseReadsTable)
     .where(
@@ -244,4 +254,7 @@ router.post("/pulse/:id/read", async (req, res): Promise<void> => {
   );
 });
 
-export default router;
+  return router;
+}
+
+export default createPulseRouter();
