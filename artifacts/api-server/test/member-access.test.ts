@@ -38,6 +38,18 @@ test("member records remain inside the caller's studio and organization", async 
       { organizationId: orgA.id, name: `A2 ${run}`, city: "Berlin" },
       { organizationId: orgB.id, name: `B ${run}`, city: "Hamburg" },
     ]).returning();
+
+    const [districtA, managerA1, managerA2, employeeA1, employeeA2, districtB, managerB, employeeB] =
+      await db.insert(staffTable).values([
+        { clerkUserId: `member-district-a-${run}`, organizationId: orgA.id, studioId: null, fullName: "District A", email: `district-a-${run}@example.com`, role: "district_manager" },
+        { clerkUserId: `member-manager-a1-${run}`, organizationId: orgA.id, studioId: studioA1.id, fullName: "Manager A1", email: `manager-a1-${run}@example.com`, role: "studio_manager" },
+        { clerkUserId: `member-manager-a2-${run}`, organizationId: orgA.id, studioId: studioA2.id, fullName: "Manager A2", email: `manager-a2-${run}@example.com`, role: "studio_manager" },
+        { clerkUserId: `member-employee-a1-${run}`, organizationId: orgA.id, studioId: studioA1.id, fullName: "Employee A1", email: `employee-a1-${run}@example.com`, role: "studio_employee" },
+        { clerkUserId: `member-employee-a2-${run}`, organizationId: orgA.id, studioId: studioA2.id, fullName: "Employee A2", email: `employee-a2-${run}@example.com`, role: "studio_employee" },
+        { clerkUserId: `member-district-b-${run}`, organizationId: orgB.id, studioId: null, fullName: "District B", email: `district-b-${run}@example.com`, role: "district_manager" },
+        { clerkUserId: `member-manager-b-${run}`, organizationId: orgB.id, studioId: studioB.id, fullName: "Manager B", email: `manager-b-${run}@example.com`, role: "studio_manager" },
+        { clerkUserId: `member-employee-b-${run}`, organizationId: orgB.id, studioId: studioB.id, fullName: "Employee B", email: `employee-b-${run}@example.com`, role: "studio_employee" },
+      ]).returning();
     const [districtA, managerA1, managerA2, employeeA1, districtB, mismatchedManager] =
       await db.insert(staffTable).values([
         { clerkUserId: `member-district-a-${run}`, organizationId: orgA.id, studioId: null, fullName: "District A", email: `district-a-${run}@example.com`, role: "district_manager" },
@@ -114,13 +126,21 @@ test("member records remain inside the caller's studio and organization", async 
     });
 
     await t.test("lists and searches expose only accessible studios", async () => {
-      assert.deepEqual(ids(await list(managerA1.clerkUserId)), [memberA1.id]);
-      assert.deepEqual(ids(await list(employeeA1.clerkUserId)), [memberA1.id]);
-      assert.deepEqual(ids(await list(managerA2.clerkUserId)), [memberA2.id]);
-      assert.deepEqual(ids(await list(districtA.clerkUserId)), [memberA1.id, memberA2.id].sort((a, b) => a - b));
-      assert.deepEqual(ids(await list(districtB.clerkUserId)), [memberB.id]);
+      for (const [staff, visibleIds] of [
+        [employeeA1, [memberA1.id]],
+        [managerA1, [memberA1.id]],
+        [employeeA2, [memberA2.id]],
+        [managerA2, [memberA2.id]],
+        [districtA, [memberA1.id, memberA2.id]],
+        [employeeB, [memberB.id]],
+        [managerB, [memberB.id]],
+        [districtB, [memberB.id]],
+      ] as const) {
+        assert.deepEqual(ids(await list(staff.clerkUserId)), [...visibleIds].sort((a, b) => a - b), staff.role);
+      }
       assert.deepEqual(await list(managerA1.clerkUserId, `?search=${encodeURIComponent(memberA2.email)}`), []);
       assert.deepEqual(await list(districtA.clerkUserId, `?search=${encodeURIComponent(memberB.email)}`), []);
+      assert.deepEqual(await list(managerB.clerkUserId, `?search=${encodeURIComponent(memberA1.email)}`), []);
       const employeeRows = await list(employeeA1.clerkUserId);
       assert.equal(employeeRows[0]?.email, null);
       assert.equal(employeeRows[0]?.phone, null);
@@ -160,13 +180,16 @@ test("member records remain inside the caller's studio and organization", async 
         [districtA.clerkUserId, memberB.id],
         [districtB.clerkUserId, memberA1.id],
       ] as const) {
-        const response = await api(user, "PATCH", `/members/${id}`, { phone: "999" });
-        assert.equal(response.status, 403);
+        const response = await api(staff.clerkUserId, "PATCH", `/members/${id}`, { phone: "999" });
+        assert.equal(response.status, 403, `${staff.role} must not edit member ${id}`);
         assert.equal(JSON.stringify(response.body).includes("private-"), false);
       }
       const protectedRows = await db.select({ id: membersTable.id, phone: membersTable.phone })
-        .from(membersTable).where(inArray(membersTable.id, [memberA2.id, memberB.id]));
-      assert.deepEqual(protectedRows.map((row) => row.phone).sort(), ["222", "333"]);
+        .from(membersTable).where(inArray(membersTable.id, [memberA1.id, memberA2.id, memberB.id]));
+      assert.deepEqual(
+        new Map(protectedRows.map((row) => [row.id, row.phone])),
+        new Map([[memberA1.id, "111"], [memberA2.id, "222"], [memberB.id, "333"]]),
+      );
       assert.equal((await api(managerA1.clerkUserId, "PATCH", "/members/999999999", { phone: "999" })).status, 404);
 
       const own = await api<MemberView>(managerA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { phone: "444" });
@@ -240,7 +263,7 @@ test("member records remain inside the caller's studio and organization", async 
     });
 
     await t.test("course creation commits a generic Pulse event with the course", async () => {
-      const startsAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+      const startsAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
       const endsAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
       const courseBody = {
         title: `Pulse event course ${run}`,
@@ -294,7 +317,7 @@ test("member records remain inside the caller's studio and organization", async 
           ),
         );
       assert.ok(existing.length < 10);
-      const toSeed = 9 - existing.length;
+      const toSeed = 24 - currentCheckIns.length;
       if (toSeed > 0) {
         await db.insert(checkInsTable).values(
           Array.from({ length: toSeed }, () => ({
