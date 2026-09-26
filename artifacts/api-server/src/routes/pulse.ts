@@ -1,11 +1,16 @@
-import { and, count, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreatePulseMessageBody,
   CreatePulseMessageResponse,
+  ListPulseQueryParams,
   ListPulseResponse,
   MarkPulseReadParams,
   MarkPulseReadResponse,
+  RetractPulseMessageParams,
+  UpdatePulseMessageBody,
+  UpdatePulseMessageParams,
+  UpdatePulseMessageResponse,
 } from "@workspace/api-zod";
 import {
   db,
@@ -74,14 +79,39 @@ export function createPulseRouter(
     return staff;
   }
 
+  async function requireEditableMessage(staff: StaffContext, id: number, res: Response) {
+    const [message] = await database.select().from(pulseMessagesTable).where(and(
+      eq(pulseMessagesTable.id, id),
+      eq(pulseMessagesTable.organizationId, staff.organizationId),
+      isNull(pulseMessagesTable.retractedAt),
+    )).limit(1);
+    if (!message) {
+      res.status(404).json({ error: "Meldung nicht gefunden." });
+      return null;
+    }
+    if (!canManageTeam(staff) || message.authorStaffId !== staff.id ||
+        (message.studioId === null && staff.role !== "district_manager") ||
+        (message.studioId !== null && !(await canAccessStudio(staff, message.studioId, database)))) {
+      res.status(403).json({ error: "Nur die zuständige Verfasserin oder der zuständige Verfasser kann diese Meldung ändern." });
+      return null;
+    }
+    return message;
+  }
+
 router.get("/pulse", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
+  const params = ListPulseQueryParams.safeParse(req.query);
+  if (!params.success) {
+    res.status(400).json({ error: "Ungültiger Nachrichten-Cursor." });
+    return;
+  }
 
   const studioIds = await getAccessibleStudioIds(staff, database);
   const messages = await database
     .select({
       id: pulseMessagesTable.id,
+      authorStaffId: pulseMessagesTable.authorStaffId,
       title: pulseMessagesTable.title,
       body: pulseMessagesTable.body,
       priority: pulseMessagesTable.priority,
@@ -90,13 +120,18 @@ router.get("/pulse", async (req, res): Promise<void> => {
       studioName: studiosTable.name,
       authorName: staffTable.fullName,
       createdAt: pulseMessagesTable.createdAt,
+      editedAt: pulseMessagesTable.editedAt,
     })
     .from(pulseMessagesTable)
     .innerJoin(staffTable, eq(pulseMessagesTable.authorStaffId, staffTable.id))
     .leftJoin(studiosTable, eq(pulseMessagesTable.studioId, studiosTable.id))
-    .where(visibleMessages(staff, studioIds))
-    .orderBy(desc(pulseMessagesTable.createdAt))
-    .limit(60);
+    .where(and(
+      visibleMessages(staff, studioIds),
+      isNull(pulseMessagesTable.retractedAt),
+      params.data.beforeId ? lt(pulseMessagesTable.id, params.data.beforeId) : undefined,
+    ))
+    .orderBy(desc(pulseMessagesTable.id))
+    .limit(30);
 
   const messageIds = messages.map((message) => message.id);
   const readCounts = messageIds.length
@@ -128,6 +163,9 @@ router.get("/pulse", async (req, res): Promise<void> => {
       messages.map((message) => ({
         ...message,
         createdAt: message.createdAt.toISOString(),
+        editedAt: message.editedAt?.toISOString() ?? null,
+        canManage: canManageTeam(staff) && message.authorStaffId === staff.id &&
+          (message.studioId !== null || staff.role === "district_manager"),
         isRead: readIds.has(message.id),
         readCount: totals.get(message.id) ?? 0,
       })),
@@ -201,10 +239,73 @@ router.post("/pulse", async (req, res): Promise<void> => {
       studioName: studio?.name ?? null,
       authorName: staff.fullName,
       createdAt: message.createdAt.toISOString(),
+      editedAt: null,
       isRead: true,
       readCount: 1,
+      canManage: true,
     }),
   );
+});
+
+router.patch("/pulse/:id", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const params = UpdatePulseMessageParams.safeParse(req.params);
+  const body = UpdatePulseMessageBody.safeParse(req.body);
+  if (!params.success || !body.success || body.data.title.trim().length < 2 || !body.data.body.trim()) {
+    res.status(400).json({ error: "Titel oder Nachricht sind ungültig." });
+    return;
+  }
+  const original = await requireEditableMessage(staff, params.data.id, res);
+  if (!original) return;
+  const updated = await database.transaction(async (tx) => {
+    const [message] = await tx.update(pulseMessagesTable).set({
+      title: body.data.title.trim(),
+      body: body.data.body.trim(),
+      priority: body.data.priority,
+      editedAt: new Date(),
+    }).where(and(eq(pulseMessagesTable.id, original.id), isNull(pulseMessagesTable.retractedAt))).returning();
+    if (!message) return null;
+    await tx.delete(pulseReadsTable).where(eq(pulseReadsTable.messageId, message.id));
+    await tx.insert(pulseReadsTable).values({ messageId: message.id, staffId: staff.id });
+    return message;
+  });
+  if (!updated) {
+    res.status(404).json({ error: "Meldung nicht gefunden." });
+    return;
+  }
+  const [studio] = updated.studioId === null ? [null] : await database
+    .select({ name: studiosTable.name }).from(studiosTable)
+    .where(eq(studiosTable.id, updated.studioId)).limit(1);
+  res.json(UpdatePulseMessageResponse.parse({
+    id: updated.id, title: updated.title, body: updated.body,
+    priority: updated.priority, audience: updated.audience,
+    studioId: updated.studioId, studioName: studio?.name ?? null,
+    authorName: staff.fullName, createdAt: updated.createdAt.toISOString(),
+    editedAt: updated.editedAt?.toISOString() ?? null,
+    isRead: true, readCount: 1, canManage: true,
+  }));
+});
+
+router.delete("/pulse/:id", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const params = RetractPulseMessageParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Ungültige Meldungs-ID." });
+    return;
+  }
+  const original = await requireEditableMessage(staff, params.data.id, res);
+  if (!original) return;
+  const [retracted] = await database.update(pulseMessagesTable)
+    .set({ retractedAt: new Date() })
+    .where(and(eq(pulseMessagesTable.id, original.id), isNull(pulseMessagesTable.retractedAt)))
+    .returning({ id: pulseMessagesTable.id });
+  if (!retracted) {
+    res.status(404).json({ error: "Meldung nicht gefunden." });
+    return;
+  }
+  res.status(204).end();
 });
 
 router.post("/pulse/:id/read", async (req, res): Promise<void> => {
@@ -223,6 +324,7 @@ router.post("/pulse/:id/read", async (req, res): Promise<void> => {
     .where(
       and(
         eq(pulseMessagesTable.id, params.data.id),
+        isNull(pulseMessagesTable.retractedAt),
         visibleMessages(staff, studioIds),
       ),
     )

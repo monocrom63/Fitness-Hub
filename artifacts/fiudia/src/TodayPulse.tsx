@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Activity, ArrowRight, Bell, CalendarDays, Check, CircleHelp, Clock3, Mail, Plus, Users, X } from 'lucide-react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { Activity, ArrowRight, Bell, CalendarDays, Check, CircleHelp, Clock3, Mail, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import {
-  getGetDashboardQueryKey, getListPulseQueryKey, getListStudiosQueryKey, useCreatePulseMessage,
-  useGetDashboard, useListPulse, useListStudios, useMarkPulseRead,
+  getGetDashboardQueryKey, getListPulseQueryKey, getListStudiosQueryKey, listPulse, useCreatePulseMessage,
+  useGetDashboard, useListPulse, useListStudios, useMarkPulseRead, useRetractPulseMessage, useUpdatePulseMessage,
 } from '@workspace/api-client-react';
 import type { Me, ModuleKey, ModuleSetting, PulseAudience, PulseMessage, PulsePriority } from '@workspace/api-client-react';
 
@@ -45,7 +45,7 @@ function enabled(modules: ModuleSetting[], key: ModuleKey) {
 
 export function TodayPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const dashboard = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey(), refetchInterval: 60000 } });
-  const pulse = useListPulse({ query: { queryKey: getListPulseQueryKey(), enabled: enabled(modules, 'pulse'), refetchInterval: 60000 } });
+  const pulse = useListPulse(undefined, { query: { queryKey: getListPulseQueryKey(), enabled: enabled(modules, 'pulse'), refetchInterval: 60000 } });
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 60000); return () => window.clearInterval(timer); }, []);
 
@@ -93,40 +93,69 @@ export function PulsePage({ me }: { me: Me }) {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const composeRequested = new URLSearchParams(search).get('compose') === '1';
-  const query = useListPulse({ query: { queryKey: getListPulseQueryKey(), refetchInterval: 60000 } });
+  const query = useInfiniteQuery({
+    queryKey: [...getListPulseQueryKey(), 'history'],
+    queryFn: ({ pageParam, signal }) => listPulse(pageParam ? { beforeId: pageParam } : undefined, { signal }),
+    initialPageParam: 0,
+    getNextPageParam: lastPage => lastPage.length === 30 ? lastPage[lastPage.length - 1].id : undefined,
+    refetchInterval: 60000,
+  });
   const create = useCreatePulseMessage();
+  const update = useUpdatePulseMessage();
+  const retract = useRetractPulseMessage();
   const markRead = useMarkPulseRead();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [open, setOpen] = useState(() => composeRequested && me.role !== 'studio_employee');
+  const [editing, setEditing] = useState<PulseMessage | null>(null);
   const [form, setForm] = useState({ title: '', body: '', priority: 'info' as PulsePriority, audience: 'all' as PulseAudience, scope: 'organization', studioId: '' });
+  const emptyForm = () => ({ title: '', body: '', priority: 'info' as PulsePriority, audience: 'all' as PulseAudience, scope: 'organization', studioId: '' });
   const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: me.role === 'district_manager' && open && form.scope === 'studio' } });
   const selectedStudioValid = !!studios.data?.some(studio => String(studio.id) === form.studioId);
   useEffect(() => { if (composeRequested && me.role !== 'studio_employee') setOpen(true); }, [composeRequested, me.role]);
-  const close = () => { setOpen(false); if (composeRequested) setLocation('/pulse', { replace: true }); };
-  const messages = [...(query.data || [])].sort((a, b) => Number(a.isRead) - Number(b.isRead) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const close = () => { setOpen(false); setEditing(null); setForm(emptyForm()); if (composeRequested) setLocation('/pulse', { replace: true }); };
+  const messages = (query.data?.pages.flat() || []).sort((a, b) => Number(a.isRead) - Number(b.isRead) || b.id - a.id);
   const visible = filter === 'unread' ? messages.filter(message => !message.isRead) : messages;
+  const startEdit = (message: PulseMessage) => {
+    update.reset();
+    setEditing(message);
+    setForm({ title: message.title, body: message.body, priority: message.priority, audience: message.audience, scope: message.studioId === null ? 'organization' : 'studio', studioId: String(message.studioId ?? '') });
+    setOpen(true);
+  };
   const publish = (event: React.FormEvent) => {
     event.preventDefault();
+    if (editing) {
+      update.mutate({ id: editing.id, data: { title: form.title.trim(), body: form.body.trim(), priority: form.priority } }, {
+        onSuccess: () => { client.invalidateQueries({ queryKey: getListPulseQueryKey() }); close(); },
+      });
+      return;
+    }
     const studioId = me.role === 'studio_manager' ? me.studioId ?? null : form.scope === 'organization' ? null : Number(form.studioId);
     if (me.role === 'studio_employee' || (me.role === 'studio_manager' && !me.studioId) || (me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading || studios.isError || !selectedStudioValid))) return;
     create.mutate({ data: { title: form.title.trim(), body: form.body.trim(), priority: form.priority, audience: form.audience, studioId: studioId ?? null } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListPulseQueryKey() }); setForm({ title: '', body: '', priority: 'info', audience: 'all', scope: 'organization', studioId: '' }); close(); } });
   };
   const read = (message: PulseMessage) => markRead.mutate({ id: message.id }, { onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }) });
-  return <div className="pulse-page"><div className="pulse-intro"><div><div className="eyebrow">Fiudia / Zusammenarbeit</div><h1>Pulse.</h1><p>Was dein Team wissen sollte. Nur Nachrichten für deinen Arbeitsbereich.</p></div>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-pulse"><Plus size={17} /> Nachricht verfassen</button>}</div>
-    <div className="pulse-tools"><div className="pulse-tabs" aria-label="Nachrichten filtern"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')} data-testid="button-pulse-all">Alle</button><button className={filter === 'unread' ? 'active' : ''} onClick={() => setFilter('unread')} data-testid="button-pulse-unread">Ungelesen{messages.filter(message => !message.isRead).length ? ` · ${messages.filter(message => !message.isRead).length}` : ''}</button></div>{!query.isLoading && !query.isError && <span className="pulse-count">{visible.length} {visible.length === 1 ? 'Nachricht' : 'Nachrichten'}</span>}</div>
-    {query.isLoading ? <Skeleton count={3} /> : query.isError ? <StatusError retry={() => query.refetch()} /> : visible.length ? <div className="pulse-feed">{visible.map(message => <article className={`pulse-card ${message.isRead ? '' : 'unread'}`} key={message.id} data-testid={`pulse-message-${message.id}`}><div className="pulse-card-top"><span className={`pulse-tag ${message.priority}`}>{priorityName(message.priority)}</span><span className="pulse-tag">{audienceName(message.audience)}</span><span className="pulse-tag">{message.studioName || 'Gesamte Organisation'}</span></div><h2>{message.title}</h2><p>{message.body}</p><div className="pulse-card-foot"><span className="pulse-meta">{message.authorName} · {dateTime(message.createdAt)} · {message.readCount} {message.readCount === 1 ? 'Lesebestätigung' : 'Lesebestätigungen'}</span>{message.isRead ? <span className="pulse-meta"><Check size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Gelesen</span> : <button className="pulse-read-button" onClick={() => read(message)} disabled={markRead.isPending} data-testid={`button-mark-pulse-read-${message.id}`}><Check size={14} /> Als gelesen markieren</button>}</div></article>)}</div> : <div className="empty-state"><div className="empty-icon"><Bell size={22} /></div><h3>{filter === 'unread' ? 'Alles gelesen' : 'Noch keine Nachrichten'}</h3><p>{filter === 'unread' ? 'Du bist auf dem aktuellen Stand.' : 'Neue Nachrichten für deinen Arbeitsbereich erscheinen hier.'}</p>{filter === 'unread' && <button className="button button-outline" onClick={() => setFilter('all')}>Alle Nachrichten ansehen</button>}</div>}
+  const remove = (message: PulseMessage) => {
+    if (!window.confirm(`„${message.title}“ für alle Empfänger zurückziehen? Die Nachricht kann danach nicht wiederhergestellt werden.`)) return;
+    retract.mutate({ id: message.id }, { onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }) });
+  };
+  return <div className="pulse-page"><div className="pulse-intro"><div><div className="eyebrow">Fiudia / Zusammenarbeit</div><h1>Pulse.</h1><p>Was dein Team wissen sollte. Nur Nachrichten für deinen Arbeitsbereich.</p></div>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => { create.reset(); setEditing(null); setForm(emptyForm()); setOpen(true); }} data-testid="button-create-pulse"><Plus size={17} /> Nachricht verfassen</button>}</div>
+    <div className="pulse-tools"><div className="pulse-tabs" aria-label="Nachrichten filtern"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')} data-testid="button-pulse-all">Alle</button><button className={filter === 'unread' ? 'active' : ''} onClick={() => setFilter('unread')} data-testid="button-pulse-unread">Ungelesen{messages.filter(message => !message.isRead).length ? ` · ${messages.filter(message => !message.isRead).length}` : ''}</button></div>{!query.isLoading && !query.isError && <span className="pulse-count">{visible.length} {visible.length === 1 ? 'Nachricht' : 'Nachrichten'} angezeigt</span>}</div>
+    {query.isLoading ? <Skeleton count={3} /> : query.isError && !query.data ? <StatusError retry={() => query.refetch()} /> : visible.length ? <div className="pulse-feed">{visible.map(message => <article className={`pulse-card ${message.isRead ? '' : 'unread'}`} key={message.id} data-testid={`pulse-message-${message.id}`}><div className="pulse-card-top"><span className={`pulse-tag ${message.priority}`}>{priorityName(message.priority)}</span><span className="pulse-tag">{audienceName(message.audience)}</span><span className="pulse-tag">{message.studioName || 'Gesamte Organisation'}</span></div><h2>{message.title}</h2><p>{message.body}</p><div className="pulse-card-foot"><span className="pulse-meta">{message.authorName} · {dateTime(message.createdAt)}{message.editedAt ? ` · Bearbeitet ${dateTime(message.editedAt)}` : ''} · {message.readCount} {message.readCount === 1 ? 'Lesebestätigung' : 'Lesebestätigungen'}</span>{message.canManage && <span className="pulse-actions"><button type="button" onClick={() => startEdit(message)} aria-label={`Nachricht ${message.title} bearbeiten`}><Pencil size={14} /> Bearbeiten</button><button type="button" onClick={() => remove(message)} disabled={retract.isPending} aria-label={`Nachricht ${message.title} zurückziehen`}><Trash2 size={14} /> Zurückziehen</button></span>}{message.isRead ? <span className="pulse-meta"><Check size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Gelesen</span> : <button className="pulse-read-button" onClick={() => read(message)} disabled={markRead.isPending} data-testid={`button-mark-pulse-read-${message.id}`}><Check size={14} /> Als gelesen markieren</button>}</div></article>)}</div> : <div className="empty-state"><div className="empty-icon"><Bell size={22} /></div><h3>{filter === 'unread' ? query.hasNextPage ? 'Keine ungelesenen in diesem Abschnitt' : 'Alles gelesen' : 'Noch keine Nachrichten'}</h3><p>{filter === 'unread' ? query.hasNextPage ? 'Lade ältere Nachrichten, um weiterzusehen.' : 'Du bist auf dem aktuellen Stand.' : 'Neue Nachrichten für deinen Arbeitsbereich erscheinen hier.'}</p>{filter === 'unread' && <button className="button button-outline" onClick={() => setFilter('all')}>Alle Nachrichten ansehen</button>}</div>}
+    {query.hasNextPage && <div className="pulse-more"><button className="button button-outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage ? 'Wird geladen …' : 'Ältere Nachrichten laden'}</button></div>}
+    {query.isFetchNextPageError && <p className="pulse-form-error" role="alert">Ältere Nachrichten konnten nicht geladen werden. <button onClick={() => query.fetchNextPage()}>Erneut versuchen</button></p>}
     {markRead.isError && <p className="pulse-form-error" role="alert">Lesebestätigung fehlgeschlagen. Bitte versuche es erneut.</p>}
+    {retract.isError && <p className="pulse-form-error" role="alert">Nachricht konnte nicht zurückgezogen werden. Bitte versuche es erneut.</p>}
     {open && <div className="modal-backdrop" role="presentation">
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="pulse-compose-title">
-        <div className="modal-head"><div><div className="eyebrow">Pulse / Neue Nachricht</div><h2 id="pulse-compose-title">Team informieren</h2></div><button className="icon-button" onClick={close} aria-label="Schließen" data-testid="button-close-pulse"><X size={18} /></button></div>
+        <div className="modal-head"><div><div className="eyebrow">Pulse / {editing ? 'Korrektur' : 'Neue Nachricht'}</div><h2 id="pulse-compose-title">{editing ? 'Nachricht korrigieren' : 'Team informieren'}</h2></div><button className="icon-button" onClick={close} aria-label="Schließen" data-testid="button-close-pulse"><X size={18} /></button></div>
         <form className="pulse-compose" onSubmit={publish}>
           <label className="field">Titel<input required minLength={2} maxLength={140} value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="Worum geht es?" data-testid="input-pulse-title" /></label>
           <label className="field">Nachricht<textarea required maxLength={2000} value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} placeholder="Die Information für dein Team …" data-testid="input-pulse-body" /></label>
-          <div className="field-grid"><label className="field">Priorität<select value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value as PulsePriority })} data-testid="select-pulse-priority"><option value="info">Info</option><option value="important">Wichtig</option><option value="urgent">Dringend</option></select></label><label className="field">Empfänger<select value={form.audience} onChange={event => setForm({ ...form, audience: event.target.value as PulseAudience })} data-testid="select-pulse-audience"><option value="all">Alle</option><option value="managers">Leitung</option><option value="employees">Studio-Team</option></select></label></div>
-          {me.role === 'district_manager' ? <label className="field">Gültigkeitsbereich<select value={form.scope} onChange={event => setForm({ ...form, scope: event.target.value, studioId: '' })} data-testid="select-pulse-scope"><option value="organization">Gesamte Organisation</option><option value="studio">Ein bestimmtes Studio</option></select></label> : <p className="pulse-meta">Studio: {me.studioName || 'Dein Studio'}</p>}
-          {me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading ? <div className="pulse-studio-status" role="status">Studios werden geladen …</div> : studios.isError ? <div className="pulse-studio-status" role="alert">Studios konnten nicht geladen werden. <button type="button" onClick={() => studios.refetch()} data-testid="button-retry-pulse-studios">Erneut versuchen</button></div> : studios.data?.length ? <label className="field">Studio<select required value={form.studioId} onChange={event => setForm({ ...form, studioId: event.target.value })} data-testid="select-pulse-studio"><option value="">Studio auswählen</option>{studios.data.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}</select></label> : <div className="pulse-studio-status" role="status">Keine zugänglichen Studios vorhanden.</div>)}
-          {create.isError && <p className="pulse-form-error" role="alert">Nachricht konnte nicht veröffentlicht werden. Prüfe die Angaben und versuche es erneut.</p>}
-          <button className="button button-dark button-wide" disabled={create.isPending || (me.role === 'studio_manager' && !me.studioId) || (me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading || studios.isError || !selectedStudioValid))} data-testid="button-publish-pulse"><Mail size={16} /> {create.isPending ? 'Wird veröffentlicht …' : 'Nachricht veröffentlichen'}</button>
+          <div className="field-grid"><label className="field">Priorität<select value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value as PulsePriority })} data-testid="select-pulse-priority"><option value="info">Info</option><option value="important">Wichtig</option><option value="urgent">Dringend</option></select></label>{!editing && <label className="field">Empfänger<select value={form.audience} onChange={event => setForm({ ...form, audience: event.target.value as PulseAudience })} data-testid="select-pulse-audience"><option value="all">Alle</option><option value="managers">Leitung</option><option value="employees">Studio-Team</option></select></label>}</div>
+          {editing ? <p className="pulse-meta">Empfänger und Studio bleiben unverändert. Bisherige Lesebestätigungen werden für die Korrektur zurückgesetzt.</p> : me.role === 'district_manager' ? <label className="field">Gültigkeitsbereich<select value={form.scope} onChange={event => setForm({ ...form, scope: event.target.value, studioId: '' })} data-testid="select-pulse-scope"><option value="organization">Gesamte Organisation</option><option value="studio">Ein bestimmtes Studio</option></select></label> : <p className="pulse-meta">Studio: {me.studioName || 'Dein Studio'}</p>}
+          {!editing && me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading ? <div className="pulse-studio-status" role="status">Studios werden geladen …</div> : studios.isError ? <div className="pulse-studio-status" role="alert">Studios konnten nicht geladen werden. <button type="button" onClick={() => studios.refetch()} data-testid="button-retry-pulse-studios">Erneut versuchen</button></div> : studios.data?.length ? <label className="field">Studio<select required value={form.studioId} onChange={event => setForm({ ...form, studioId: event.target.value })} data-testid="select-pulse-studio"><option value="">Studio auswählen</option>{studios.data.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}</select></label> : <div className="pulse-studio-status" role="status">Keine zugänglichen Studios vorhanden.</div>)}
+          {(create.isError || update.isError) && <p className="pulse-form-error" role="alert">Nachricht konnte nicht gespeichert werden. Prüfe die Angaben und versuche es erneut.</p>}
+          <button className="button button-dark button-wide" disabled={create.isPending || update.isPending || (!editing && ((me.role === 'studio_manager' && !me.studioId) || (me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading || studios.isError || !selectedStudioValid))))} data-testid="button-publish-pulse"><Mail size={16} /> {create.isPending || update.isPending ? 'Wird gespeichert …' : editing ? 'Korrektur speichern' : 'Nachricht veröffentlichen'}</button>
         </form>
       </div>
     </div>}

@@ -429,8 +429,11 @@ export interface PulseMessage {
   studioName: string | null;
   authorName: string;
   createdAt: string;
+  /** @nullable */
+  editedAt: string | null;
   isRead: boolean;
   readCount: number;
+  canManage: boolean;
 }
 
 export interface PulseInput {
@@ -450,6 +453,20 @@ export interface PulseInput {
   studioId: number | null;
 }
 
+export interface PulseCorrection {
+  /**
+     * @minLength 2
+     * @maxLength 140
+     */
+  title: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  body: string;
+  priority: PulsePriority;
+}
+
 export interface PulseRead {
   messageId: number;
   readAt: string;
@@ -459,5 +476,13 @@ export type ListMembersParams = {
 search?: string;
 status?: MemberStatus;
 studioId?: number;
+};
+
+export type ListPulseParams = {
+/**
+ * Load messages older than this message ID
+ * @minimum 1
+ */
+beforeId?: number;
 };
 

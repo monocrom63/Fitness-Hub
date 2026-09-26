@@ -6,3 +6,4 @@
 - [Managed Clerk publishing](managed-clerk-publishing.md) — development-key warnings do not imply live keys need manual replacement; managed tenants switch automatically on publish.
 - [Publish readiness checks](publish-readiness.md) — successful Publish status alone does not prove that new routes and managed schema are live; verify both.
 - [Post-merge workflow ports](post-merge-workflow-ports.md) — a failed managed workflow after merge may be a duplicate listener, even while the old service still answers requests.
+- [Pulse corrections](pulse-corrections.md) — corrections reset prior read receipts; retractions hide messages but retain their audit record.

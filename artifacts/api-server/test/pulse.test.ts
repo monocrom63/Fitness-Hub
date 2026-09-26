@@ -59,7 +59,7 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
     await new Promise<void>((resolve) => server!.once("listening", resolve));
     const port = (server.address() as AddressInfo).port;
 
-    async function api(user: string | null, method: "GET" | "POST", path: string, data?: unknown): Promise<ApiResult> {
+    async function api(user: string | null, method: "GET" | "POST" | "PATCH" | "DELETE", path: string, data?: unknown): Promise<ApiResult> {
       const response = await fetch(`http://127.0.0.1:${port}/api${path}`, {
         method,
         headers: {
@@ -68,7 +68,7 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
         },
         ...(data ? { body: JSON.stringify(data) } : {}),
       });
-      return { status: response.status, body: await response.json() };
+      return { status: response.status, body: response.status === 204 ? null : await response.json() };
     }
     const user = (staff: typeof district) => staff.clerkUserId;
     const draft = (studioId: number | null, audience: string, title = "Pulse test") => ({
@@ -164,6 +164,47 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal((await list(employeeB)).find((m) => m.id === global)?.isRead, false);
       assert.equal((await list(employeeB)).find((m) => m.id === global)?.readCount, 2);
       assert.equal((await list(otherDistrict)).some((m) => m.id === global), false);
+    });
+
+    await t.test("older messages are accessible through a scoped cursor", async () => {
+      for (let index = 0; index < 32; index++) {
+        await publish(managerA, studioA.id, "all", `History ${index}`);
+      }
+      assert.equal((await api(user(employeeA), "GET", "/pulse?beforeId=bad")).status, 400);
+      const first = await api(user(employeeA), "GET", "/pulse");
+      assert.equal(first.status, 200);
+      assert.equal(first.body.length, 30);
+      const second = await api(user(employeeA), "GET", `/pulse?beforeId=${first.body.at(-1).id}`);
+      assert.equal(second.status, 200);
+      assert.ok(second.body.some((message: { id: number }) => message.id === global));
+      assert.equal(new Set([...first.body, ...second.body].map((message: { id: number }) => message.id)).size, first.body.length + second.body.length);
+      assert.ok(!second.body.some((message: { id: number }) => message.id === other || message.id === studioBAll));
+    });
+
+    await t.test("only the author can correct or retract; corrections reset old receipts", async () => {
+      const correction = { title: "Korrigierter Plan", body: "Neuer Termin", priority: "important" };
+      assert.equal((await api(user(employeeA), "PATCH", `/pulse/${studioAAll}`, correction)).status, 403);
+      assert.equal((await api(user(managerB), "PATCH", `/pulse/${studioAAll}`, correction)).status, 403);
+      assert.equal((await api(user(otherDistrict), "PATCH", `/pulse/${studioAAll}`, correction)).status, 404);
+      assert.equal((await api(user(managerB), "DELETE", `/pulse/${studioAAll}`)).status, 403);
+      assert.equal((await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, body: " " })).status, 400);
+      assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`)).status, 200);
+      const updated = await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, correction);
+      assert.equal(updated.status, 200);
+      assert.equal(updated.body.title, correction.title);
+      assert.ok(updated.body.editedAt);
+      assert.equal(updated.body.readCount, 1);
+      const employeePage = await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`);
+      const corrected = employeePage.body.find((message: { id: number }) => message.id === studioAAll);
+      assert.equal(corrected?.title, correction.title);
+      assert.equal(corrected?.isRead, false);
+      assert.equal(corrected?.canManage, false);
+      assert.equal((await api(user(managerA), "DELETE", `/pulse/${studioAAll}`)).status, 204);
+      assert.equal((await api(user(managerA), "DELETE", `/pulse/${studioAAll}`)).status, 404);
+      assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`)).status, 404);
+      assert.ok(!(await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`)).body.some((message: { id: number }) => message.id === studioAAll));
+      const [record] = await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.id, studioAAll));
+      assert.ok(record.retractedAt);
     });
 
     assert.equal((await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.organizationId, orgB.id))).length, 1);

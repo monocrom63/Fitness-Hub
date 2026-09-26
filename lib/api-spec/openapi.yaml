@@ -527,9 +527,14 @@ paths:
       operationId: listPulse
       tags: [pulse]
       summary: List Pulse messages visible to the signed-in staff member
+      parameters:
+        - name: beforeId
+          in: query
+          description: Load messages older than this message ID
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
-          description: Recent visible messages with read state
+          description: Up to 30 visible messages with read state, newest first
           content:
             application/json:
               schema:
@@ -563,6 +568,47 @@ paths:
           description: Sign-in required
         "403":
           description: Insufficient role or studio access
+  /pulse/{id}:
+    patch:
+      operationId: updatePulseMessage
+      tags: [pulse]
+      summary: Correct the author's published Pulse message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PulseCorrection"
+      responses:
+        "200":
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PulseMessage"
+        "400": { description: Invalid correction }
+        "401": { description: Sign-in required }
+        "403": { description: Insufficient permission }
+        "404": { description: Message not found or already retracted }
+    delete:
+      operationId: retractPulseMessage
+      tags: [pulse]
+      summary: Retract the author's published Pulse message without deleting its audit record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204": { description: Message retracted }
+        "401": { description: Sign-in required }
+        "403": { description: Insufficient permission }
+        "404": { description: Message not found or already retracted }
   /pulse/{id}/read:
     post:
       operationId: markPulseRead
@@ -939,7 +985,7 @@ components:
     PulseMessage:
       type: object
       required:
-        [id, title, body, priority, audience, studioId, studioName, authorName, createdAt, isRead, readCount]
+        [id, title, body, priority, audience, studioId, studioName, authorName, createdAt, editedAt, isRead, readCount, canManage]
       properties:
         id: { type: integer }
         title: { type: string }
@@ -950,8 +996,10 @@ components:
         studioName: { type: ["string", "null"] }
         authorName: { type: string }
         createdAt: { type: string, format: date-time }
+        editedAt: { type: ["string", "null"], format: date-time }
         isRead: { type: boolean }
         readCount: { type: integer }
+        canManage: { type: boolean }
     PulseInput:
       type: object
       required: [title, body, priority, audience, studioId]
@@ -961,6 +1009,13 @@ components:
         priority: { $ref: "#/components/schemas/PulsePriority" }
         audience: { $ref: "#/components/schemas/PulseAudience" }
         studioId: { type: ["integer", "null"] }
+    PulseCorrection:
+      type: object
+      required: [title, body, priority]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 140 }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+        priority: { $ref: "#/components/schemas/PulsePriority" }
     PulseRead:
       type: object
       required: [messageId, readAt]

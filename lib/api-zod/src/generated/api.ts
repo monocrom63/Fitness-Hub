@@ -613,6 +613,13 @@ export const CreateCheckInResponse = zod.object({
 /**
  * @summary List Pulse messages visible to the signed-in staff member
  */
+
+
+
+export const ListPulseQueryParams = zod.object({
+  "beforeId": zod.coerce.number().int().min(1).optional().describe('Load messages older than this message ID')
+})
+
 export const ListPulseResponseItem = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
@@ -623,8 +630,10 @@ export const ListPulseResponseItem = zod.object({
   "studioName": zod.string().nullable(),
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
+  "editedAt": zod.coerce.date().nullable(),
   "isRead": zod.boolean(),
-  "readCount": zod.number().int()
+  "readCount": zod.number().int(),
+  "canManage": zod.boolean()
 })
 export const ListPulseResponse = zod.array(ListPulseResponseItem)
 
@@ -657,9 +666,58 @@ export const CreatePulseMessageResponse = zod.object({
   "studioName": zod.string().nullable(),
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
+  "editedAt": zod.coerce.date().nullable(),
   "isRead": zod.boolean(),
-  "readCount": zod.number().int()
+  "readCount": zod.number().int(),
+  "canManage": zod.boolean()
 })
+
+
+/**
+ * @summary Correct the author's published Pulse message
+ */
+export const UpdatePulseMessageParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updatePulseMessageBodyTitleMin = 2;
+export const updatePulseMessageBodyTitleMax = 140;
+
+export const updatePulseMessageBodyBodyMax = 2000;
+
+
+
+export const UpdatePulseMessageBody = zod.object({
+  "title": zod.string().min(updatePulseMessageBodyTitleMin).max(updatePulseMessageBodyTitleMax),
+  "body": zod.string().min(1).max(updatePulseMessageBodyBodyMax),
+  "priority": zod.enum(['info', 'important', 'urgent'])
+})
+
+export const UpdatePulseMessageResponse = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "priority": zod.enum(['info', 'important', 'urgent']),
+  "audience": zod.enum(['all', 'managers', 'employees']),
+  "studioId": zod.number().int().nullable(),
+  "studioName": zod.string().nullable(),
+  "authorName": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "editedAt": zod.coerce.date().nullable(),
+  "isRead": zod.boolean(),
+  "readCount": zod.number().int(),
+  "canManage": zod.boolean()
+})
+
+
+/**
+ * @summary Retract the author's published Pulse message without deleting its audit record
+ */
+export const RetractPulseMessageParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const RetractPulseMessageResponse = zod.void()
 
 
 /**

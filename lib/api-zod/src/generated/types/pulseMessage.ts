@@ -20,6 +20,9 @@ export interface PulseMessage {
   studioName: string | null;
   authorName: string;
   createdAt: Date;
+  /** @nullable */
+  editedAt: Date | null;
   isRead: boolean;
   readCount: number;
+  canManage: boolean;
 }

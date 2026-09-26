@@ -201,6 +201,8 @@ export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  editedAt: timestamp("edited_at", { withTimezone: true }),
+  retractedAt: timestamp("retracted_at", { withTimezone: true }),
 });
 
 export const pulseReadsTable = pgTable(
