@@ -152,6 +152,19 @@ test("manager records an absence, resolves all affected courses and notifies mem
       newCourse("  mIkE  ", slot(14), slot(15)));
     assert.equal(blockedCourse.status, 409, JSON.stringify(blockedCourse.body));
     assert.match(blockedCourse.body.error, /abwesend/);
+    const utcMidnight = slot(0);
+    const berlinOffsetHours = Number(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23",
+    }).format(utcMidnight));
+    const berlinMidnight = new Date(utcMidnight.getTime() - berlinOffsetHours * 3600000);
+    const minutesFromMidnight = (minutes: number) => new Date(berlinMidnight.getTime() + minutes * 60000);
+    const overnightCourse = await api(manager.clerkUserId, "POST", "/courses",
+      newCourse("Mike", minutesFromMidnight(-45), minutesFromMidnight(45), "Overnight Room"));
+    assert.equal(overnightCourse.status, 409, JSON.stringify(overnightCourse.body));
+    assert.match(overnightCourse.body.error, /abwesend/);
+    const endedBeforeAbsence = await api(manager.clerkUserId, "POST", "/courses",
+      newCourse("Mike", minutesFromMidnight(-60), berlinMidnight, "Previous Day Room"));
+    assert.equal(endedBeforeAbsence.status, 201, JSON.stringify(endedBeforeAbsence.body));
     assert.equal((await api(employee.clerkUserId, "POST", "/courses",
       newCourse("Mike", slot(14), slot(15)))).status, 403);
     assert.equal((await api(otherManager.clerkUserId, "POST", "/courses",
@@ -287,6 +300,17 @@ test("manager records an absence, resolves all affected courses and notifies mem
     assert.match(notices.find((notice) => notice.courseId === midday.id)!.body, /abgesagt/);
     const [resolvedAlert] = await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.id, alert.id));
     assert.ok(resolvedAlert.retractedAt, "external cancellation retires the last open trainer case");
+
+    const [nightCourse] = await db.insert(coursesTable).values({
+      studioId: studio.id, title: "Night shift", instructor: "Night Shift",
+      startsAt: minutesFromMidnight(-45), endsAt: minutesFromMidnight(45),
+      room: "Night shift room", capacity: 10,
+    }).returning();
+    const nightAbsence = await api(manager.clerkUserId, "POST", "/trainer-absences",
+      { studioId: studio.id, instructor: "Night Shift", fromDate: day, toDate: day });
+    assert.equal(nightAbsence.status, 201, JSON.stringify(nightAbsence.body));
+    assert.ok(nightAbsence.body.courses.some((course: any) => course.courseId === nightCourse.id),
+      "an absence includes a course crossing into its first day");
 
     // Either a concurrent new class is included in the reported absence, or
     // course creation is rejected. It must never be scheduled without review.

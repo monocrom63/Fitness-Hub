@@ -17,7 +17,7 @@ import {
   getStaffContext, type StaffContext,
 } from "../lib/fiudia-access";
 import { processTrainerAbsencePush, trainerDecisionNotice } from "../lib/trainer-absence-push";
-import { isTrainerAbsentForCourse, retireTrainerAlertIfResolved, trainerLockKey } from "../lib/trainer-scheduling";
+import { isTrainerAbsentForCourse, retireTrainerAlertIfResolved, trainerAbsenceOverlapsCourse, trainerLockKey } from "../lib/trainer-scheduling";
 
 type Dependencies = {
   database: typeof db;
@@ -144,7 +144,6 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
       first.trim().toLocaleLowerCase("de-DE") === second.trim().toLocaleLowerCase("de-DE");
     const names = await database.selectDistinct({ name: coursesTable.instructor })
       .from(coursesTable).where(eq(coursesTable.studioId, studioId));
-    const day = berlinDate(course.startsAt);
     const conflicts = await database.select({
       name: coursesTable.instructor, title: coursesTable.title,
     }).from(coursesTable).where(and(
@@ -155,14 +154,13 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
     ));
     const absent = await database.select({ name: trainerAbsencesTable.instructor })
       .from(trainerAbsencesTable).where(and(eq(trainerAbsencesTable.studioId, studioId),
-        sql<boolean>`${trainerAbsencesTable.fromDate} <= ${day}::date`,
-        sql<boolean>`${trainerAbsencesTable.toDate} >= ${day}::date`));
+        trainerAbsenceOverlapsCourse(course.startsAt, course.endsAt)));
     return names.filter((item) => !sameName(item.name, course.originalInstructor)).map(({ name }) => {
       const absence = absent.some((item) => sameName(item.name, name));
       const conflict = conflicts.find((item) => sameName(item.name, name));
       return {
         name, available: !absence && !conflict,
-        reason: absence ? "Für diesen Tag nicht verfügbar" :
+        reason: absence ? "Für diesen Kurszeitraum nicht verfügbar" :
           conflict ? `Hat bereits „${conflict.title}“ (30 Minuten Wechselzeit)` : null,
       };
     }).sort((a, b) => Number(b.available) - Number(a.available) || a.name.localeCompare(b.name, "de"));
@@ -223,7 +221,8 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
         eq(coursesTable.studioId, studioId),
         sql<boolean>`lower(btrim(${coursesTable.instructor})) = lower(${instructor})`,
         ne(coursesTable.status, "cancelled"), gt(coursesTable.startsAt, new Date()),
-        sql<boolean>`(${coursesTable.startsAt} AT TIME ZONE 'Europe/Berlin')::date BETWEEN ${fromDate}::date AND ${toDate}::date`,
+        sql<boolean>`(${coursesTable.startsAt} AT TIME ZONE 'Europe/Berlin') < (${toDate}::date + 1)::timestamp`,
+        sql<boolean>`(${coursesTable.endsAt} AT TIME ZONE 'Europe/Berlin') > ${fromDate}::date::timestamp`,
       )).orderBy(asc(coursesTable.startsAt)).for("update");
       if (!courses.length) return { error: "Für diese Trainerperson gibt es im Zeitraum keine bevorstehenden Kurse." };
       const [overlapping] = await tx.select({ id: trainerAbsencesTable.id })
@@ -346,7 +345,7 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
         }
       } else if (action === "external") {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(row.studioId, externalName)}))`);
-        if (await isTrainerAbsentForCourse(row.studioId, externalName, lockedCourse.startsAt, tx)) {
+        if (await isTrainerAbsentForCourse(row.studioId, externalName, lockedCourse.startsAt, lockedCourse.endsAt, tx)) {
           return { error: "Die externe Vertretung ist für diesen Kurstag ebenfalls abwesend." };
         }
       }

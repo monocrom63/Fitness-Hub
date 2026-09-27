@@ -833,7 +833,7 @@ router.post("/courses", async (req, res): Promise<void> => {
   const created = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(body.data.studioId, instructor)}))`);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-room:${body.data.studioId}:${body.data.room}`}))`);
-    if (await isTrainerAbsentForCourse(body.data.studioId, instructor, startsAt, tx)) {
+    if (await isTrainerAbsentForCourse(body.data.studioId, instructor, startsAt, endsAt, tx)) {
       return { error: "Diese Trainerperson ist am Kurstag abwesend. Bitte eine andere Kursleitung wählen." as const };
     }
     const closures = await tx.select({

@@ -7,18 +7,25 @@ export function trainerLockKey(studioId: number, instructor: string) {
   return `fiudia-trainer:${studioId}:${instructor.trim().toLocaleLowerCase("de-DE")}`;
 }
 
+export function trainerAbsenceOverlapsCourse(startsAt: Date, endsAt: Date) {
+  return sql<boolean>`
+    (${startsAt}::timestamptz AT TIME ZONE 'Europe/Berlin') < (${trainerAbsencesTable.toDate} + 1)::timestamp
+    AND (${endsAt}::timestamptz AT TIME ZONE 'Europe/Berlin') > ${trainerAbsencesTable.fromDate}::timestamp
+  `;
+}
+
 export async function isTrainerAbsentForCourse(
   studioId: number,
   instructor: string,
   startsAt: Date,
+  endsAt: Date,
   database: Pick<typeof db, "select"> = db,
 ) {
   const [absence] = await database.select({ id: trainerAbsencesTable.id })
     .from(trainerAbsencesTable).where(and(
       eq(trainerAbsencesTable.studioId, studioId),
       sql<boolean>`lower(btrim(${trainerAbsencesTable.instructor})) = lower(${instructor.trim()})`,
-      sql<boolean>`(${startsAt}::timestamptz AT TIME ZONE 'Europe/Berlin')::date
-        BETWEEN ${trainerAbsencesTable.fromDate} AND ${trainerAbsencesTable.toDate}`,
+      trainerAbsenceOverlapsCourse(startsAt, endsAt),
     )).limit(1);
   return absence !== undefined;
 }
