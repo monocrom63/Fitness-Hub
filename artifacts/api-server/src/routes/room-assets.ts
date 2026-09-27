@@ -67,6 +67,7 @@ import {
   invalidateCoursePromotionNotices,
   resolutionRetryMatches,
 } from "../lib/room-closures";
+import { settleCancelledTrainerCourse } from "../lib/trainer-scheduling";
 
 const router: IRouter = Router();
 
@@ -576,6 +577,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         eq(courseBookingsTable.courseId, lockedCourse.id),
         inArray(courseBookingsTable.status, ["confirmed", "waitlisted"]),
       ));
+      await settleCancelledTrainerCourse(lockedCourse.id, staff.id, tx);
     }
 
     if (request.channel === "in_app" || request.channel === "push") {

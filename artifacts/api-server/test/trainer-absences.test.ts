@@ -6,13 +6,15 @@ import { test } from "node:test";
 import express from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import {
-  courseBookingsTable, coursesTable, db, memberNotificationsTable,
+  courseBookingsTable, courseClosureResolutionsTable, coursesTable, db, memberNotificationsTable,
   memberPushSubscriptionsTable, membersTable, organizationsTable,
-  pulseMessagesTable, staffTable, studiosTable, trainerAbsenceCoursesTable,
+  pulseMessagesTable, roomClosuresTable, staffTable, studiosTable, trainerAbsenceCoursesTable,
   trainerAbsencePushDeliveriesTable, trainerAbsencesTable,
 } from "@workspace/db";
 import { processTrainerAbsencePush, type TrainerPushProxy } from "../src/lib/trainer-absence-push";
 import { createTrainerAbsencesRouter } from "../src/routes/trainer-absences";
+import portalRouter from "../src/routes/portal";
+import roomAssetsRouter from "../src/routes/room-assets";
 
 function futureBerlinDay() {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -78,10 +80,18 @@ test("manager records an absence, resolves all affected courses and notifies mem
 
     const app = express();
     app.use(express.json());
+    app.use((req, _res, next) => {
+      const userId = req.header("x-test-user") ?? null;
+      const auth = Object.assign(() => ({ userId, tokenType: "session_token" }), {
+        [Symbol.for("@clerk/express.auth")]: true,
+      });
+      Object.assign(req, { auth });
+      next();
+    });
     app.use("/api", createTrainerAbsencesRouter({
       userIdFromRequest: (req) => req.header("x-test-user") ?? null,
       processPush: (id) => processTrainerAbsencePush(id, proxy),
-    }));
+    }), portalRouter, roomAssetsRouter);
     server = app.listen(0, "127.0.0.1");
     await once(server, "listening");
     const port = (server.address() as AddressInfo).port;
@@ -106,6 +116,27 @@ test("manager records an absence, resolves all affected courses and notifies mem
     assert.equal(alert.audience, "managers");
     assert.equal(alert.priority, "urgent");
     assert.match(alert.body, /3 Kurse ohne Trainer/);
+    const newCourse = (instructor: string, startsAt: Date, endsAt: Date, room = "New Room") => ({
+      studioId: studio.id, title: "New class", instructor, startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(), capacity: 10, room,
+    });
+    const blockedCourse = await api(manager.clerkUserId, "POST", "/courses",
+      newCourse("  mIkE  ", slot(14), slot(15)));
+    assert.equal(blockedCourse.status, 409, JSON.stringify(blockedCourse.body));
+    assert.match(blockedCourse.body.error, /abwesend/);
+    assert.equal((await api(employee.clerkUserId, "POST", "/courses",
+      newCourse("Mike", slot(14), slot(15)))).status, 403);
+    assert.equal((await api(otherManager.clerkUserId, "POST", "/courses",
+      newCourse("Mike", slot(14), slot(15)))).status, 403);
+    const unaffectedStudio = await api(otherManager.clerkUserId, "POST", "/courses", {
+      ...newCourse("Mike", slot(14), slot(15), "Other Studio Room"), studioId: otherStudio.id,
+    });
+    assert.equal(unaffectedStudio.status, 201, JSON.stringify(unaffectedStudio.body));
+    const nextDay = (value: Date) => new Date(value.getTime() + 86400000);
+    const outsideAbsence = await api(manager.clerkUserId, "POST", "/courses",
+      newCourse("  Mike  ", nextDay(slot(14)), nextDay(slot(15))));
+    assert.equal(outsideAbsence.status, 201, JSON.stringify(outsideAbsence.body));
+    assert.equal(outsideAbsence.body.instructor, "Mike");
 
     const prefix = (courseId: number) =>
       `/trainer-absences/${created.body.id}/courses/${courseId}`;
@@ -149,29 +180,77 @@ test("manager records an absence, resolves all affected courses and notifies mem
     await processTrainerAbsencePush(replaced.body.id, proxy);
     assert.equal(sends.length, 2, "successful push is never resent");
 
-    const cancelled = await api(manager.clerkUserId, "POST", `${prefix(midday.id)}/resolve`, { action: "cancel" });
+    assert.equal((await api(manager.clerkUserId, "POST", `${prefix(evening.id)}/resolve`,
+      { action: "external", externalName: "  mIkE  " })).status, 400);
+    const absentExternal = await api(manager.clerkUserId, "POST", `${prefix(evening.id)}/resolve`,
+      { action: "external", externalName: "  lEo " });
+    assert.equal(absentExternal.status, 409);
+    assert.match(absentExternal.body.error, /ebenfalls abwesend/);
+    const external = await api(manager.clerkUserId, "POST", `${prefix(evening.id)}/resolve`,
+      { action: "external", externalName: "Externe Vertretung" });
+    assert.equal(external.status, 200, JSON.stringify(external.body));
+    assert.equal(external.body.instructor, "Externe Vertretung");
+    assert.equal((await api(manager.clerkUserId, "POST", `/studios/${studio.id}/rooms`,
+      { name: "A" })).status, 201);
+    const closure = await api(manager.clerkUserId, "POST", `/studios/${studio.id}/closures`, {
+      roomName: "A", fromDate: day, toDate: day,
+      reason: "Raum gesperrt", responsible: "Management",
+    });
+    assert.equal(closure.status, 201, JSON.stringify(closure.body));
+    const cancelled = await api(manager.clerkUserId, "POST", `/courses/${midday.id}/closure-resolution`, {
+      closureId: closure.body.id, action: "cancel", channel: "in_app", idempotencyKey: randomUUID(),
+    });
     assert.equal(cancelled.status, 200, JSON.stringify(cancelled.body));
     const [cancelledBooking] = await db.select().from(courseBookingsTable)
       .where(eq(courseBookingsTable.courseId, midday.id));
     assert.equal(cancelledBooking.status, "cancelled");
     assert.equal((await db.select().from(coursesTable).where(eq(coursesTable.id, midday.id)))[0].status, "cancelled");
-    const external = await api(manager.clerkUserId, "POST", `${prefix(evening.id)}/resolve`,
-      { action: "external", externalName: "Externe Vertretung" });
-    assert.equal(external.status, 200, JSON.stringify(external.body));
-    assert.equal(external.body.instructor, "Externe Vertretung");
+    const updatedAbsence = await api(manager.clerkUserId, "GET", "/trainer-absences");
+    assert.equal(updatedAbsence.status, 200);
+    assert.equal(updatedAbsence.body.find((item: any) => item.id === created.body.id)
+      .courses.find((course: any) => course.courseId === midday.id).status, "cancelled");
+    assert.equal((await api(manager.clerkUserId, "POST", `${prefix(midday.id)}/resolve`,
+      { action: "cancel" })).status, 409);
     const notices = await db.select().from(memberNotificationsTable)
       .where(inArray(memberNotificationsTable.courseId, [morning.id, midday.id, evening.id]));
     assert.equal(notices.length, 3);
     for (const notice of notices) assert.doesNotMatch(`${notice.title} ${notice.body}`, /krank|Mike|Abwesenheit/i);
-    assert.match(notices.find((notice) => notice.courseId === midday.id)!.body, /storniert/);
+    assert.match(notices.find((notice) => notice.courseId === midday.id)!.body, /abgesagt/);
     const [resolvedAlert] = await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.id, alert.id));
-    assert.ok(resolvedAlert.retractedAt, "urgent manager alert is retired once all courses are resolved");
+    assert.ok(resolvedAlert.retractedAt, "external cancellation retires the last open trainer case");
+
+    // Either a concurrent new class is included in the reported absence, or
+    // course creation is rejected. It must never be scheduled without review.
+    await db.insert(coursesTable).values({
+      studioId: studio.id, title: "Nora's class", instructor: "Nora",
+      startsAt: slot(18), endsAt: slot(19), room: "Nora's room", capacity: 10,
+    });
+    const [noraAbsence, concurrentCourse] = await Promise.all([
+      api(manager.clerkUserId, "POST", "/trainer-absences",
+        { studioId: studio.id, instructor: "Nora", fromDate: day, toDate: day }),
+      api(manager.clerkUserId, "POST", "/courses",
+        newCourse("  nOrA  ", slot(21), slot(22), "Other room")),
+    ]);
+    assert.equal(noraAbsence.status, 201, JSON.stringify(noraAbsence.body));
+    assert.ok([201, 409].includes(concurrentCourse.status), JSON.stringify(concurrentCourse.body));
+    if (concurrentCourse.status === 201) {
+      assert.ok(noraAbsence.body.courses.some((course: any) => course.courseId === concurrentCourse.body.id),
+        "course created first must be captured by the absence");
+    } else {
+      assert.match(concurrentCourse.body.error, /abwesend/);
+    }
   } finally {
     if (server) { server.close(); await once(server, "close"); }
     if (organizationId !== undefined) {
       await db.transaction(async (tx) => {
         const studioIds = (await tx.select({ id: studiosTable.id }).from(studiosTable)
           .where(eq(studiosTable.organizationId, organizationId!))).map((item) => item.id);
+        const closureIds = (await tx.select({ id: roomClosuresTable.id }).from(roomClosuresTable)
+          .where(inArray(roomClosuresTable.studioId, studioIds))).map((item) => item.id);
+        if (closureIds.length) {
+          await tx.delete(courseClosureResolutionsTable)
+            .where(inArray(courseClosureResolutionsTable.closureId, closureIds));
+        }
         const absenceIds = (await tx.select({ id: trainerAbsencesTable.id }).from(trainerAbsencesTable)
           .where(inArray(trainerAbsencesTable.studioId, studioIds))).map((item) => item.id);
         if (absenceIds.length) {

@@ -16,6 +16,7 @@ import {
   getStaffContext, type StaffContext,
 } from "../lib/fiudia-access";
 import { processTrainerAbsencePush, trainerDecisionNotice } from "../lib/trainer-absence-push";
+import { isTrainerAbsentForCourse, retireTrainerAlertIfResolved, trainerLockKey } from "../lib/trainer-scheduling";
 
 type Dependencies = {
   database: typeof db;
@@ -138,6 +139,8 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
   }
 
   async function candidates(studioId: number, course: { courseId: number; startsAt: Date; endsAt: Date; originalInstructor: string }) {
+    const sameName = (first: string, second: string) =>
+      first.trim().toLocaleLowerCase("de-DE") === second.trim().toLocaleLowerCase("de-DE");
     const names = await database.selectDistinct({ name: coursesTable.instructor })
       .from(coursesTable).where(eq(coursesTable.studioId, studioId));
     const day = berlinDate(course.startsAt);
@@ -153,9 +156,9 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
       .from(trainerAbsencesTable).where(and(eq(trainerAbsencesTable.studioId, studioId),
         sql<boolean>`${trainerAbsencesTable.fromDate} <= ${day}::date`,
         sql<boolean>`${trainerAbsencesTable.toDate} >= ${day}::date`));
-    return names.filter((item) => item.name !== course.originalInstructor).map(({ name }) => {
-      const absence = absent.some((item) => item.name === name);
-      const conflict = conflicts.find((item) => item.name === name);
+    return names.filter((item) => !sameName(item.name, course.originalInstructor)).map(({ name }) => {
+      const absence = absent.some((item) => sameName(item.name, name));
+      const conflict = conflicts.find((item) => sameName(item.name, name));
       return {
         name, available: !absence && !conflict,
         reason: absence ? "Für diesen Tag nicht verfügbar" :
@@ -196,11 +199,12 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
       res.status(403).json({ error: "Kein Zugriff auf dieses Studio." }); return;
     }
     const result = await database.transaction(async (tx) => {
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-trainer:${studioId}:${instructor}`}))`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(studioId, instructor)}))`);
       const courses = await tx.select({
-        id: coursesTable.id, title: coursesTable.title,
+        id: coursesTable.id, title: coursesTable.title, instructor: coursesTable.instructor,
       }).from(coursesTable).where(and(
-        eq(coursesTable.studioId, studioId), eq(coursesTable.instructor, instructor),
+        eq(coursesTable.studioId, studioId),
+        sql<boolean>`lower(btrim(${coursesTable.instructor})) = lower(${instructor})`,
         ne(coursesTable.status, "cancelled"), gt(coursesTable.startsAt, new Date()),
         sql<boolean>`(${coursesTable.startsAt} AT TIME ZONE 'Europe/Berlin')::date BETWEEN ${fromDate}::date AND ${toDate}::date`,
       )).orderBy(asc(coursesTable.startsAt)).for("update");
@@ -208,7 +212,7 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
       const [overlapping] = await tx.select({ id: trainerAbsencesTable.id })
         .from(trainerAbsencesTable).where(and(
           eq(trainerAbsencesTable.studioId, studioId),
-          eq(trainerAbsencesTable.instructor, instructor),
+          sql<boolean>`lower(btrim(${trainerAbsencesTable.instructor})) = lower(${instructor})`,
           sql<boolean>`${trainerAbsencesTable.fromDate} <= ${toDate}::date`,
           sql<boolean>`${trainerAbsencesTable.toDate} >= ${fromDate}::date`,
         )).limit(1);
@@ -217,7 +221,7 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
         studioId, instructor, fromDate, toDate, createdByStaffId: staff.id,
       }).returning();
       await tx.insert(trainerAbsenceCoursesTable).values(courses.map((course) => ({
-        absenceId: absence.id, courseId: course.id, originalInstructor: instructor,
+        absenceId: absence.id, courseId: course.id, originalInstructor: course.instructor,
       })));
       const [studio] = await tx.select({ name: studiosTable.name })
         .from(studiosTable).where(eq(studiosTable.id, studioId)).limit(1);
@@ -289,7 +293,8 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
     if (action !== "replace" && candidateName) {
       res.status(400).json({ error: "Ein Kandidatenname ist nur bei einer Vertretung zulässig." }); return;
     }
-    if (action === "external" && (externalName.length < 2 || externalName === row.originalInstructor)) {
+    if (action === "external" && (externalName.length < 2 ||
+      trainerLockKey(row.studioId, externalName) === trainerLockKey(row.studioId, row.originalInstructor))) {
       res.status(400).json({ error: "Bitte den Namen der externen Vertretung eintragen." }); return;
     }
     if (action !== "external" && externalName) {
@@ -314,13 +319,18 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
         }
         // Serialize assignment and overlapping sick reports for this trainer
         // across separate courses before doing the final availability check.
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-trainer:${row.studioId}:${decision.candidateName}`}))`);
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(row.studioId, decision.candidateName)}))`);
         const pool = await candidates(row.studioId, {
           courseId: lockedCourse.id, startsAt: lockedCourse.startsAt, endsAt: lockedCourse.endsAt,
           originalInstructor: decision.originalInstructor,
         });
         if (!pool.some((candidate) => candidate.name === decision.candidateName && candidate.available)) {
           return { error: "Die angefragte Person ist inzwischen nicht mehr verfügbar." };
+        }
+      } else if (action === "external") {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(row.studioId, externalName)}))`);
+        if (await isTrainerAbsentForCourse(row.studioId, externalName, lockedCourse.startsAt, tx)) {
+          return { error: "Die externe Vertretung ist für diesen Kurstag ebenfalls abwesend." };
         }
       }
       const nextInstructor = action === "replace" ? decision.candidateName! :
@@ -366,14 +376,7 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
             subscriptionId: subscription.subscriptionId,
           })));
       }
-      const [remaining] = await tx.select({ total: count() }).from(trainerAbsenceCoursesTable)
-        .where(and(eq(trainerAbsenceCoursesTable.absenceId, row.absenceId),
-          inArray(trainerAbsenceCoursesTable.status, ["open", "requested"])));
-      if (remaining.total === 0 && row.pulseMessageId) {
-        // The historic incident remains in the absence list; remove stale urgency from Pulse.
-        await tx.update(pulseMessagesTable).set({ retractedAt: new Date() })
-          .where(eq(pulseMessagesTable.id, row.pulseMessageId));
-      }
+      await retireTrainerAlertIfResolved(row.absenceId, row.pulseMessageId, tx);
       return { id: decision.id };
     });
     if ("error" in result) { res.status(409).json({ error: result.error }); return; }

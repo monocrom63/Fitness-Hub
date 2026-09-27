@@ -54,6 +54,7 @@ import {
 } from "../lib/fiudia-access";
 import { isModuleEnabled } from "../lib/module-access";
 import { closureIntersectsInterval, hasOverlappingLiveCourse } from "../lib/room-closures";
+import { isTrainerAbsentForCourse, trainerLockKey } from "../lib/trainer-scheduling";
 
 const router: IRouter = Router();
 const CHECK_IN_MILESTONES = new Set([10, 25, 50, 100, 250, 500]);
@@ -682,9 +683,18 @@ router.post("/courses", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Das Kursende muss nach dem Kursstart liegen." });
     return;
   }
+  const instructor = body.data.instructor.trim();
+  if (instructor.length < 2) {
+    res.status(400).json({ error: "Bitte eine gültige Trainerperson angeben." });
+    return;
+  }
 
   const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(body.data.studioId, instructor)}))`);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-room:${body.data.studioId}:${body.data.room}`}))`);
+    if (await isTrainerAbsentForCourse(body.data.studioId, instructor, startsAt, tx)) {
+      return { error: "Diese Trainerperson ist am Kurstag abwesend. Bitte eine andere Kursleitung wählen." as const };
+    }
     const closures = await tx.select({
       fromDate: roomClosuresTable.fromDate,
       toDate: roomClosuresTable.toDate,
@@ -700,7 +710,7 @@ router.post("/courses", async (req, res): Promise<void> => {
     }
     const [createdCourse] = await tx
       .insert(coursesTable)
-      .values({ ...body.data, startsAt, endsAt })
+      .values({ ...body.data, instructor, startsAt, endsAt })
       .returning();
     const [courseStudio] = await tx
       .select({

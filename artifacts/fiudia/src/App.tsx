@@ -412,7 +412,24 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
     </div>)}</div>}
     {manager && rosterCourse && <CourseRoster key={rosterCourse.id} course={rosterCourse} onClose={() => setRosterCourse(null)} />}
     {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}
-    {me.role !== 'studio_employee' && open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}><form onSubmit={submit} className="modal-form"><TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" /><TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} /><div className="field-grid"><TextField label="Beginn" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" /><TextField label="Ende" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" /></div><div className="field-grid"><TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" /><TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} /></div>{create.isError && <p className="form-error" role="alert">Kurs konnte nicht gespeichert werden.</p>}<button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button></form></Modal>}
+    {me.role !== 'studio_employee' && open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}>
+      <form onSubmit={submit} className="modal-form">
+        <TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" />
+        <TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} />
+        <div className="field-grid">
+          <TextField label="Beginn" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" />
+          <TextField label="Ende" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" />
+        </div>
+        <div className="field-grid">
+          <TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" />
+          <TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} />
+        </div>
+        {create.isError && <p className="form-error" role="alert" data-testid="error-create-course">
+          {(create.error as { data?: { error?: string } } | null)?.data?.error || 'Kurs konnte nicht gespeichert werden.'}
+        </p>}
+        <button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button>
+      </form>
+    </Modal>}
   </>;
 }
 

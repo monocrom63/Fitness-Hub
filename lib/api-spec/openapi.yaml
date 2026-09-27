@@ -232,7 +232,7 @@ paths:
         "403":
           description: Insufficient role or studio access
         "409":
-          description: The room is closed or already occupied during the requested course interval
+          description: The room is closed or occupied, or the trainer is absent on the course date
   /trainer-absences:
     get:
       operationId: listTrainerAbsences
