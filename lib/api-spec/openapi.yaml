@@ -375,6 +375,23 @@ paths:
                 items: { $ref: "#/components/schemas/ClosureCourseResolution" }
         "403": { description: Manager access required }
         "404": { description: Closure not found }
+  /studios/{studioId}/closures/push-readiness:
+    get:
+      operationId: getClosurePushReadiness
+      tags: [portal]
+      summary: Check whether OneSignal can be used before choosing push for a course change
+      parameters:
+        - name: studioId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Current push readiness for the accessible studio
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClosurePushReadiness" }
+        "403": { description: Manager access required }
   /courses/{id}/closure-resolution:
     post:
       operationId: resolveCourseRoomClosure
@@ -1274,6 +1291,12 @@ components:
         deliveries:
           type: array
           items: { $ref: "#/components/schemas/ClosurePushDelivery" }
+    ClosurePushReadiness:
+      type: object
+      required: [ready, reason]
+      properties:
+        ready: { type: boolean }
+        reason: { type: ["string", "null"] }
     ClosureEmailDeliveryCounts:
       type: object
       required: [total, pending, sending, sent, failed]

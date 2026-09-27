@@ -430,6 +430,12 @@ export interface ClosurePushDeliveryReport {
   deliveries: ClosurePushDelivery[];
 }
 
+export interface ClosurePushReadiness {
+  ready: boolean;
+  /** @nullable */
+  reason: string | null;
+}
+
 export interface ClosureEmailDeliveryCounts {
   total: number;
   pending: number;

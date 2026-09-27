@@ -441,6 +441,19 @@ export const ListClosureResolutionsResponse = zod.array(ListClosureResolutionsRe
 
 
 /**
+ * @summary Check whether OneSignal can be used before choosing push for a course change
+ */
+export const GetClosurePushReadinessParams = zod.object({
+  "studioId": zod.coerce.number().int()
+})
+
+export const GetClosurePushReadinessResponse = zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable()
+})
+
+
+/**
  * @summary Relocate or cancel an affected course and notify booked members
  */
 export const ResolveCourseRoomClosureParams = zod.object({

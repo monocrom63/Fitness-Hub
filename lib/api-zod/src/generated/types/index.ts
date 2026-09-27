@@ -25,6 +25,7 @@ export * from './closureNotificationOutcomeStatus';
 export * from './closurePushDelivery';
 export * from './closurePushDeliveryReport';
 export * from './closurePushDeliveryStatus';
+export * from './closurePushReadiness';
 export * from './course';
 export * from './courseBooking';
 export * from './courseBookingStatus';

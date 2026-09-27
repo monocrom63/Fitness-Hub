@@ -11,6 +11,8 @@ import {
   DeleteStudioRoomClosureParams,
   GetClosureEmailDeliveriesParams,
   GetClosureEmailDeliveriesResponse,
+  GetClosurePushReadinessParams,
+  GetClosurePushReadinessResponse,
   GetClosurePushDeliveriesParams,
   GetClosurePushDeliveriesResponse,
   ListClosureAffectedCoursesParams,
@@ -389,6 +391,20 @@ router.get("/studios/:studioId/closures/:closureId/resolutions", async (req, res
   }
   const rows = await listClosureResolutionsForStudio(params.data.studioId, closure.id);
   res.json(ListClosureResolutionsResponse.parse(rows));
+});
+
+router.get("/studios/:studioId/closures/push-readiness", async (req, res): Promise<void> => {
+  const staff = await requireManager(req, res);
+  if (!staff) return;
+  const params = GetClosurePushReadinessParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!(await accessibleStudio(staff, params.data.studioId, res))) return;
+  res.setHeader("Cache-Control", "no-store");
+  const reason = await closurePushReadiness();
+  res.json(GetClosurePushReadinessResponse.parse({ ready: reason === null, reason }));
 });
 
 function resolutionMessage(action: "relocate" | "cancel", courseTitle: string, room: string | null) {

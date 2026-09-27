@@ -27,6 +27,7 @@ import type {
   ClosureCourseResolution,
   ClosureEmailDeliveryReport,
   ClosurePushDeliveryReport,
+  ClosurePushReadiness,
   Course,
   CourseBooking,
   CourseClosureResolution,
@@ -1481,6 +1482,83 @@ export function useListClosureResolutions<TData = Awaited<ReturnType<typeof list
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListClosureResolutionsQueryOptions(studioId,closureId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetClosurePushReadinessUrl = (studioId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/closures/push-readiness`
+}
+
+/**
+ * @summary Check whether OneSignal can be used before choosing push for a course change
+ */
+export const getClosurePushReadiness = async (studioId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosurePushReadiness> => {
+
+  return customFetch<ClosurePushReadiness>(getGetClosurePushReadinessUrl(studioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClosurePushReadinessQueryKey = (studioId: number,) => {
+    return [
+    `/api/studios/${studioId}/closures/push-readiness`
+    ] as const;
+    }
+
+
+export const getGetClosurePushReadinessQueryOptions = <TData = Awaited<ReturnType<typeof getClosurePushReadiness>>, TError = ErrorType<void>>(studioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClosurePushReadiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClosurePushReadinessQueryKey(studioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClosurePushReadiness>>> = ({ signal }) => getClosurePushReadiness(studioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: studioId !== null && studioId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClosurePushReadiness>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClosurePushReadinessQueryResult = NonNullable<Awaited<ReturnType<typeof getClosurePushReadiness>>>
+export type GetClosurePushReadinessQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check whether OneSignal can be used before choosing push for a course change
+ */
+
+export function useGetClosurePushReadiness<TData = Awaited<ReturnType<typeof getClosurePushReadiness>>, TError = ErrorType<void>>(
+ studioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClosurePushReadiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClosurePushReadinessQueryOptions(studioId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

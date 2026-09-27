@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSearch } from 'wouter';
 import { AlertTriangle, ArrowRight, DoorOpen, Plus, Trash2, X } from 'lucide-react';
 import {
-  getGetClosureEmailDeliveriesQueryKey, getGetClosurePushDeliveriesQueryKey, getListClosureAffectedCoursesQueryKey, getListClosureResolutionsQueryKey, getListCoursesQueryKey, getListMemberNotificationsQueryKey,
+  getGetClosureEmailDeliveriesQueryKey, getGetClosurePushDeliveriesQueryKey, getGetClosurePushReadinessQueryKey, getListClosureAffectedCoursesQueryKey, getListClosureResolutionsQueryKey, getListCoursesQueryKey, getListMemberNotificationsQueryKey,
   getListStudioRoomClosuresQueryKey, getListStudioRoomsQueryKey, getListStudiosQueryKey, useCreateStudioRoom,
-  useCreateStudioRoomClosure, useDeleteStudioRoomClosure, useGetClosureEmailDeliveries, useGetClosurePushDeliveries, useListClosureAffectedCourses,
+  useCreateStudioRoomClosure, useDeleteStudioRoomClosure, useGetClosureEmailDeliveries, useGetClosurePushDeliveries, useGetClosurePushReadiness, useListClosureAffectedCourses,
   useListClosureResolutions, useListStudioRoomClosures, useListStudioRooms, useListStudios, useResolveCourseRoomClosure, useRetryClosureEmailDeliveries, useRetryClosurePushDeliveries,
 } from '@workspace/api-client-react';
 import type { ClosureAffectedCourse, ClosureCourseResolution, CourseClosureResolutionInput, Me, RoomClosure } from '@workspace/api-client-react';
@@ -52,7 +52,7 @@ function ConfirmDialog({ title, description, confirmLabel, onConfirm, onClose, b
 
 type Attempt = { courseId: number; data: CourseClosureResolutionInput };
 
-function AffectedCourse({ course, closureId, studioId }: { course: ClosureAffectedCourse; closureId: number; studioId: number }) {
+function AffectedCourse({ course, closureId, studioId, pushReady, pushReason }: { course: ClosureAffectedCourse; closureId: number; studioId: number; pushReady: boolean; pushReason: string }) {
   const client = useQueryClient();
   const resolve = useResolveCourseRoomClosure();
   const [action, setAction] = useState<'relocate' | 'cancel' | null>(null);
@@ -80,12 +80,18 @@ function AffectedCourse({ course, closureId, studioId }: { course: ClosureAffect
         client.invalidateQueries({ queryKey: getListCoursesQueryKey() });
         client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() });
       },
-      onError: error => setRequestError(errorText(error)),
+      onError: error => {
+        if (next.data.channel === 'push') client.invalidateQueries({ queryKey: getGetClosurePushReadinessQueryKey(studioId) });
+        setRequestError(errorText(error));
+      },
     });
   }
 
   function submit() {
     if (!action || resolve.isPending) return;
+    if (channel === 'push' && !pushReady && !attempt) {
+      setRequestError(pushReason); return;
+    }
     if (action === 'relocate' && !course.alternativeRooms.includes(room)) {
       setRequestError('Bitte wähle einen verfügbaren Alternativraum.'); return;
     }
@@ -120,7 +126,7 @@ function AffectedCourse({ course, closureId, studioId }: { course: ClosureAffect
       <div className="rooms-field">Mitglieder informieren <div className="rooms-channels" role="group" aria-label="Benachrichtigungskanal">
         <button type="button" aria-pressed={channel === 'in_app'} onClick={() => { setChannel('in_app'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-in-app-${course.id}`}>In-App</button>
         <button type="button" aria-pressed={channel === 'email'} onClick={() => { setChannel('email'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-email-${course.id}`}>E-Mail</button>
-        <button type="button" aria-pressed={channel === 'push'} onClick={() => { setChannel('push'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-push-${course.id}`}>Push</button>
+        <button type="button" aria-pressed={channel === 'push'} disabled={!pushReady} title={!pushReady ? pushReason : undefined} onClick={() => { setChannel('push'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-push-${course.id}`}>Push</button>
         <button type="button" disabled title="Noch nicht eingerichtet" data-testid={`button-channel-whatsapp-${course.id}`}>WhatsApp · geplant</button>
       </div></div>
       {action === 'cancel' && <p className="rooms-form-note">{channel === 'push'
@@ -132,7 +138,7 @@ function AffectedCourse({ course, closureId, studioId }: { course: ClosureAffect
     {submitted && <div className="rooms-notice" role="status" data-testid={`status-resolution-outcome-${course.id}`}>Entscheidung erfasst. Den aktuellen Zustellungsstatus findest du unten bei „Getroffene Entscheidungen“.</div>}
     {confirmCancel && <ConfirmDialog title="Kurs wirklich absagen?" description={channel === 'push'
       ? `„${course.title}“ wird abgesagt. Push wird an Browser-Abonnenten versucht; alle ${course.enrolled} gebuchten Mitglieder erhalten zusätzlich eine In-App-Benachrichtigung. Ist der Push-Anbieter nicht bereit, kann die Anfrage bereits vor der Erfassung abgelehnt werden.`
-      : `„${course.title}“ wird abgesagt. ${course.enrolled} gebuchte Mitglieder werden über ${channel === 'email' ? 'E-Mail' : 'In-App'} informiert.`} confirmLabel="Kurs verbindlich absagen" busy={resolve.isPending} onClose={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); const next: Attempt = { courseId: course.id, data: { closureId, action: 'cancel', channel, idempotencyKey: crypto.randomUUID() } }; setAttempt(next); sendResolution(next); }} />}
+      : `„${course.title}“ wird abgesagt. ${course.enrolled} gebuchte Mitglieder werden über ${channel === 'email' ? 'E-Mail' : 'In-App'} informiert.`} confirmLabel="Kurs verbindlich absagen" busy={resolve.isPending} onClose={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); if (channel === 'push' && !pushReady) { setRequestError(pushReason); return; } const next: Attempt = { courseId: course.id, data: { closureId, action: 'cancel', channel, idempotencyKey: crypto.randomUUID() } }; setAttempt(next); sendResolution(next); }} />}
   </article>;
 }
 
@@ -222,7 +228,7 @@ function ResolutionOutcome({ resolution, studioId, closureId }: { resolution: Cl
   </article>;
 }
 
-function ClosureCard({ closure, studioId, onDelete, deleting, initiallyOpen }: { closure: RoomClosure; studioId: number; onDelete: (closure: RoomClosure) => void; deleting: boolean; initiallyOpen: boolean }) {
+function ClosureCard({ closure, studioId, onDelete, deleting, initiallyOpen, pushReady, pushReason }: { closure: RoomClosure; studioId: number; onDelete: (closure: RoomClosure) => void; deleting: boolean; initiallyOpen: boolean; pushReady: boolean; pushReason: string }) {
   const [expanded, setExpanded] = useState(initiallyOpen);
   useEffect(() => { if (initiallyOpen) setExpanded(true); }, [initiallyOpen]);
   const affected = useListClosureAffectedCourses(studioId, closure.id, { query: { queryKey: getListClosureAffectedCoursesQueryKey(studioId, closure.id), enabled: expanded, refetchOnMount: 'always', staleTime: 0 } });
@@ -238,7 +244,7 @@ function ClosureCard({ closure, studioId, onDelete, deleting, initiallyOpen }: {
       {affected.data && <p className="rooms-muted" data-testid={`text-affected-count-${closure.id}`}>{open} offen · {resolutions.data?.length ?? 0} entschieden. Zeitraum einschließlich beider Kalendertage.</p>}
       {affected.isLoading ? <div className="rooms-skeleton" aria-label="Kurse werden geladen" /> : affected.isError ? <div className="rooms-alert" role="alert">Betroffene Kurse konnten nicht geladen werden. {errorText(affected.error)} <button type="button" className="rooms-action" onClick={() => affected.refetch()} data-testid={`button-retry-affected-${closure.id}`}>Erneut laden</button></div>
         : !affected.data?.length ? <div className="rooms-empty">Keine offenen Kurse in diesem Zeitraum betroffen.</div>
-        : affected.data.map(course => <AffectedCourse key={course.id} course={course} closureId={closure.id} studioId={studioId} />)}
+        : affected.data.map(course => <AffectedCourse key={course.id} course={course} closureId={closure.id} studioId={studioId} pushReady={pushReady} pushReason={pushReason} />)}
       <div className="rooms-resolution-history"><h4>Getroffene Entscheidungen {resolutions.data && `· ${resolutions.data.length}`}</h4>
         {resolutions.isLoading ? <div className="rooms-skeleton" aria-label="Entscheidungen werden geladen" /> : resolutions.isError ? <div className="rooms-alert" role="alert">Entscheidungen konnten nicht geladen werden. {errorText(resolutions.error)} <button type="button" className="rooms-action" onClick={() => resolutions.refetch()} data-testid={`button-retry-resolutions-${closure.id}`}>Erneut laden</button></div>
           : !resolutions.data?.length ? <p className="rooms-muted">Noch keine Kursentscheidungen für diese Sperrung.</p>
@@ -264,6 +270,11 @@ export default function RoomClosuresPage({ me }: { me: Me }) {
   const studioId = district ? (selectedStudio ?? linkedStudioId ?? studios.data?.[0]?.id ?? 0) : (me.studioId ?? 0);
   const rooms = useListStudioRooms(studioId, { query: { enabled: studioId > 0, queryKey: getListStudioRoomsQueryKey(studioId), refetchOnMount: 'always', staleTime: 0 } });
   const closures = useListStudioRoomClosures(studioId, { query: { enabled: studioId > 0, queryKey: getListStudioRoomClosuresQueryKey(studioId), refetchOnMount: 'always', staleTime: 0 } });
+  const pushReadiness = useGetClosurePushReadiness(studioId, { query: { enabled: studioId > 0, queryKey: getGetClosurePushReadinessQueryKey(studioId), refetchOnMount: 'always', refetchOnWindowFocus: true, staleTime: 0, retry: false } });
+  const pushReady = pushReadiness.data?.ready === true;
+  const pushReason = pushReadiness.isError
+    ? 'Die Push-Verbindung konnte nicht geprüft werden. Bitte erneut prüfen oder In-App wählen.'
+    : pushReadiness.data?.reason ?? 'Die Push-Verbindung wird geprüft.';
   const createRoom = useCreateStudioRoom();
   const createClosure = useCreateStudioRoomClosure();
   const deleteClosure = useDeleteStudioRoomClosure();
@@ -312,6 +323,7 @@ export default function RoomClosuresPage({ me }: { me: Me }) {
     {studios.isError && district ? <div className="rooms-alert" role="alert">Studios konnten nicht geladen werden. <button type="button" className="rooms-action" onClick={() => studios.refetch()} data-testid="button-retry-studios">Erneut versuchen</button></div>
       : !studioId ? <div className="rooms-empty">Noch kein Studio verfügbar.</div> : <>
       <div className="rooms-summary"><span>{rooms.data?.length ?? '–'} Räume</span><span>{closures.data?.length ?? '–'} Sperrungen</span><span>Lokale Kalendertage · inklusive Start und Ende</span></div>
+      {!pushReady && <div className="rooms-alert" role="status" data-testid="status-closure-push-readiness">Push derzeit nicht verfügbar: {pushReason} {!pushReadiness.isFetching && <button type="button" className="rooms-action" onClick={() => { void pushReadiness.refetch(); }} data-testid="button-recheck-closure-push">Erneut prüfen</button>}</div>}
       {feedback && <div className="rooms-notice" role="status" data-testid="status-room-feedback">{feedback}</div>}
       <div className="rooms-columns"><div><section className="rooms-panel"><div className="rooms-panel-head"><div><h2>Raumverzeichnis</h2><p>Alle nutzbaren Räume dieses Studios.</p></div><span className="rooms-count">{rooms.data?.length ?? '–'}</span></div>
         {rooms.isLoading ? <div className="rooms-skeleton" aria-label="Räume werden geladen" /> : rooms.isError ? <div className="rooms-alert" role="alert">Räume konnten nicht geladen werden. {errorText(rooms.error)} <button type="button" className="rooms-action" onClick={() => rooms.refetch()} data-testid="button-retry-rooms">Erneut laden</button></div> : rooms.data?.length ? <ul className="rooms-assets">{rooms.data.map(room => <li key={room.id} data-testid={`text-room-${room.id}`}><DoorOpen size={17} />{room.name}</li>)}</ul> : <div className="rooms-empty">Noch keine Räume erfasst. Lege den ersten Raum an, um Sperrungen zu planen.</div>}
@@ -332,7 +344,7 @@ export default function RoomClosuresPage({ me }: { me: Me }) {
         {closures.isLoading ? <><div className="rooms-skeleton" /><div className="rooms-skeleton" /></> : closures.isError ? <div className="rooms-alert" role="alert">Sperrungen konnten nicht geladen werden. {errorText(closures.error)} <button type="button" className="rooms-action" onClick={() => closures.refetch()} data-testid="button-retry-closures">Erneut laden</button></div>
           : closures.data?.length ? <div className="rooms-closure-list">
             {targetClosureId && !closures.data.some(closure => closure.id === targetClosureId) && <div className="rooms-alert" role="status" data-testid="status-closure-not-found">Diese Sperrung ist im ausgewählten Studio nicht zu sehen. {district ? 'Bitte wähle das zugehörige Studio oben aus.' : 'Sie wurde möglicherweise entfernt.'}</div>}
-            {closures.data.map(closure => <ClosureCard key={`${studioId}-${closure.id}`} closure={closure} studioId={studioId} initiallyOpen={closure.id === newClosureId || closure.id === targetClosureId} deleting={deleteClosure.isPending} onDelete={target => { setDeleteTarget(target); setDeleteError(''); }} />)}</div>
+            {closures.data.map(closure => <ClosureCard key={`${studioId}-${closure.id}`} closure={closure} studioId={studioId} initiallyOpen={closure.id === newClosureId || closure.id === targetClosureId} deleting={deleteClosure.isPending} onDelete={target => { setDeleteTarget(target); setDeleteError(''); }} pushReady={pushReady} pushReason={pushReason} />)}</div>
           : <div className="rooms-empty"><AlertTriangle size={19} /><p>{targetClosureId ? `Die verlinkte Sperrung ist in diesem Studio nicht zu sehen. ${district ? 'Bitte wähle das zugehörige Studio oben aus.' : 'Sie wurde möglicherweise entfernt.'}` : 'Keine Raumsperrungen eingetragen. Wenn ein Raum ausfällt, halte Zeitraum, Grund und Verantwortung hier fest.'}</p></div>}
       </section></div></>}
     {deleteTarget && <div className="rooms-confirm-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !deleteClosure.isPending) setDeleteTarget(null); }}><div className="rooms-confirm" role="alertdialog" aria-modal="true" aria-labelledby="delete-closure-title" aria-describedby="delete-closure-description"><h2 id="delete-closure-title">Sperrung löschen?</h2><p id="delete-closure-description">Die Sperrung von {deleteTarget.roomName} vom {formatDate(deleteTarget.fromDate)} bis {formatDate(deleteTarget.toDate)} wird entfernt. Bereits abgesagte oder verlegte Kurse werden dadurch nicht rückgängig gemacht.</p>{deleteError && <div className="rooms-alert" role="alert">{deleteError}</div>}<div className="rooms-confirm-actions"><button type="button" className="rooms-action" onClick={() => setDeleteTarget(null)} disabled={deleteClosure.isPending} data-testid="button-dismiss-delete-closure">Zurück</button><button type="button" className="rooms-action danger" onClick={removeClosure} disabled={deleteClosure.isPending} data-testid="button-confirm-delete-closure">{deleteClosure.isPending ? 'Wird gelöscht …' : 'Sperrung löschen'}</button></div></div></div>}
