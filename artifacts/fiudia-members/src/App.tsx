@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
 import type { Member, MemberCourse, MemberHome } from '@workspace/api-client-react';
-import { registerMemberPushSubscription, unregisterMemberPushSubscription } from '@workspace/api-client-react';
+import { unregisterMemberPushSubscription } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
@@ -16,7 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { afterAuthPath, clearInvite, invitePath, pendingInvite as getPendingInvite, rememberInvite } from './invitation-return';
-import { getOneSignal, optOutOnSignOut, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
+import { getOneSignal, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -90,12 +90,20 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
   const [location] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   const leave = () => {
-    // A blocked SDK/CDN request must never prevent the member from signing out.
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError('');
     void Promise.race([
-      optOutOnSignOut().catch(() => {}),
-      new Promise<void>(resolve => setTimeout(resolve, 1500)),
-    ]).then(() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` }));
+      optOutOnSignOut(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Abmeldung vom Push-Dienst dauert zu lange.')), 5000)),
+    ]).then(() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` }))
+      .catch(() => {
+        setSignOutError('Push konnte auf diesem Gerät nicht sicher abgemeldet werden. Bitte versuche es erneut.');
+        setSigningOut(false);
+      });
   };
   const notifications = useMemberNotifications(Boolean(member && home?.coursesEnabled));
   const unread = notifications.data?.filter(item => !item.readAt).length ?? 0;
@@ -113,10 +121,10 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
       <nav className="rail-nav" aria-label="Hauptnavigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`rail-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${href === '/' ? 'today' : href.slice(1)}`}><Icon /><span className="nav-label">{label}</span>{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`} data-testid="status-unread-count">{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
       <div className="rail-bottom">
         <div className="rail-note"><div><strong>Dein Tempo zählt.</strong>Ein guter Trainingstag beginnt damit, dass du einfach auftauchst.</div></div>
-        <div className="rail-user"><span className="avatar">{initials(member?.fullName || user?.fullName || 'Fiudia')}</span><span>{member?.fullName || user?.fullName || 'Mein Konto'}<small>{member?.studioName || 'Noch kein Studio verbunden'}</small></span><button className="signout" type="button" onClick={leave} aria-label="Abmelden" title="Abmelden" data-testid="button-sign-out"><LogOut size={17} /></button></div>
+        <div className="rail-user"><span className="avatar">{initials(member?.fullName || user?.fullName || 'Fiudia')}</span><span>{member?.fullName || user?.fullName || 'Mein Konto'}<small>{member?.studioName || 'Noch kein Studio verbunden'}</small></span><button className="signout" type="button" onClick={leave} disabled={signingOut} aria-label="Abmelden" title="Abmelden" data-testid="button-sign-out"><LogOut size={17} /></button></div>
       </div>
     </aside>
-    <div className="main"><div className="mobile-header"><Brand /><button className="signout" type="button" onClick={leave} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{children}</div>
+    <div className="main"><div className="mobile-header"><Brand /><button className="signout" type="button" onClick={leave} disabled={signingOut} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{signOutError && <p className="form-error" role="alert">{signOutError}</p>}{children}</div>
     <nav className="mobile-nav" aria-label="Mobile Navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} data-testid={`link-mobile-${href === '/' ? 'today' : href.slice(1)}`}><Icon size={19} strokeWidth={1.7} />{label}{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`}>{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
   </div>;
 }
@@ -238,11 +246,13 @@ function PushPreference() {
           rememberPushChoice(true);
           if (id) {
             const sequence = ++registrationSequence;
-            void registerMemberPushSubscription({ subscriptionId: id }).then(() => {
+            void registerPushSubscription(id).then(() => {
               if (active && sequence === registrationSequence) {
                 rememberPushSubscriptionId(id);
                 setRegistered(true);
                 setError('');
+              } else if (!sdk.User.PushSubscription.optedIn || sdk.User.PushSubscription.id !== id) {
+                void unregisterMemberPushSubscription(id).catch(() => {});
               }
             }).catch(() => {
               if (active && sequence === registrationSequence) {
@@ -298,7 +308,7 @@ function PushPreference() {
           setRegistered(false);
           setError('OneSignal richtet dieses Gerät noch ein. Bitte versuche es gleich erneut.');
         } else {
-          await registerMemberPushSubscription({ subscriptionId: id });
+          await registerPushSubscription(id);
           rememberPushSubscriptionId(id);
           setRegistered(true);
         }

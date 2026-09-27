@@ -290,6 +290,18 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
     const repeatPushAttempt = await processResolutionPushDeliveries(pushResolution.id, mockProxy);
     assert.equal(repeatPushAttempt[0].status, "sent");
     assert.equal(providerCalls, 2, "successful deliveries are not sent again on retry");
+    const withdrawnSubscriptionId = randomUUID();
+    await db.insert(closurePushDeliveriesTable).values({
+      resolutionId: pushResolution.id,
+      bookingId: bookingWithoutPush.id,
+      memberId: memberWithoutPush.id,
+      subscriptionId: withdrawnSubscriptionId,
+      idempotencyKey: randomUUID(),
+      status: "pending",
+    });
+    const afterWithdrawal = await processResolutionPushDeliveries(pushResolution.id, mockProxy);
+    assert.equal(afterWithdrawal.find((item) => item.memberId === memberWithoutPush.id && item.status === "skipped" && item.attemptCount === 1)?.error?.includes("abgemeldet"), true);
+    assert.equal(providerCalls, 2, "unlinked browser subscriptions are never sent to OneSignal");
     const pushResolutionReport = await listClosureResolutionsForStudio(studio.id, otherClosure.id);
     assert.equal(pushResolutionReport[0].deliveryCounts.sent, 1);
     assert.equal(pushResolutionReport[0].deliveries[0].status, "sent");

@@ -1,4 +1,4 @@
-import { unregisterMemberPushSubscription } from '@workspace/api-client-react';
+import { registerMemberPushSubscription, unregisterMemberPushSubscription } from '@workspace/api-client-react';
 
 const APP_ID = 'c1a30beb-bc79-45f6-9cdd-275e663dbcd6';
 const basePath = import.meta.env.BASE_URL.replace(/\/?$/, '/');
@@ -41,6 +41,7 @@ declare global {
 
 let sdkPromise: Promise<OneSignalSdk> | null = null;
 let scriptPromise: Promise<void> | null = null;
+const pendingRegistrations = new Set<Promise<unknown>>();
 
 export function supportsPushEnvironment() {
   return window.isSecureContext && 'serviceWorker' in navigator && 'Notification' in window;
@@ -114,20 +115,36 @@ export function rememberPushSubscriptionId(id: string | null) {
   else localStorage.removeItem(SUBSCRIPTION_KEY);
 }
 
+export function registerPushSubscription(id: string) {
+  const request = registerMemberPushSubscription({ subscriptionId: id });
+  pendingRegistrations.add(request);
+  void request.then(
+    () => pendingRegistrations.delete(request),
+    () => pendingRegistrations.delete(request),
+  );
+  return request;
+}
+
 // A browser shared by multiple people must not keep an opted-in subscription
 // after a member signs out. Keep the ID if server cleanup fails.
 export async function optOutOnSignOut() {
+  // Finish any registration already in flight before unlinking it. Otherwise a
+  // slow POST can recreate the binding after the DELETE has completed.
+  await Promise.allSettled([...pendingRegistrations]);
   const id = storedPushSubscriptionId();
+  const operations: Promise<unknown>[] = [];
   if (id) {
-    try {
-      await unregisterMemberPushSubscription(id);
-      rememberPushSubscriptionId(null);
-    } catch {
-      // The SDK still needs to be opted out even if the API cannot be reached.
-    }
+    operations.push(unregisterMemberPushSubscription(id).then(() => rememberPushSubscriptionId(null)));
   }
-  if (!localStorage.getItem(OPTED_IN_KEY)) return;
-  const sdk = await getOneSignal();
-  await sdk.User.PushSubscription.optOut();
-  rememberPushChoice(false);
+  if (localStorage.getItem(OPTED_IN_KEY)) {
+    operations.push(getOneSignal().then(async sdk => {
+      await sdk.User.PushSubscription.optOut();
+      rememberPushChoice(false);
+    }));
+  }
+  if (operations.length) {
+    // Either unlinking on the server or turning off the browser subscription
+    // must succeed before signing out of a shared device.
+    await Promise.any(operations);
+  }
 }

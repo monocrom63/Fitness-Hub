@@ -6,6 +6,7 @@ import {
   courseClosureResolutionsTable,
   coursesTable,
   db,
+  memberPushSubscriptionsTable,
 } from "@workspace/db";
 
 const APP_ID = "c1a30beb-bc79-45f6-9cdd-275e663dbcd6";
@@ -84,6 +85,7 @@ export async function closurePushReadiness(
 
 type ClaimableDelivery = {
   id: number;
+  memberId: number;
   subscriptionId: string;
   idempotencyKey: string;
   claimToken: string;
@@ -95,6 +97,7 @@ export async function claimResolutionPushDeliveries(resolutionId: number) {
     const reclaimBefore = new Date(now.getTime() - CLAIM_LEASE_MS);
     const claimable = await tx.select({
       id: closurePushDeliveriesTable.id,
+      memberId: closurePushDeliveriesTable.memberId,
       subscriptionId: closurePushDeliveriesTable.subscriptionId,
       idempotencyKey: closurePushDeliveriesTable.idempotencyKey,
     }).from(closurePushDeliveriesTable).where(and(
@@ -122,12 +125,14 @@ export async function claimResolutionPushDeliveries(resolutionId: number) {
         attemptCount: sql`${closurePushDeliveriesTable.attemptCount} + 1`,
       }).where(eq(closurePushDeliveriesTable.id, delivery.id)).returning({
         id: closurePushDeliveriesTable.id,
+        memberId: closurePushDeliveriesTable.memberId,
         subscriptionId: closurePushDeliveriesTable.subscriptionId,
         idempotencyKey: closurePushDeliveriesTable.idempotencyKey,
       });
       if (claimed && claimed.subscriptionId !== null) {
         claims.push({
           id: claimed.id,
+          memberId: claimed.memberId,
           subscriptionId: claimed.subscriptionId,
           idempotencyKey: claimed.idempotencyKey,
           claimToken,
@@ -143,6 +148,21 @@ async function sendOne(
   resolutionId: number,
   proxy: OneSignalProxy,
 ) {
+  // A member can withdraw permission after a course change has queued this
+  // delivery. Do not retry an old browser address after it has been unlinked.
+  const [linkedSubscription] = await db.select({ id: memberPushSubscriptionsTable.subscriptionId })
+    .from(memberPushSubscriptionsTable)
+    .where(and(
+      eq(memberPushSubscriptionsTable.subscriptionId, delivery.subscriptionId),
+      eq(memberPushSubscriptionsTable.memberId, delivery.memberId),
+    ))
+    .limit(1);
+  if (!linkedSubscription) {
+    return {
+      status: "skipped" as const,
+      detail: "Push-Abo inzwischen abgemeldet; der In-App-Hinweis bleibt verfügbar.",
+    };
+  }
   const [resolution] = await db.select({
     action: courseClosureResolutionsTable.action,
     targetRoom: courseClosureResolutionsTable.targetRoom,
@@ -179,6 +199,12 @@ async function sendOne(
       return {
         status: "failed" as const,
         detail: result.message ?? `OneSignal returned HTTP ${response.status}.`,
+      };
+    }
+    if (result.errors && (typeof result.errors !== "object" || Object.keys(result.errors).length > 0)) {
+      return {
+        status: "failed" as const,
+        detail: `OneSignal hat die Zieladresse abgelehnt: ${JSON.stringify(result.errors).slice(0, 300)}`,
       };
     }
     if (typeof result.id !== "string" || !result.id) {
