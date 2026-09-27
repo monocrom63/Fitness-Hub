@@ -37,7 +37,7 @@ import {
   roomsTable,
   studiosTable,
 } from "@workspace/db";
-import { getResolutionEmailStatuses, processResolutionEmails } from "../lib/closure-email";
+import { closureEmailReadiness, getResolutionEmailStatuses, processResolutionEmails } from "../lib/closure-email";
 import { listClosureResolutionsForStudio } from "../lib/closure-resolutions";
 import {
   canAccessStudio,
@@ -410,6 +410,24 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
     return;
   }
   if (!(await accessibleStudio(staff, course.studioId, res))) return;
+
+  if (request.channel === "email") {
+    // An idempotent replay of a completed resolution must still be readable
+    // if the provider becomes unavailable after the first attempt.
+    const [prior] = await db.select({ id: courseClosureResolutionsTable.id })
+      .from(courseClosureResolutionsTable)
+      .where(and(
+        eq(courseClosureResolutionsTable.courseId, course.id),
+        eq(courseClosureResolutionsTable.closureId, request.closureId),
+      )).limit(1);
+    if (!prior) {
+      const issue = await closureEmailReadiness();
+      if (issue) {
+        res.status(409).json({ error: issue });
+        return;
+      }
+    }
+  }
 
   const result = await db.transaction(async (tx) => {
     const [lockedCourse] = await tx.select().from(coursesTable)

@@ -14,6 +14,41 @@ export function closureEmailSender(configured = process.env.RESEND_FROM_EMAIL): 
   return configured ?? WAITLIST_EMAIL_SENDER;
 }
 
+/**
+ * Check provider configuration before changing a course. This cannot guarantee
+ * delivery later; failed sends remain in the durable delivery queue.
+ */
+export async function closureEmailReadiness(
+  apiKey = process.env.RESEND_API_KEY,
+  sender = closureEmailSender(),
+  request: (url: string, init: RequestInit) => Promise<Response> = fetch,
+): Promise<string | null> {
+  if (!apiKey?.trim()) return "E-Mail ist derzeit nicht eingerichtet. Bitte In-App wählen.";
+  const domain = sender.match(/@([a-z0-9.-]+)>?$/i)?.[1]?.toLowerCase();
+  if (!domain) return "Die E-Mail-Absenderadresse ist ungültig. Bitte In-App wählen.";
+
+  try {
+    const response = await request("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    // A valid sending-only key may not have permission to list domains. Allow
+    // the attempt in that case; the actual send still records its outcome.
+    if (response.status === 403) return null;
+    if (!response.ok) return "E-Mail ist derzeit nicht versandbereit. Bitte In-App wählen; der Kurs wurde nicht geändert.";
+    const result = await response.json() as { data?: Array<{ name: string; status: string }> };
+    if (!Array.isArray(result.data)) {
+      return "Die E-Mail-Absenderdomain konnte nicht geprüft werden. Bitte In-App wählen.";
+    }
+    if (!result.data.some((entry) => entry.name.toLowerCase() === domain && entry.status === "verified")) {
+      return "Die E-Mail-Absenderdomain ist noch nicht verifiziert. Bitte In-App wählen.";
+    }
+    return null;
+  } catch {
+    return "Der E-Mail-Anbieter ist derzeit nicht erreichbar. Bitte In-App wählen; der Kurs wurde nicht geändert.";
+  }
+}
+
 type ClaimableDelivery = {
   id: number;
   email: string;

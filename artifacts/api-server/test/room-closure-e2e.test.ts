@@ -235,6 +235,33 @@ test("manager room-closure workflow lists, resolves, notifies, and prevents canc
     assert.equal(courseOn18.alternativeRooms.includes("Room Blocked"), false);
     assert.equal(courseOn18.alternativeRooms.includes("Room Overlap"), false);
 
+    const previousResendKey = process.env.RESEND_API_KEY;
+    try {
+      delete process.env.RESEND_API_KEY;
+      const unavailableEmail = await api(
+        manager.clerkUserId,
+        "POST",
+        `/courses/${matchingCourses[0].id}/closure-resolution`,
+        {
+          closureId,
+          action: "relocate",
+          room: "Room Free",
+          channel: "email",
+          idempotencyKey: `closure-email-not-ready-${suffix}`,
+        },
+      );
+      assert.equal(unavailableEmail.status, 409);
+      assert.match(unavailableEmail.body.error, /Bitte In-App wählen/);
+    } finally {
+      if (previousResendKey === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = previousResendKey;
+    }
+    const [unchangedCourse] = await db.select().from(coursesTable)
+      .where(eq(coursesTable.id, matchingCourses[0].id));
+    assert.equal(unchangedCourse.room, "Room A");
+    assert.equal((await db.select().from(courseClosureResolutionsTable)
+      .where(eq(courseClosureResolutionsTable.courseId, matchingCourses[0].id))).length, 0);
+
     const relocation = await api(
       manager.clerkUserId,
       "POST",
