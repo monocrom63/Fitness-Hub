@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
+import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -167,21 +168,10 @@ function CourseRow({ course, targeted = false }: { course: MemberCourse; targete
 function CoursesPage() {
   const [, navigate] = useLocation();
   const search = useSearch();
-  const params = new URLSearchParams(search);
-  const requestedId = params.get('courseId');
-  const parsedId = requestedId && /^[1-9]\d*$/.test(requestedId) ? Number(requestedId) : null;
-  const targetId = parsedId !== null && Number.isSafeInteger(parsedId) ? parsedId : null;
+  const { targetId, filter } = readCourseLocation(search);
   const courses = useListMemberCourses(targetId !== null ? { courseId: targetId } : undefined);
-  const filter = params.get('filter') === 'mine' ? 'mine' : 'all';
-  const setFilter = (next: 'all' | 'mine') => {
-    const nextParams = new URLSearchParams(search);
-    if (next === 'mine') nextParams.set('filter', 'mine');
-    else nextParams.delete('filter');
-    navigate(`/courses${nextParams.size ? `?${nextParams}` : ''}`);
-  };
-  const visible = (courses.data || []).filter(course => filter === 'all' || course.bookingStatus === 'confirmed' || course.bookingStatus === 'waitlisted').sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  const targetVisible = targetId !== null && visible.some(course => course.id === targetId);
-  const targetExists = targetId !== null && courses.data?.some(course => course.id === targetId);
+  const setFilter = (next: CourseFilter) => navigate(courseFilterHref(search, next));
+  const { visible, targetVisible, targetExists } = courseDisplayState(courses.data || [], filter, targetId);
   useEffect(() => {
     if (!targetVisible) return;
     const course = document.getElementById(`course-${targetId}`);
