@@ -398,6 +398,48 @@ export const GetMemberHomeResponse = zod.object({
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
   "checkInsEnabled": zod.boolean(),
+  "waitlistEmailEnabled": zod.boolean(),
+  "nextCourse": zod.union([zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
+  "waitlistPosition": zod.number().int().nullable()
+}),zod.null()]),
+  "upcomingBookings": zod.number().int()
+})
+
+
+/**
+ * @summary Opt in or out of waitlist promotion email (delivery not active yet)
+ */
+export const UpdateMemberNotificationSettingsBody = zod.object({
+  "waitlistEmailEnabled": zod.boolean()
+})
+
+export const UpdateMemberNotificationSettingsResponse = zod.object({
+  "member": zod.union([zod.object({
+  "id": zod.number().int(),
+  "fullName": zod.string(),
+  "email": zod.string().email().nullable(),
+  "phone": zod.string().nullable(),
+  "membershipType": zod.string(),
+  "status": zod.enum(['active', 'trial', 'paused']),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "joinedAt": zod.coerce.date(),
+  "lastCheckIn": zod.coerce.date().nullable()
+}),zod.null()]),
+  "checkInCount": zod.number().int(),
+  "coursesEnabled": zod.boolean(),
+  "checkInsEnabled": zod.boolean(),
+  "waitlistEmailEnabled": zod.boolean(),
   "nextCourse": zod.union([zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
@@ -438,6 +480,7 @@ export const ClaimMembershipResponse = zod.object({
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
   "checkInsEnabled": zod.boolean(),
+  "waitlistEmailEnabled": zod.boolean(),
   "nextCourse": zod.union([zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
@@ -483,6 +526,7 @@ export const AcceptMemberInvitationResponse = zod.object({
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
   "checkInsEnabled": zod.boolean(),
+  "waitlistEmailEnabled": zod.boolean(),
   "nextCourse": zod.union([zod.object({
   "id": zod.number().int(),
   "title": zod.string(),

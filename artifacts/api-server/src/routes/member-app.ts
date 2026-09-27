@@ -7,6 +7,7 @@ import {
   GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesResponse,
   ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
+  UpdateMemberNotificationSettingsBody, UpdateMemberNotificationSettingsResponse,
 } from "@workspace/api-zod";
 import {
   checkInsTable, courseBookingsTable, coursesTable, db, memberNotificationsTable,
@@ -27,6 +28,7 @@ export async function linkedMember(userId: string) {
     phone: membersTable.phone,
     membershipType: membersTable.membershipType,
     status: membersTable.status,
+    waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
     organizationId: studiosTable.organizationId,
@@ -83,7 +85,7 @@ async function memberCourses(member: LinkedMember) {
 export async function memberHome(member: LinkedMember | null) {
   if (!member) return {
     member: null, checkInCount: 0, nextCourse: null, upcomingBookings: 0,
-    coursesEnabled: false, checkInsEnabled: false,
+    coursesEnabled: false, checkInsEnabled: false, waitlistEmailEnabled: false,
   };
   const [coursesEnabled, checkInsEnabled] = await Promise.all([
     isModuleEnabled(member.organizationId, "courses"),
@@ -101,12 +103,13 @@ export async function memberHome(member: LinkedMember | null) {
     coursesEnabled ? memberCourses(member) : Promise.resolve([]),
   ]);
   const bookings = courses.filter((course) => course.bookingStatus === "confirmed");
-  const { organizationId: _organizationId, ...publicMember } = member;
+  const { organizationId: _organizationId, waitlistEmailEnabled, ...publicMember } = member;
   return {
     member: { ...publicMember, lastCheckIn: lastCheckIn?.checkedInAt ?? null },
     checkInCount: checkIns.total,
     coursesEnabled,
     checkInsEnabled,
+    waitlistEmailEnabled: waitlistEmailEnabled === 1,
     nextCourse: bookings[0] ?? null,
     upcomingBookings: bookings.length,
   };
@@ -116,6 +119,27 @@ router.get("/member/me", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
   res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));
+});
+
+router.patch("/member/notification-settings", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Mitgliedschaft zuerst verbinden." }); return; }
+  if (!(await isModuleEnabled(member.organizationId, "courses"))) {
+    res.status(403).json({ error: "Kurse sind nicht verfügbar." }); return;
+  }
+  const body = UpdateMemberNotificationSettingsBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Ungültige E-Mail-Einstellung." }); return; }
+  await db.update(membersTable)
+    .set({ waitlistEmailEnabled: body.data.waitlistEmailEnabled ? 1 : 0 })
+    .where(and(eq(membersTable.id, member.id), eq(membersTable.clerkUserId, userId)));
+  if (!body.data.waitlistEmailEnabled) {
+    await db.update(memberNotificationsTable)
+      .set({ emailRequested: 0 })
+      .where(eq(memberNotificationsTable.memberId, member.id));
+  }
+  res.json(UpdateMemberNotificationSettingsResponse.parse(await memberHome(await linkedMember(userId))));
 });
 
 router.post("/member/claim", async (req, res): Promise<void> => {

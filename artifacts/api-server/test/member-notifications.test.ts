@@ -58,15 +58,26 @@ test("members can read and acknowledge only their own course notifications", asy
     server = app.listen(0, "127.0.0.1");
     await new Promise<void>((resolve) => server!.once("listening", resolve));
     const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
-    async function request(user: string | null, method: "GET" | "PATCH", path: string) {
+    async function request(user: string | null, method: "GET" | "PATCH", path: string, data?: unknown) {
       const response = await fetch(`${base}${path}`, {
-        method, headers: user ? { "x-test-user": user } : {},
+        method, headers: { ...(user ? { "x-test-user": user } : {}), ...(data ? { "content-type": "application/json" } : {}) },
+        body: data ? JSON.stringify(data) : undefined,
       });
       return { status: response.status, body: await response.json() as unknown };
     }
 
     assert.equal((await request(null, "GET", "/member/notifications")).status, 401);
     assert.equal((await request("unlinked", "GET", "/member/notifications")).status, 403);
+    const settings = "/member/notification-settings";
+    assert.equal((await request(null, "PATCH", settings, { waitlistEmailEnabled: true })).status, 401);
+    assert.equal((await request("unlinked", "PATCH", settings, { waitlistEmailEnabled: true })).status, 403);
+    assert.equal((await request(waiting.clerkUserId, "PATCH", settings, { waitlistEmailEnabled: "yes" })).status, 400);
+    assert.equal(((await request(waiting.clerkUserId, "GET", "/member/me")).body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, false);
+    const enabled = await request(waiting.clerkUserId, "PATCH", settings, { waitlistEmailEnabled: true });
+    assert.equal(enabled.status, 200);
+    assert.equal((enabled.body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, true);
+    assert.equal(((await request(waiting.clerkUserId, "GET", "/member/me")).body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, true);
+    assert.equal(((await request(other.clerkUserId, "GET", "/member/me")).body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, false);
     const list = await request(own.clerkUserId, "GET", "/member/notifications");
     assert.equal(list.status, 200);
     assert.deepEqual((list.body as Array<{ id: number }>).map(item => item.id), [ownNotice.id]);
@@ -87,6 +98,12 @@ test("members can read and acknowledge only their own course notifications", asy
     assert.equal(messages[0].courseId, course.id);
     assert.match(messages[0].body, /Testkurs.*\d{4}.*Uhr/);
     assert.equal(messages[0].readAt, null);
+    assert.equal((await db.select({ emailRequested: memberNotificationsTable.emailRequested })
+      .from(memberNotificationsTable).where(eq(memberNotificationsTable.id, messages[0].id)))[0].emailRequested, 1);
+    const disabled = await request(waiting.clerkUserId, "PATCH", settings, { waitlistEmailEnabled: false });
+    assert.equal((disabled.body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, false);
+    assert.equal((await db.select({ emailRequested: memberNotificationsTable.emailRequested })
+      .from(memberNotificationsTable).where(eq(memberNotificationsTable.id, messages[0].id)))[0].emailRequested, 0);
     assert.equal((await db.select().from(courseBookingsTable)
       .where(eq(courseBookingsTable.id, waitingBooking.id)))[0].status, "confirmed");
     await assert.rejects(cancelCourseBooking(course.id, own.id),

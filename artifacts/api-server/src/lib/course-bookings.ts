@@ -108,6 +108,7 @@ export async function cancelCourseBooking(
       .set({
         title: "Diese Platzbestätigung ist nicht mehr gültig",
         body: `Deine frühere Platzbestätigung für „${course.title}“ gilt nicht mehr. Sieh dir deinen aktuellen Kursplan an.`,
+          emailRequested: 0,
         readAt: options.cancelledByStaff ? null : new Date(),
       })
       .where(and(
@@ -129,6 +130,8 @@ export async function cancelCourseBooking(
         memberId: courseBookingsTable.memberId,
         memberStatus: membersTable.status,
         memberStudioId: membersTable.studioId,
+        memberEmailEnabled: membersTable.waitlistEmailEnabled,
+        memberEmail: membersTable.email,
       }).from(courseBookingsTable)
         .innerJoin(membersTable, eq(courseBookingsTable.memberId, membersTable.id))
         .where(and(
@@ -152,6 +155,8 @@ export async function cancelCourseBooking(
           courseId,
           title: "Dein Kursplatz ist bestätigt",
           body: `Du bist für „${course.title}“ am ${courseDateTime(course.startsAt)} Uhr von der Warteliste nachgerückt. Deinen Platz findest du unter „Meine Plätze“.`,
+          // Record the opt-in at promotion time, but never dispatch an email here.
+          emailRequested: candidate.memberEmailEnabled && candidate.memberEmail.trim() ? 1 : 0,
         });
         promoted = true;
         break;

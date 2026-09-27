@@ -246,6 +246,13 @@ button:disabled { cursor: not-allowed; }
 .invite-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .invite-hint { max-width: 620px; margin: 17px 0 0; color: #707784; font-size: 12px; line-height: 1.6; }
 .notification-list { display: grid; gap: 12px; }
+.email-preference { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; padding: 24px; }
+.email-preference > div { flex: 1 1 260px; }
+.email-preference h2 { margin: 0 0 8px; font-size: 19px; }
+.email-preference p { margin: 0; color: var(--muted, #68746d); line-height: 1.5; }
+.email-preference-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.email-preference-toggle input { width: 18px; height: 18px; accent-color: #2d694a; }
+.email-preference .form-error { flex-basis: 100%; }
 .notification-item { display: flex; gap: 17px; align-items: flex-start; padding: 23px 25px; border: 1px solid #e5e0d4; border-radius: 17px; background: #fdfbf7; }
 .notification-item.unread { border-color: #c6b5e6; background: #f5f0fb; }
 .notification-icon { flex: 0 0 43px; width: 43px; height: 43px; display: grid; place-items: center; border-radius: 12px; background: #e9e4f5; color: #746099; }

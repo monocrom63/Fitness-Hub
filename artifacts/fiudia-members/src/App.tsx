@@ -12,7 +12,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
+import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -207,9 +207,11 @@ function CheckInsPage() {
     <div className="footer-line">Deine Besuche bleiben deine Geschichte.</div>
   </div>;
 }
-function NotificationsPage() {
+function NotificationsPage({ home }: { home: MemberHome }) {
   const notifications = useMemberNotifications(true);
   const markRead = useNotificationRead();
+  const emailPreference = useEmailPreference();
+  const [preferenceError, setPreferenceError] = useState('');
   const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
   const read = async (id: number) => {
     setActionError(null);
@@ -218,6 +220,22 @@ function NotificationsPage() {
   };
   const items = [...(notifications.data || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return <div className="page"><PageHeader eyebrow="Hinweise" title="Deine Hinweise." description="Hier erfährst du, wenn sich etwas an deinen Kursbuchungen oder Wartelistenplätzen ändert." />
+    <section className="soft-card email-preference" aria-labelledby="email-preference-title">
+      <div><h2 id="email-preference-title">E-Mail für freie Kursplätze</h2>
+        <p>Wenn du von der Warteliste nachrückst, kannst du zusätzlich einen E-Mail-Hinweis wünschen. Der Versand ist derzeit noch nicht aktiv; Hinweise erscheinen weiterhin hier.</p>
+      </div>
+      <label className="email-preference-toggle">
+        <input type="checkbox" checked={home.waitlistEmailEnabled} disabled={emailPreference.isPending}
+          onChange={async (event) => {
+            setPreferenceError('');
+            try { await emailPreference.mutateAsync({ data: { waitlistEmailEnabled: event.target.checked } }); }
+            catch { setPreferenceError('Deine Einstellung konnte nicht gespeichert werden. Bitte versuche es erneut.'); }
+          }}
+          data-testid="checkbox-waitlist-email" />
+        <span>E-Mail-Wunsch {home.waitlistEmailEnabled ? 'vorgemerkt' : 'vormerken'}</span>
+      </label>
+      {preferenceError && <p className="form-error" role="alert">{preferenceError}</p>}
+    </section>
     {notifications.isLoading ? <div className="skeleton-page" data-testid="status-notifications-loading"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> :
       notifications.isError ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
       items.length ? <div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
@@ -310,7 +328,7 @@ function AuthenticatedPage({ page, token = '' }: { page: 'today' | 'courses' | '
   const memberHome = home.data;
   const member = memberHome.member;
   if ((page === 'courses' || page === 'notifications') && (!member || !memberHome.coursesEnabled) || page === 'check-ins' && !memberHome.checkInsEnabled) return <Redirect to="/" />;
-  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage /> : page === 'check-ins' ? <CheckInsPage /> : <ConnectPage member={member} />}</MemberShell>;
+  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage home={memberHome} /> : page === 'check-ins' ? <CheckInsPage /> : <ConnectPage member={member} />}</MemberShell>;
 }
 function NotFoundPage() {
   useEffect(() => pageTitle('Seite nicht gefunden'), []);

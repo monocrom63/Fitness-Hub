@@ -30,6 +30,8 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 
 ## Product
 
+- Für spätere Kursplatz-E-Mails ist `mail@fiudia.com` der gewünschte Absender (`.com`, nicht `.app`). Der Liveversand ist noch nicht aktiviert; zuvor eingetragene E-Mail-Wünsche dürfen nicht nachträglich als alte Kursbestätigungen versandt werden.
+
 _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences

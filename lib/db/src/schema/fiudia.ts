@@ -93,6 +93,7 @@ export const membersTable = pgTable("fiudia_members", {
   phone: text("phone"),
   membershipType: text("membership_type").notNull(),
   status: text("status").notNull().default("active"),
+  waitlistEmailEnabled: integer("waitlist_email_enabled").notNull().default(0),
   joinedAt: timestamp("joined_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -163,6 +164,7 @@ export const memberNotificationsTable = pgTable("fiudia_member_notifications", {
     .references(() => coursesTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   body: text("body").notNull(),
+  emailRequested: integer("email_requested").notNull().default(0),
   readAt: timestamp("read_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

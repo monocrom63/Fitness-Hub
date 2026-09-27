@@ -14,6 +14,7 @@ import {
   useListMemberCourses,
   useListMemberNotifications,
   useMarkMemberNotificationRead,
+  useUpdateMemberNotificationSettings,
 } from '@workspace/api-client-react';
 
 export { useGetMemberHome, useListMemberCourses, useListMemberCheckIns };
@@ -38,6 +39,17 @@ export function useNotificationRead() {
           old?.map(item => item.id === notification.id ? notification : item),
         );
         void client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() });
+      },
+    },
+  });
+}
+
+export function useEmailPreference() {
+  const client = useQueryClient();
+  return useUpdateMemberNotificationSettings({
+    mutation: {
+      onSuccess: (home) => {
+        client.setQueryData(getGetMemberHomeQueryKey(), home);
       },
     },
   });

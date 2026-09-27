@@ -43,6 +43,7 @@ import type {
   MemberInvitationLink,
   MemberLinkInput,
   MemberNotification,
+  MemberNotificationSettings,
   MemberUpdate,
   ModuleKey,
   ModuleSetting,
@@ -1479,6 +1480,94 @@ export function useGetMemberHome<TData = Awaited<ReturnType<typeof getMemberHome
 
 
 
+
+export const getUpdateMemberNotificationSettingsUrl = () => {
+
+
+
+
+  return `/api/member/notification-settings`
+}
+
+/**
+ * @summary Opt in or out of waitlist promotion email (delivery not active yet)
+ */
+export const updateMemberNotificationSettings = async (memberNotificationSettings: MemberNotificationSettings, options?: Parameters<typeof customFetch>[1]): Promise<MemberHome> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MemberHome>(getUpdateMemberNotificationSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(memberNotificationSettings)
+  }
+);}
+
+
+
+
+
+export const getUpdateMemberNotificationSettingsMutationKey = () => ['updateMemberNotificationSettings'] as const;
+
+export const getUpdateMemberNotificationSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMemberNotificationSettings>>, TError,UpdateMemberNotificationSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMemberNotificationSettings>>, TError,UpdateMemberNotificationSettingsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateMemberNotificationSettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMemberNotificationSettings>>, UpdateMemberNotificationSettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateMemberNotificationSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMemberNotificationSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateMemberNotificationSettings>>>
+    export type UpdateMemberNotificationSettingsMutationBody = BodyType<MemberNotificationSettings>
+    export type UpdateMemberNotificationSettingsMutationError = ErrorType<void>
+    export type UpdateMemberNotificationSettingsMutationVariables = {data: BodyType<MemberNotificationSettings>}
+
+    /**
+ * @summary Opt in or out of waitlist promotion email (delivery not active yet)
+ */
+export const useUpdateMemberNotificationSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMemberNotificationSettings>>, TError,UpdateMemberNotificationSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMemberNotificationSettings>>,
+        TError,
+        UpdateMemberNotificationSettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateMemberNotificationSettingsMutationOptions(options));
+    }
 
 export const getClaimMembershipUrl = () => {
 

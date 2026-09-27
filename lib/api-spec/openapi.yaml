@@ -369,6 +369,25 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/MemberHome" }
         "401": { description: Sign-in required }
+  /member/notification-settings:
+    patch:
+      operationId: updateMemberNotificationSettings
+      tags: [member-app]
+      summary: Opt in or out of waitlist promotion email (delivery not active yet)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberNotificationSettings" }
+      responses:
+        "200":
+          description: Updated member home with saved preference
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberHome" }
+        "400": { description: Invalid preference }
+        "401": { description: Sign-in required }
+        "403": { description: Membership not linked or courses unavailable }
   /member/claim:
     post:
       operationId: claimMembership
@@ -913,7 +932,7 @@ components:
         memberId: { type: integer }
     MemberHome:
       type: object
-      required: [member, checkInCount, nextCourse, upcomingBookings, coursesEnabled, checkInsEnabled]
+      required: [member, checkInCount, nextCourse, upcomingBookings, coursesEnabled, checkInsEnabled, waitlistEmailEnabled]
       properties:
         member:
           oneOf:
@@ -922,11 +941,18 @@ components:
         checkInCount: { type: integer }
         coursesEnabled: { type: boolean }
         checkInsEnabled: { type: boolean }
+        waitlistEmailEnabled: { type: boolean }
         nextCourse:
           oneOf:
             - { $ref: "#/components/schemas/MemberCourse" }
             - { type: "null" }
         upcomingBookings: { type: integer }
+    MemberNotificationSettings:
+      type: object
+      required: [waitlistEmailEnabled]
+      additionalProperties: false
+      properties:
+        waitlistEmailEnabled: { type: boolean }
     MemberCourse:
       type: object
       required: [id, title, instructor, studioName, startsAt, endsAt, capacity, enrolled, room, bookingStatus, waitlistPosition]

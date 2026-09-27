@@ -349,8 +349,13 @@ export interface MemberHome {
   checkInCount: number;
   coursesEnabled: boolean;
   checkInsEnabled: boolean;
+  waitlistEmailEnabled: boolean;
   nextCourse: MemberCourse | null;
   upcomingBookings: number;
+}
+
+export interface MemberNotificationSettings {
+  waitlistEmailEnabled: boolean;
 }
 
 export interface MemberCheckIn {
