@@ -9,3 +9,4 @@
 - [Pulse corrections](pulse-corrections.md) — corrections reset prior read receipts; retractions hide messages but retain their audit record.
 - [Artifact CLI builds](artifact-cli-builds.md) — direct shell builds lack artifact-scoped workflow variables; supply the artifact base path and port explicitly.
 - [Course-change delivery](course-change-delivery.md) — keep notification work durable across closure deletion, page reloads, and provider failures.
+- [Backlog verification](backlog-verification.md) — pending task titles may lag completed code; inspect full implementations and tests before picking a “next” task.
