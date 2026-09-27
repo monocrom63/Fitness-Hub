@@ -199,6 +199,13 @@ export const memberNotificationsTable = pgTable("fiudia_member_notifications", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const memberPushSubscriptionsTable = pgTable("fiudia_member_push_subscriptions", {
+  subscriptionId: text("subscription_id").primaryKey(),
+  memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const courseClosureResolutionsTable = pgTable(
   "fiudia_course_closure_resolutions",
   {
@@ -247,6 +254,27 @@ export const closureEmailDeliveriesTable = pgTable(
   (table) => [
     unique("fiudia_closure_email_resolution_booking").on(table.resolutionId, table.bookingId),
   ],
+);
+
+export const closurePushDeliveriesTable = pgTable(
+  "fiudia_closure_push_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    resolutionId: integer("resolution_id").notNull().references(() => courseClosureResolutionsTable.id, { onDelete: "restrict" }),
+    bookingId: integer("booking_id").notNull().references(() => courseBookingsTable.id, { onDelete: "cascade" }),
+    memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+    subscriptionId: text("subscription_id"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    status: text("status").notNull().default("pending"),
+    error: text("error"),
+    providerId: text("provider_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    claimToken: text("claim_token"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("fiudia_closure_push_resolution_subscription").on(table.resolutionId, table.subscriptionId)],
 );
 
 export const checkInsTable = pgTable("fiudia_check_ins", {

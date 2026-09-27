@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import {
   closureEmailDeliveriesTable,
+  closurePushDeliveriesTable,
   courseClosureResolutionsTable,
   coursesTable,
   db,
@@ -30,7 +31,7 @@ export async function listClosureResolutionsForStudio(
 
   if (!rows.length) return [];
   const resolutionIds = rows.map(({ resolutionId }) => resolutionId);
-  const deliveries = await db.select({
+  const emailDeliveries = await db.select({
     id: closureEmailDeliveriesTable.id,
     resolutionId: closureEmailDeliveriesTable.resolutionId,
     memberId: closureEmailDeliveriesTable.memberId,
@@ -41,9 +42,21 @@ export async function listClosureResolutionsForStudio(
   }).from(closureEmailDeliveriesTable)
     .where(inArray(closureEmailDeliveriesTable.resolutionId, resolutionIds))
     .orderBy(closureEmailDeliveriesTable.id);
+  const pushDeliveries = await db.select({
+    id: closurePushDeliveriesTable.id,
+    resolutionId: closurePushDeliveriesTable.resolutionId,
+    memberId: closurePushDeliveriesTable.memberId,
+    status: closurePushDeliveriesTable.status,
+    attemptCount: closurePushDeliveriesTable.attemptCount,
+    error: closurePushDeliveriesTable.error,
+    attemptedAt: closurePushDeliveriesTable.attemptedAt,
+  }).from(closurePushDeliveriesTable)
+    .where(inArray(closurePushDeliveriesTable.resolutionId, resolutionIds))
+    .orderBy(closurePushDeliveriesTable.id);
 
   return rows.map((resolution) => {
-    const relatedDeliveries = deliveries
+    const rawDeliveries = resolution.channel === "push" ? pushDeliveries : emailDeliveries;
+    const relatedDeliveries = rawDeliveries
       .filter((delivery) => delivery.resolutionId === resolution.resolutionId)
       .map(({ resolutionId: _resolutionId, ...delivery }) => delivery);
     const counts = {

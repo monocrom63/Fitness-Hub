@@ -7,11 +7,13 @@ import {
   GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
   ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
+  RegisterMemberPushSubscriptionBody, RegisterMemberPushSubscriptionResponse,
   UpdateMemberNotificationSettingsBody, UpdateMemberNotificationSettingsResponse,
+  UnregisterMemberPushSubscriptionParams, UnregisterMemberPushSubscriptionResponse,
 } from "@workspace/api-zod";
 import {
   checkInsTable, courseBookingsTable, coursesTable, db, memberNotificationsTable,
-  membersTable, studiosTable,
+  memberPushSubscriptionsTable, membersTable, studiosTable,
 } from "@workspace/db";
 import { BookingError, bookCourse, cancelCourseBooking } from "../lib/course-bookings";
 import { getClerkIdentity, getRequestUserId } from "../lib/fiudia-access";
@@ -145,6 +147,58 @@ router.get("/member/me", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
   res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));
+});
+
+router.post("/member/push-subscriptions", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member || member.status !== "active") {
+    res.status(403).json({ error: "Ein aktives, verbundenes Mitgliedskonto ist erforderlich." }); return;
+  }
+  if (!(await isModuleEnabled(member.organizationId, "courses"))) {
+    res.status(403).json({ error: "Kurse sind für diese Organisation nicht verfügbar." }); return;
+  }
+  const body = RegisterMemberPushSubscriptionBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Ungültige Push-Abonnement-ID." }); return; }
+
+  const [subscription] = await db.insert(memberPushSubscriptionsTable).values({
+    subscriptionId: body.data.subscriptionId,
+    memberId: member.id,
+  }).onConflictDoNothing({ target: memberPushSubscriptionsTable.subscriptionId })
+    .returning({ subscriptionId: memberPushSubscriptionsTable.subscriptionId });
+  if (!subscription) {
+    const [existing] = await db.select({
+      memberId: memberPushSubscriptionsTable.memberId,
+    }).from(memberPushSubscriptionsTable)
+      .where(eq(memberPushSubscriptionsTable.subscriptionId, body.data.subscriptionId))
+      .limit(1);
+    if (existing && existing.memberId !== member.id) {
+      res.status(409).json({ error: "Dieses Push-Abonnement ist bereits mit einem anderen Mitgliedskonto verknüpft." });
+      return;
+    }
+  }
+  res.json(RegisterMemberPushSubscriptionResponse.parse({
+    subscriptionId: body.data.subscriptionId,
+    registered: true,
+  }));
+});
+
+router.delete("/member/push-subscriptions/:subscriptionId", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Mitgliedschaft zuerst verbinden." }); return; }
+  const params = UnregisterMemberPushSubscriptionParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: "Ungültige Push-Abonnement-ID." }); return; }
+  await db.delete(memberPushSubscriptionsTable).where(and(
+    eq(memberPushSubscriptionsTable.subscriptionId, params.data.subscriptionId),
+    eq(memberPushSubscriptionsTable.memberId, member.id),
+  ));
+  res.json(UnregisterMemberPushSubscriptionResponse.parse({
+    subscriptionId: params.data.subscriptionId,
+    registered: false,
+  }));
 });
 
 router.patch("/member/notification-settings", async (req, res): Promise<void> => {

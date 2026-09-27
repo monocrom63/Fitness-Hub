@@ -431,6 +431,36 @@ paths:
               schema: { $ref: "#/components/schemas/ClosureEmailDeliveryReport" }
         "403": { description: Manager access required }
         "404": { description: Resolution not found }
+  /closure-resolutions/{resolutionId}/push-deliveries:
+    parameters:
+      - name: resolutionId
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getClosurePushDeliveries
+      tags: [portal]
+      summary: Inspect per-device push delivery outcomes
+      responses:
+        "200":
+          description: Current push delivery states
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClosurePushDeliveryReport" }
+        "403": { description: Manager access required }
+        "404": { description: Resolution not found }
+    post:
+      operationId: retryClosurePushDeliveries
+      tags: [portal]
+      summary: Retry pending or failed push deliveries with their original idempotency keys
+      responses:
+        "200":
+          description: Push delivery states after retry attempts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClosurePushDeliveryReport" }
+        "403": { description: Manager access required }
+        "404": { description: Resolution not found }
   /courses/{id}/bookings:
     get:
       operationId: listCourseBookings
@@ -588,6 +618,43 @@ paths:
         "400": { description: Invalid preference }
         "401": { description: Sign-in required }
         "403": { description: Membership not linked or courses unavailable }
+  /member/push-subscriptions:
+    post:
+      operationId: registerMemberPushSubscription
+      tags: [member-app]
+      summary: Bind this browser's OneSignal push subscription to the signed-in member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PushSubscriptionInput" }
+      responses:
+        "200":
+          description: Push subscription linked to this member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PushSubscriptionRegistration" }
+        "401": { description: Sign-in required }
+        "403": { description: Linked active membership required }
+        "409": { description: Subscription is already linked to another member }
+  /member/push-subscriptions/{subscriptionId}:
+    delete:
+      operationId: unregisterMemberPushSubscription
+      tags: [member-app]
+      summary: Stop targeting this member's browser subscription
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Subscription unlinked from this member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PushSubscriptionRegistration" }
+        "401": { description: Sign-in required }
+        "403": { description: Linked membership required }
   /member/claim:
     post:
       operationId: claimMembership
@@ -1156,8 +1223,8 @@ components:
       required: [memberId, channel, status, detail]
       properties:
         memberId: { type: integer }
-        channel: { type: string, enum: [in_app, email] }
-        status: { type: string, enum: [created, sent, failed, pending, sending] }
+        channel: { type: string, enum: [in_app, email, push] }
+        status: { type: string, enum: [created, sent, failed, pending, sending, skipped] }
         detail: { type: ["string", "null"] }
     CourseClosureResolution:
       type: object
@@ -1167,7 +1234,7 @@ components:
         courseId: { type: integer }
         action: { type: string, enum: [relocate, cancel] }
         room: { type: ["string", "null"] }
-        channel: { type: string, enum: [in_app, email] }
+        channel: { type: string, enum: [in_app, email, push] }
         notifications:
           type: array
           items: { $ref: "#/components/schemas/ClosureNotificationOutcome" }
@@ -1177,7 +1244,7 @@ components:
       properties:
         id: { type: integer }
         memberId: { type: integer }
-        status: { type: string, enum: [pending, sending, sent, failed] }
+        status: { type: string, enum: [pending, sending, sent, failed, skipped] }
         attemptCount: { type: integer }
         error: { type: ["string", "null"] }
         attemptedAt: { type: ["string", "null"], format: date-time }
@@ -1189,6 +1256,24 @@ components:
         deliveries:
           type: array
           items: { $ref: "#/components/schemas/ClosureEmailDelivery" }
+    ClosurePushDelivery:
+      type: object
+      required: [id, memberId, status, attemptCount, error, attemptedAt]
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        status: { type: string, enum: [pending, sending, sent, failed, skipped] }
+        attemptCount: { type: integer }
+        error: { type: ["string", "null"] }
+        attemptedAt: { type: ["string", "null"], format: date-time }
+    ClosurePushDeliveryReport:
+      type: object
+      required: [resolutionId, deliveries]
+      properties:
+        resolutionId: { type: integer }
+        deliveries:
+          type: array
+          items: { $ref: "#/components/schemas/ClosurePushDelivery" }
     ClosureEmailDeliveryCounts:
       type: object
       required: [total, pending, sending, sent, failed]
@@ -1207,11 +1292,22 @@ components:
         courseTitle: { type: string }
         action: { type: string, enum: [relocate, cancel] }
         room: { type: ["string", "null"] }
-        channel: { type: string, enum: [in_app, email] }
+        channel: { type: string, enum: [in_app, email, push] }
         deliveryCounts: { $ref: "#/components/schemas/ClosureEmailDeliveryCounts" }
         deliveries:
           type: array
           items: { $ref: "#/components/schemas/ClosureEmailDelivery" }
+    PushSubscriptionInput:
+      type: object
+      required: [subscriptionId]
+      properties:
+        subscriptionId: { type: string, format: uuid }
+    PushSubscriptionRegistration:
+      type: object
+      required: [subscriptionId, registered]
+      properties:
+        subscriptionId: { type: string, format: uuid }
+        registered: { type: boolean }
     StaffBookingInput:
       type: object
       required: [memberId]

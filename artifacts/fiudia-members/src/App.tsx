@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
 import type { Member, MemberCourse, MemberHome } from '@workspace/api-client-react';
+import { registerMemberPushSubscription, unregisterMemberPushSubscription } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
@@ -15,7 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { afterAuthPath, clearInvite, invitePath, pendingInvite as getPendingInvite, rememberInvite } from './invitation-return';
-import { getOneSignal, optOutOnSignOut, rememberPushChoice, supportsPushEnvironment } from './lib/onesignal';
+import { getOneSignal, optOutOnSignOut, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -208,6 +209,7 @@ function CheckInsPage() {
 function PushPreference() {
   const [state, setState] = useState<'loading' | 'ready' | 'unsupported' | 'error'>('loading');
   const [optedIn, setOptedIn] = useState(false);
+  const [registered, setRegistered] = useState(false);
   const [denied, setDenied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -215,6 +217,7 @@ function PushPreference() {
   useEffect(() => {
     let active = true;
     let detach = () => {};
+    let registrationSequence = 0;
     if (!supportsPushEnvironment()) {
       setState('unsupported');
       return;
@@ -228,9 +231,37 @@ function PushPreference() {
       const refresh = () => {
         if (!active) return;
         const subscribed = sdk.User.PushSubscription.optedIn;
+        const id = sdk.User.PushSubscription.id;
         setOptedIn(subscribed);
         setDenied(Notification.permission === 'denied');
-        if (subscribed) rememberPushChoice(true);
+        if (subscribed) {
+          rememberPushChoice(true);
+          if (id) {
+            const sequence = ++registrationSequence;
+            void registerMemberPushSubscription({ subscriptionId: id }).then(() => {
+              if (active && sequence === registrationSequence) {
+                rememberPushSubscriptionId(id);
+                setRegistered(true);
+                setError('');
+              }
+            }).catch(() => {
+              if (active && sequence === registrationSequence) {
+                setRegistered(false);
+                setError('Dieses Gerät konnte nicht mit deiner Mitgliedschaft verknüpft werden. Bitte versuche es erneut.');
+              }
+            });
+          } else setRegistered(false);
+        } else {
+          registrationSequence++;
+          setRegistered(false);
+          // Permission revocation can occur outside the toggle button.
+          const previousId = storedPushSubscriptionId();
+          if (previousId) {
+            void unregisterMemberPushSubscription(previousId).then(() => rememberPushSubscriptionId(null)).catch(() => {
+              if (active) setError('Die Push-Abmeldung konnte nicht gespeichert werden. Bitte versuche es erneut.');
+            });
+          }
+        }
       };
       sdk.User.PushSubscription.addEventListener('change', refresh);
       sdk.Notifications.addEventListener('permissionChange', refresh);
@@ -249,19 +280,39 @@ function PushPreference() {
     setError('');
     try {
       const sdk = await getOneSignal();
-      if (optedIn) await sdk.User.PushSubscription.optOut();
-      else await sdk.User.PushSubscription.optIn();
+      if (optedIn && registered) {
+        const id = storedPushSubscriptionId() || sdk.User.PushSubscription.id;
+        await sdk.User.PushSubscription.optOut();
+        if (id) await unregisterMemberPushSubscription(id);
+        rememberPushSubscriptionId(null);
+      } else if (!optedIn) {
+        await sdk.User.PushSubscription.optIn();
+      }
       const subscribed = sdk.User.PushSubscription.optedIn;
       setOptedIn(subscribed);
       setDenied(Notification.permission === 'denied');
       rememberPushChoice(subscribed);
+      if (subscribed) {
+        const id = sdk.User.PushSubscription.id;
+        if (!id) {
+          setRegistered(false);
+          setError('OneSignal richtet dieses Gerät noch ein. Bitte versuche es gleich erneut.');
+        } else {
+          await registerMemberPushSubscription({ subscriptionId: id });
+          rememberPushSubscriptionId(id);
+          setRegistered(true);
+        }
+      } else {
+        setRegistered(false);
+      }
       if (!optedIn && !subscribed) {
         setError(Notification.permission === 'denied'
           ? 'Benachrichtigungen sind im Browser blockiert. Bitte ändere die Berechtigung in deinen Browser-Einstellungen.'
           : 'Dieses Gerät konnte noch nicht für Push angemeldet werden. Bitte versuche es erneut.');
       }
     } catch {
-      setError('Die Push-Einstellung konnte nicht geändert werden. Bitte versuche es erneut.');
+      setRegistered(false);
+      setError('Die Push-Einstellung konnte nicht gespeichert werden. Bitte versuche es erneut.');
     } finally {
       setBusy(false);
     }
@@ -269,14 +320,14 @@ function PushPreference() {
 
   return <section className="soft-card email-preference" aria-labelledby="push-preference-title" data-testid="push-preference">
     <div><h2 id="push-preference-title">Push auf diesem Gerät</h2>
-      <p>Du entscheidest, ob Fiudia auf diesem Gerät Browser-Benachrichtigungen anzeigen darf. Für Kursänderungen ist der Versand durch dein Studio noch nicht aktiviert.</p>
-      {state === 'ready' && <p role="status" data-testid="status-push-subscription">{optedIn ? 'Dieses Gerät ist für Push angemeldet.' : denied ? 'Benachrichtigungen sind im Browser blockiert.' : 'Dieses Gerät ist nicht für Push angemeldet.'}</p>}
+      <p>Du entscheidest, ob Fiudia auf diesem Gerät Push-Benachrichtigungen für Kursänderungen senden darf. Dein Studio wählt beim Ändern eines Kurses den Benachrichtigungskanal.</p>
+      {state === 'ready' && <p role="status" data-testid="status-push-subscription">{optedIn && registered ? 'Dieses Gerät ist für Push mit deiner Mitgliedschaft angemeldet.' : optedIn ? 'Dieses Gerät ist noch nicht mit deiner Mitgliedschaft verknüpft.' : denied ? 'Benachrichtigungen sind im Browser blockiert.' : 'Dieses Gerät ist nicht für Push angemeldet.'}</p>}
       {state === 'unsupported' && <p role="status">Dieser Browser oder diese Verbindung unterstützt keine Push-Benachrichtigungen.</p>}
       {state === 'error' && <p role="alert">Push konnte hier nicht eingerichtet werden. Prüfe die OneSignal-Konfiguration für diese Website.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>
     <button className="button button-secondary" type="button" disabled={state !== 'ready' || busy || (denied && !optedIn)} onClick={() => { void toggle(); }} data-testid="button-toggle-push">
-      {busy ? 'Bitte warten …' : optedIn ? 'Gerät abmelden' : 'Benachrichtigungen erlauben'}
+      {busy ? 'Bitte warten …' : optedIn ? registered ? 'Gerät abmelden' : 'Verknüpfung erneut versuchen' : 'Benachrichtigungen erlauben'}
     </button>
   </section>;
 }

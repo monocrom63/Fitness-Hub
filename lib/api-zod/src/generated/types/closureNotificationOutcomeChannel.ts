@@ -12,4 +12,5 @@ export type ClosureNotificationOutcomeChannel = typeof ClosureNotificationOutcom
 export const ClosureNotificationOutcomeChannel = {
   in_app: 'in_app',
   email: 'email',
+  push: 'push',
 } as const;

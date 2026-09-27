@@ -26,6 +26,7 @@ import type {
   ClosureAffectedCourse,
   ClosureCourseResolution,
   ClosureEmailDeliveryReport,
+  ClosurePushDeliveryReport,
   Course,
   CourseBooking,
   CourseClosureResolution,
@@ -60,6 +61,8 @@ import type {
   PulseInput,
   PulseMessage,
   PulseRead,
+  PushSubscriptionInput,
+  PushSubscriptionRegistration,
   RoomAsset,
   RoomClosure,
   RoomClosureInput,
@@ -1731,6 +1734,157 @@ export const useRetryClosureEmailDeliveries = <TError = ErrorType<void>,
       return useMutation(getRetryClosureEmailDeliveriesMutationOptions(options));
     }
 
+export const getGetClosurePushDeliveriesUrl = (resolutionId: number,) => {
+
+
+
+
+  return `/api/closure-resolutions/${resolutionId}/push-deliveries`
+}
+
+/**
+ * @summary Inspect per-device push delivery outcomes
+ */
+export const getClosurePushDeliveries = async (resolutionId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosurePushDeliveryReport> => {
+
+  return customFetch<ClosurePushDeliveryReport>(getGetClosurePushDeliveriesUrl(resolutionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClosurePushDeliveriesQueryKey = (resolutionId: number,) => {
+    return [
+    `/api/closure-resolutions/${resolutionId}/push-deliveries`
+    ] as const;
+    }
+
+
+export const getGetClosurePushDeliveriesQueryOptions = <TData = Awaited<ReturnType<typeof getClosurePushDeliveries>>, TError = ErrorType<void>>(resolutionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClosurePushDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClosurePushDeliveriesQueryKey(resolutionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClosurePushDeliveries>>> = ({ signal }) => getClosurePushDeliveries(resolutionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: resolutionId !== null && resolutionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClosurePushDeliveries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClosurePushDeliveriesQueryResult = NonNullable<Awaited<ReturnType<typeof getClosurePushDeliveries>>>
+export type GetClosurePushDeliveriesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect per-device push delivery outcomes
+ */
+
+export function useGetClosurePushDeliveries<TData = Awaited<ReturnType<typeof getClosurePushDeliveries>>, TError = ErrorType<void>>(
+ resolutionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClosurePushDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClosurePushDeliveriesQueryOptions(resolutionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRetryClosurePushDeliveriesUrl = (resolutionId: number,) => {
+
+
+
+
+  return `/api/closure-resolutions/${resolutionId}/push-deliveries`
+}
+
+/**
+ * @summary Retry pending or failed push deliveries with their original idempotency keys
+ */
+export const retryClosurePushDeliveries = async (resolutionId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosurePushDeliveryReport> => {
+
+  return customFetch<ClosurePushDeliveryReport>(getRetryClosurePushDeliveriesUrl(resolutionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRetryClosurePushDeliveriesMutationKey = () => ['retryClosurePushDeliveries'] as const;
+
+export const getRetryClosurePushDeliveriesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryClosurePushDeliveries>>, TError,RetryClosurePushDeliveriesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryClosurePushDeliveries>>, TError,RetryClosurePushDeliveriesMutationVariables, TContext> => {
+
+const mutationKey = getRetryClosurePushDeliveriesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryClosurePushDeliveries>>, RetryClosurePushDeliveriesMutationVariables> = (props) => {
+          const {resolutionId} = props ?? {};
+
+          return  retryClosurePushDeliveries(resolutionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryClosurePushDeliveriesMutationResult = NonNullable<Awaited<ReturnType<typeof retryClosurePushDeliveries>>>
+
+    export type RetryClosurePushDeliveriesMutationError = ErrorType<void>
+    export type RetryClosurePushDeliveriesMutationVariables = {resolutionId: number}
+
+    /**
+ * @summary Retry pending or failed push deliveries with their original idempotency keys
+ */
+export const useRetryClosurePushDeliveries = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryClosurePushDeliveries>>, TError,RetryClosurePushDeliveriesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryClosurePushDeliveries>>,
+        TError,
+        RetryClosurePushDeliveriesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRetryClosurePushDeliveriesMutationOptions(options));
+    }
+
 export const getListCourseBookingsUrl = (id: number,) => {
 
 
@@ -2391,6 +2545,168 @@ export const useUpdateMemberNotificationSettings = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateMemberNotificationSettingsMutationOptions(options));
+    }
+
+export const getRegisterMemberPushSubscriptionUrl = () => {
+
+
+
+
+  return `/api/member/push-subscriptions`
+}
+
+/**
+ * @summary Bind this browser's OneSignal push subscription to the signed-in member
+ */
+export const registerMemberPushSubscription = async (pushSubscriptionInput: PushSubscriptionInput, options?: Parameters<typeof customFetch>[1]): Promise<PushSubscriptionRegistration> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PushSubscriptionRegistration>(getRegisterMemberPushSubscriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pushSubscriptionInput)
+  }
+);}
+
+
+
+
+
+export const getRegisterMemberPushSubscriptionMutationKey = () => ['registerMemberPushSubscription'] as const;
+
+export const getRegisterMemberPushSubscriptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerMemberPushSubscription>>, TError,RegisterMemberPushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerMemberPushSubscription>>, TError,RegisterMemberPushSubscriptionMutationVariables, TContext> => {
+
+const mutationKey = getRegisterMemberPushSubscriptionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerMemberPushSubscription>>, RegisterMemberPushSubscriptionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerMemberPushSubscription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterMemberPushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof registerMemberPushSubscription>>>
+    export type RegisterMemberPushSubscriptionMutationBody = BodyType<PushSubscriptionInput>
+    export type RegisterMemberPushSubscriptionMutationError = ErrorType<void>
+    export type RegisterMemberPushSubscriptionMutationVariables = {data: BodyType<PushSubscriptionInput>}
+
+    /**
+ * @summary Bind this browser's OneSignal push subscription to the signed-in member
+ */
+export const useRegisterMemberPushSubscription = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerMemberPushSubscription>>, TError,RegisterMemberPushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerMemberPushSubscription>>,
+        TError,
+        RegisterMemberPushSubscriptionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRegisterMemberPushSubscriptionMutationOptions(options));
+    }
+
+export const getUnregisterMemberPushSubscriptionUrl = (subscriptionId: string,) => {
+
+
+
+
+  return `/api/member/push-subscriptions/${subscriptionId}`
+}
+
+/**
+ * @summary Stop targeting this member's browser subscription
+ */
+export const unregisterMemberPushSubscription = async (subscriptionId: string, options?: Parameters<typeof customFetch>[1]): Promise<PushSubscriptionRegistration> => {
+
+  return customFetch<PushSubscriptionRegistration>(getUnregisterMemberPushSubscriptionUrl(subscriptionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnregisterMemberPushSubscriptionMutationKey = () => ['unregisterMemberPushSubscription'] as const;
+
+export const getUnregisterMemberPushSubscriptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unregisterMemberPushSubscription>>, TError,UnregisterMemberPushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unregisterMemberPushSubscription>>, TError,UnregisterMemberPushSubscriptionMutationVariables, TContext> => {
+
+const mutationKey = getUnregisterMemberPushSubscriptionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unregisterMemberPushSubscription>>, UnregisterMemberPushSubscriptionMutationVariables> = (props) => {
+          const {subscriptionId} = props ?? {};
+
+          return  unregisterMemberPushSubscription(subscriptionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnregisterMemberPushSubscriptionMutationResult = NonNullable<Awaited<ReturnType<typeof unregisterMemberPushSubscription>>>
+
+    export type UnregisterMemberPushSubscriptionMutationError = ErrorType<void>
+    export type UnregisterMemberPushSubscriptionMutationVariables = {subscriptionId: string}
+
+    /**
+ * @summary Stop targeting this member's browser subscription
+ */
+export const useUnregisterMemberPushSubscription = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unregisterMemberPushSubscription>>, TError,UnregisterMemberPushSubscriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unregisterMemberPushSubscription>>,
+        TError,
+        UnregisterMemberPushSubscriptionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnregisterMemberPushSubscriptionMutationOptions(options));
     }
 
 export const getClaimMembershipUrl = () => {

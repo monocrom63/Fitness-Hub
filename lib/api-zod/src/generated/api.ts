@@ -420,7 +420,7 @@ export const ListClosureResolutionsResponseItem = zod.object({
   "courseTitle": zod.string(),
   "action": zod.enum(['relocate', 'cancel']),
   "room": zod.string().nullable(),
-  "channel": zod.enum(['in_app', 'email']),
+  "channel": zod.enum(['in_app', 'email', 'push']),
   "deliveryCounts": zod.object({
   "total": zod.number().int(),
   "pending": zod.number().int(),
@@ -431,7 +431,7 @@ export const ListClosureResolutionsResponseItem = zod.object({
   "deliveries": zod.array(zod.object({
   "id": zod.number().int(),
   "memberId": zod.number().int(),
-  "status": zod.enum(['pending', 'sending', 'sent', 'failed']),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
   "attemptCount": zod.number().int(),
   "error": zod.string().nullable(),
   "attemptedAt": zod.coerce.date().nullable()
@@ -467,11 +467,11 @@ export const ResolveCourseRoomClosureResponse = zod.object({
   "courseId": zod.number().int(),
   "action": zod.enum(['relocate', 'cancel']),
   "room": zod.string().nullable(),
-  "channel": zod.enum(['in_app', 'email']),
+  "channel": zod.enum(['in_app', 'email', 'push']),
   "notifications": zod.array(zod.object({
   "memberId": zod.number().int(),
-  "channel": zod.enum(['in_app', 'email']),
-  "status": zod.enum(['created', 'sent', 'failed', 'pending', 'sending']),
+  "channel": zod.enum(['in_app', 'email', 'push']),
+  "status": zod.enum(['created', 'sent', 'failed', 'pending', 'sending', 'skipped']),
   "detail": zod.string().nullable()
 }))
 })
@@ -489,7 +489,7 @@ export const GetClosureEmailDeliveriesResponse = zod.object({
   "deliveries": zod.array(zod.object({
   "id": zod.number().int(),
   "memberId": zod.number().int(),
-  "status": zod.enum(['pending', 'sending', 'sent', 'failed']),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
   "attemptCount": zod.number().int(),
   "error": zod.string().nullable(),
   "attemptedAt": zod.coerce.date().nullable()
@@ -510,7 +510,47 @@ export const RetryClosureEmailDeliveriesResponse = zod.object({
   "deliveries": zod.array(zod.object({
   "id": zod.number().int(),
   "memberId": zod.number().int(),
-  "status": zod.enum(['pending', 'sending', 'sent', 'failed']),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "attemptedAt": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
+ * @summary Inspect per-device push delivery outcomes
+ */
+export const GetClosurePushDeliveriesParams = zod.object({
+  "resolutionId": zod.coerce.number().int()
+})
+
+export const GetClosurePushDeliveriesResponse = zod.object({
+  "resolutionId": zod.number().int(),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "memberId": zod.number().int(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "attemptedAt": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
+ * @summary Retry pending or failed push deliveries with their original idempotency keys
+ */
+export const RetryClosurePushDeliveriesParams = zod.object({
+  "resolutionId": zod.coerce.number().int()
+})
+
+export const RetryClosurePushDeliveriesResponse = zod.object({
+  "resolutionId": zod.number().int(),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "memberId": zod.number().int(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
   "attemptCount": zod.number().int(),
   "error": zod.string().nullable(),
   "attemptedAt": zod.coerce.date().nullable()
@@ -697,6 +737,32 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
   "upcomingBookings": zod.number().int()
+})
+
+
+/**
+ * @summary Bind this browser's OneSignal push subscription to the signed-in member
+ */
+export const RegisterMemberPushSubscriptionBody = zod.object({
+  "subscriptionId": zod.string().uuid()
+})
+
+export const RegisterMemberPushSubscriptionResponse = zod.object({
+  "subscriptionId": zod.string().uuid(),
+  "registered": zod.boolean()
+})
+
+
+/**
+ * @summary Stop targeting this member's browser subscription
+ */
+export const UnregisterMemberPushSubscriptionParams = zod.object({
+  "subscriptionId": zod.coerce.string().uuid()
+})
+
+export const UnregisterMemberPushSubscriptionResponse = zod.object({
+  "subscriptionId": zod.string().uuid(),
+  "registered": zod.boolean()
 })
 
 

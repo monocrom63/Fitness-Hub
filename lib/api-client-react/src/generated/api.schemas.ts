@@ -326,6 +326,7 @@ export type ClosureNotificationOutcomeChannel = typeof ClosureNotificationOutcom
 export const ClosureNotificationOutcomeChannel = {
   in_app: 'in_app',
   email: 'email',
+  push: 'push',
 } as const;
 
 export type ClosureNotificationOutcomeStatus = typeof ClosureNotificationOutcomeStatus[keyof typeof ClosureNotificationOutcomeStatus];
@@ -337,6 +338,7 @@ export const ClosureNotificationOutcomeStatus = {
   failed: 'failed',
   pending: 'pending',
   sending: 'sending',
+  skipped: 'skipped',
 } as const;
 
 export interface ClosureNotificationOutcome {
@@ -361,6 +363,7 @@ export type CourseClosureResolutionChannel = typeof CourseClosureResolutionChann
 export const CourseClosureResolutionChannel = {
   in_app: 'in_app',
   email: 'email',
+  push: 'push',
 } as const;
 
 export interface CourseClosureResolution {
@@ -381,6 +384,7 @@ export const ClosureEmailDeliveryStatus = {
   sending: 'sending',
   sent: 'sent',
   failed: 'failed',
+  skipped: 'skipped',
 } as const;
 
 export interface ClosureEmailDelivery {
@@ -397,6 +401,33 @@ export interface ClosureEmailDelivery {
 export interface ClosureEmailDeliveryReport {
   resolutionId: number;
   deliveries: ClosureEmailDelivery[];
+}
+
+export type ClosurePushDeliveryStatus = typeof ClosurePushDeliveryStatus[keyof typeof ClosurePushDeliveryStatus];
+
+
+export const ClosurePushDeliveryStatus = {
+  pending: 'pending',
+  sending: 'sending',
+  sent: 'sent',
+  failed: 'failed',
+  skipped: 'skipped',
+} as const;
+
+export interface ClosurePushDelivery {
+  id: number;
+  memberId: number;
+  status: ClosurePushDeliveryStatus;
+  attemptCount: number;
+  /** @nullable */
+  error: string | null;
+  /** @nullable */
+  attemptedAt: string | null;
+}
+
+export interface ClosurePushDeliveryReport {
+  resolutionId: number;
+  deliveries: ClosurePushDelivery[];
 }
 
 export interface ClosureEmailDeliveryCounts {
@@ -421,6 +452,7 @@ export type ClosureCourseResolutionChannel = typeof ClosureCourseResolutionChann
 export const ClosureCourseResolutionChannel = {
   in_app: 'in_app',
   email: 'email',
+  push: 'push',
 } as const;
 
 export interface ClosureCourseResolution {
@@ -433,6 +465,15 @@ export interface ClosureCourseResolution {
   channel: ClosureCourseResolutionChannel;
   deliveryCounts: ClosureEmailDeliveryCounts;
   deliveries: ClosureEmailDelivery[];
+}
+
+export interface PushSubscriptionInput {
+  subscriptionId: string;
+}
+
+export interface PushSubscriptionRegistration {
+  subscriptionId: string;
+  registered: boolean;
 }
 
 export interface StaffBookingInput {

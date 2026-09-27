@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, asc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
@@ -10,6 +11,8 @@ import {
   DeleteStudioRoomClosureParams,
   GetClosureEmailDeliveriesParams,
   GetClosureEmailDeliveriesResponse,
+  GetClosurePushDeliveriesParams,
+  GetClosurePushDeliveriesResponse,
   ListClosureAffectedCoursesParams,
   ListClosureAffectedCoursesResponse,
   ListClosureResolutionsParams,
@@ -23,14 +26,18 @@ import {
   ResolveCourseRoomClosureResponse,
   RetryClosureEmailDeliveriesParams,
   RetryClosureEmailDeliveriesResponse,
+  RetryClosurePushDeliveriesParams,
+  RetryClosurePushDeliveriesResponse,
 } from "@workspace/api-zod";
 import {
   closureEmailDeliveriesTable,
+  closurePushDeliveriesTable,
   courseBookingsTable,
   courseClosureResolutionsTable,
   coursesTable,
   db,
   memberNotificationsTable,
+  memberPushSubscriptionsTable,
   membersTable,
   pulseMessagesTable,
   roomClosuresTable,
@@ -38,6 +45,12 @@ import {
   studiosTable,
 } from "@workspace/db";
 import { closureEmailReadiness, getResolutionEmailStatuses, processResolutionEmails } from "../lib/closure-email";
+import {
+  buildClosurePushDeliveryTargets,
+  closurePushReadiness,
+  getResolutionPushStatuses,
+  processResolutionPushDeliveries,
+} from "../lib/closure-push";
 import { listClosureResolutionsForStudio } from "../lib/closure-resolutions";
 import {
   canAccessStudio,
@@ -395,8 +408,8 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
   }
   const request = body.data;
   // Unsupported channels must fail before any course, booking, or notification mutation.
-  if (request.channel === "push" || request.channel === "whatsapp") {
-    res.status(409).json({ error: `Der Benachrichtigungskanal ${request.channel} wird nicht unterstützt; es wurde nichts geändert oder versendet.` });
+  if (request.channel === "whatsapp") {
+    res.status(409).json({ error: "Der Benachrichtigungskanal whatsapp wird nicht unterstützt; es wurde nichts geändert oder versendet." });
     return;
   }
   if (request.action === "relocate" && !request.room?.trim()) {
@@ -411,7 +424,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
   }
   if (!(await accessibleStudio(staff, course.studioId, res))) return;
 
-  if (request.channel === "email") {
+  if (request.channel === "email" || request.channel === "push") {
     // An idempotent replay of a completed resolution must still be readable
     // if the provider becomes unavailable after the first attempt.
     const [prior] = await db.select({ id: courseClosureResolutionsTable.id })
@@ -421,7 +434,9 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         eq(courseClosureResolutionsTable.closureId, request.closureId),
       )).limit(1);
     if (!prior) {
-      const issue = await closureEmailReadiness();
+      const issue = request.channel === "email"
+        ? await closureEmailReadiness()
+        : await closurePushReadiness();
       if (issue) {
         res.status(409).json({ error: issue });
         return;
@@ -507,6 +522,20 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         inArray(courseBookingsTable.status, ["confirmed", "waitlisted"]),
         eq(membersTable.studioId, lockedCourse.studioId),
       ));
+    let pushTargets: ReturnType<typeof buildClosurePushDeliveryTargets> = [];
+    if (request.channel === "push" && activeBookings.length) {
+      const subscriptions = await tx.select({
+        memberId: memberPushSubscriptionsTable.memberId,
+        subscriptionId: memberPushSubscriptionsTable.subscriptionId,
+      }).from(memberPushSubscriptionsTable).where(inArray(
+        memberPushSubscriptionsTable.memberId,
+        activeBookings.map(({ memberId }) => memberId),
+      ));
+      pushTargets = buildClosurePushDeliveryTargets(activeBookings, subscriptions);
+      if (!pushTargets.some(({ subscriptionId }) => subscriptionId !== null)) {
+        return { error: "Für diesen Kurs ist kein Browser-Push-Abonnement eingerichtet. Bitte wählen Sie In-App, damit alle gebuchten Mitglieder die Kursänderung erhalten." as const };
+      }
+    }
     const title = request.action === "cancel"
       ? "Dein Kurs wurde storniert"
       : "Der Kursraum wurde geändert";
@@ -533,7 +562,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
       ));
     }
 
-    if (request.channel === "in_app") {
+    if (request.channel === "in_app" || request.channel === "push") {
       if (activeBookings.length) {
         await tx.insert(memberNotificationsTable).values(activeBookings.map((booking) => ({
           bookingId: booking.id,
@@ -549,6 +578,17 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         bookingId: booking.id,
         memberId: booking.memberId,
         email: booking.memberEmail,
+      })));
+    }
+    if (request.channel === "push" && pushTargets.length) {
+      await tx.insert(closurePushDeliveriesTable).values(pushTargets.map((target) => ({
+        resolutionId: resolution.id,
+        bookingId: target.bookingId,
+        memberId: target.memberId,
+        subscriptionId: target.subscriptionId,
+        idempotencyKey: randomUUID(),
+        status: target.status,
+        error: target.error,
       })));
     }
     return {
@@ -572,7 +612,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
   const resolution = result.existing ?? result.resolution!;
   const action = resolution.action as "relocate" | "cancel";
   const room = resolution.targetRoom;
-  let notifications: Array<{ memberId: number; channel: "in_app" | "email"; status: "created" | "sent" | "failed" | "pending" | "sending"; detail: string | null }> = [];
+  let notifications: Array<{ memberId: number; channel: "in_app" | "email" | "push"; status: "created" | "sent" | "failed" | "pending" | "sending" | "skipped"; detail: string | null }> = [];
   if (chosenChannel === "in_app") {
     const people = result.existing
       ? await db.select({ memberId: memberNotificationsTable.memberId })
@@ -587,12 +627,20 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
       status: "created",
       detail: null,
     }));
-  } else {
+  } else if (chosenChannel === "email") {
     const deliveries = await processResolutionEmails(resolution.id);
     notifications = deliveries.map((delivery) => ({
       memberId: delivery.memberId,
       channel: "email" as const,
       status: delivery.status as "created" | "sent" | "failed" | "pending" | "sending",
+      detail: delivery.error,
+    }));
+  } else {
+    const deliveries = await processResolutionPushDeliveries(resolution.id);
+    notifications = deliveries.map((delivery) => ({
+      memberId: delivery.memberId,
+      channel: "push" as const,
+      status: delivery.status as "created" | "sent" | "failed" | "pending" | "sending" | "skipped",
       detail: delivery.error,
     }));
   }
@@ -615,6 +663,7 @@ async function accessibleResolution(
   const [resolution] = await db.select({
     id: courseClosureResolutionsTable.id,
     studioId: coursesTable.studioId,
+    channel: courseClosureResolutionsTable.channel,
   }).from(courseClosureResolutionsTable)
     .innerJoin(coursesTable, eq(coursesTable.id, courseClosureResolutionsTable.courseId))
     .innerJoin(roomClosuresTable, eq(roomClosuresTable.id, courseClosureResolutionsTable.closureId))
@@ -661,6 +710,48 @@ router.post("/closure-resolutions/:resolutionId/email-deliveries", async (req, r
   const deliveries = await processResolutionEmails(resolutionId);
   res.json(RetryClosureEmailDeliveriesResponse.parse({
     resolutionId,
+    deliveries,
+  }));
+});
+
+router.get("/closure-resolutions/:resolutionId/push-deliveries", async (req, res): Promise<void> => {
+  const staff = await requireManager(req, res);
+  if (!staff) return;
+  const params = GetClosurePushDeliveriesParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const resolution = await accessibleResolution(params.data.resolutionId, staff, res);
+  if (!resolution) return;
+  if (resolution.channel !== "push") {
+    res.status(409).json({ error: "Diese Kursauflösung verwendet keinen Push-Kanal." });
+    return;
+  }
+  const deliveries = await getResolutionPushStatuses(params.data.resolutionId);
+  res.json(GetClosurePushDeliveriesResponse.parse({
+    resolutionId: params.data.resolutionId,
+    deliveries,
+  }));
+});
+
+router.post("/closure-resolutions/:resolutionId/push-deliveries", async (req, res): Promise<void> => {
+  const staff = await requireManager(req, res);
+  if (!staff) return;
+  const params = RetryClosurePushDeliveriesParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const resolution = await accessibleResolution(params.data.resolutionId, staff, res);
+  if (!resolution) return;
+  if (resolution.channel !== "push") {
+    res.status(409).json({ error: "Diese Kursauflösung verwendet keinen Push-Kanal." });
+    return;
+  }
+  const deliveries = await processResolutionPushDeliveries(params.data.resolutionId);
+  res.json(RetryClosurePushDeliveriesResponse.parse({
+    resolutionId: params.data.resolutionId,
     deliveries,
   }));
 });

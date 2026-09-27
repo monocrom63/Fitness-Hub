@@ -12,4 +12,5 @@ export type ClosureCourseResolutionChannel = typeof ClosureCourseResolutionChann
 export const ClosureCourseResolutionChannel = {
   in_app: 'in_app',
   email: 'email',
+  push: 'push',
 } as const;

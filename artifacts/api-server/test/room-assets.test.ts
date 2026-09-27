@@ -4,11 +4,13 @@ import { test } from "node:test";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   closureEmailDeliveriesTable,
+  closurePushDeliveriesTable,
   courseBookingsTable,
   courseClosureResolutionsTable,
   coursesTable,
   db,
   memberNotificationsTable,
+  memberPushSubscriptionsTable,
   organizationsTable,
   roomClosuresTable,
   roomsTable,
@@ -22,6 +24,11 @@ import {
   getResolutionEmailStatuses,
 } from "../src/lib/closure-email";
 import { listClosureResolutionsForStudio } from "../src/lib/closure-resolutions";
+import {
+  buildClosurePushDeliveryTargets,
+  closurePushReadiness,
+  processResolutionPushDeliveries,
+} from "../src/lib/closure-push";
 import { canAccessStudio, getStaffContext } from "../src/lib/fiudia-access";
 import { WAITLIST_EMAIL_SENDER } from "../src/lib/waitlist-email";
 import {
@@ -154,7 +161,7 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
       courseId: course.id,
       closureId: otherClosure.id,
       action: "cancel",
-      channel: "in_app",
+      channel: "push",
       idempotencyKey: `room-resolve-${suffix}-later-closure`,
     });
     const courseResolutions = await db.select().from(courseClosureResolutionsTable)
@@ -177,6 +184,17 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
       memberId: member.id,
       status: "confirmed",
     }).returning();
+    const [memberWithoutPush] = await db.insert(membersTable).values({
+      studioId: studio.id,
+      fullName: "No push subscription member",
+      email: `no-push-${suffix}@example.invalid`,
+      membershipType: "Basic",
+    }).returning();
+    const [bookingWithoutPush] = await db.insert(courseBookingsTable).values({
+      courseId: course.id,
+      memberId: memberWithoutPush.id,
+      status: "waitlisted",
+    }).returning();
     const [promotionNotice] = await db.insert(memberNotificationsTable).values({
       bookingId: booking.id,
       memberId: member.id,
@@ -197,6 +215,8 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
         eq(courseClosureResolutionsTable.courseId, course.id),
         eq(courseClosureResolutionsTable.closureId, closure.id),
       ));
+    const [pushResolution] = await db.select().from(courseClosureResolutionsTable)
+      .where(eq(courseClosureResolutionsTable.closureId, otherClosure.id));
     const [delivery] = await db.insert(closureEmailDeliveriesTable).values({
       resolutionId: emailResolution.id,
       bookingId: booking.id,
@@ -206,6 +226,82 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
       error: "Provider unavailable",
       attemptCount: 1,
     }).returning();
+    await db.insert(memberPushSubscriptionsTable).values({
+      subscriptionId: randomUUID(),
+      memberId: member.id,
+    });
+    const subscriptionId = (await db.select({ subscriptionId: memberPushSubscriptionsTable.subscriptionId })
+      .from(memberPushSubscriptionsTable).where(eq(memberPushSubscriptionsTable.memberId, member.id)))[0].subscriptionId;
+    const idempotencyKey = randomUUID();
+    const pushTargets = buildClosurePushDeliveryTargets(
+      [
+        { id: booking.id, memberId: member.id },
+        { id: bookingWithoutPush.id, memberId: memberWithoutPush.id },
+      ],
+      [{ memberId: member.id, subscriptionId }],
+    );
+    assert.equal(pushTargets.length, 2);
+    assert.equal(pushTargets.filter(({ status }) => status === "pending").length, 1);
+    assert.equal(pushTargets.filter(({ status }) => status === "skipped").length, 1);
+    assert.deepEqual(buildClosurePushDeliveryTargets([], []), [], "a course with no bookings has no push deliveries");
+    await db.insert(closurePushDeliveriesTable).values(pushTargets.map((target) => ({
+      resolutionId: pushResolution.id,
+      bookingId: target.bookingId,
+      memberId: target.memberId,
+      subscriptionId: target.subscriptionId,
+      idempotencyKey: target.status === "pending" ? idempotencyKey : randomUUID(),
+      status: target.status,
+      error: target.error,
+    })));
+    await db.insert(closurePushDeliveriesTable).values({
+      resolutionId: pushResolution.id,
+      bookingId: bookingWithoutPush.id,
+      memberId: memberWithoutPush.id,
+      subscriptionId: null,
+      idempotencyKey: randomUUID(),
+      status: "pending",
+    });
+    let providerCalls = 0;
+    const requestBodies: unknown[] = [];
+    const mockProxy = async (_path: string, options?: { method?: string; body?: unknown }) => {
+      providerCalls += 1;
+      assert.equal(options?.method, "POST");
+      requestBodies.push(options?.body);
+      return new Response(JSON.stringify(providerCalls === 1 ? {} : { id: "onesignal-notification-id" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    const firstPushAttempt = await processResolutionPushDeliveries(pushResolution.id, mockProxy);
+    assert.equal(firstPushAttempt.find(({ memberId }) => memberId === member.id)?.status, "failed", "HTTP 200 without provider ID is not a confirmed send");
+    assert.equal(firstPushAttempt.find(({ memberId }) => memberId === memberWithoutPush.id)?.status, "skipped");
+    assert.match(firstPushAttempt.find(({ memberId }) => memberId === memberWithoutPush.id)?.error ?? "", /In-App-Fallback/);
+    assert.equal(firstPushAttempt.filter(({ memberId, status }) => memberId === memberWithoutPush.id && status === "pending").length, 1);
+    const secondPushAttempt = await processResolutionPushDeliveries(pushResolution.id, mockProxy);
+    assert.equal(secondPushAttempt.find(({ memberId }) => memberId === member.id)?.status, "sent");
+    assert.equal(secondPushAttempt.find(({ memberId }) => memberId === memberWithoutPush.id)?.status, "skipped");
+    assert.equal(secondPushAttempt.filter(({ memberId, status }) => memberId === memberWithoutPush.id && status === "pending").length, 1);
+    assert.equal(providerCalls, 2);
+    assert.equal((requestBodies[0] as any).idempotency_key, idempotencyKey);
+    assert.deepEqual((requestBodies[0] as any).include_subscription_ids, [subscriptionId]);
+    assert.equal((requestBodies[0] as any).target_channel, "push");
+    assert.equal((requestBodies[0] as any).app_id, "c1a30beb-bc79-45f6-9cdd-275e663dbcd6");
+    assert.deepEqual(requestBodies[1], requestBodies[0], "the stable payload and provider idempotency key are reused");
+    const repeatPushAttempt = await processResolutionPushDeliveries(pushResolution.id, mockProxy);
+    assert.equal(repeatPushAttempt[0].status, "sent");
+    assert.equal(providerCalls, 2, "successful deliveries are not sent again on retry");
+    const pushResolutionReport = await listClosureResolutionsForStudio(studio.id, otherClosure.id);
+    assert.equal(pushResolutionReport[0].deliveryCounts.sent, 1);
+    assert.equal(pushResolutionReport[0].deliveries[0].status, "sent");
+    assert.equal("subscriptionId" in pushResolutionReport[0].deliveries[0], false);
+    const ready = await closurePushReadiness(async (path, options) => {
+      assert.match(path, /^\/notifications\?app_id=c1a30beb-bc79-45f6-9cdd-275e663dbcd6&limit=1&offset=0$/);
+      assert.equal(options?.method, "GET");
+      return new Response("{}", { status: 200 });
+    });
+    assert.equal(ready, null);
+    const unauthorized = await closurePushReadiness(async () => new Response("unauthorized", { status: 401 }));
+    assert.match(unauthorized ?? "", /OneSignal-Verbindung/);
     const persistedResolutionReport = await listClosureResolutionsForStudio(studio.id, closure.id);
     assert.equal(persistedResolutionReport.length, 1);
     assert.equal(persistedResolutionReport[0].deliveryCounts.failed, 1);
@@ -261,6 +357,8 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
             if (resolutionIds.length) {
               await tx.delete(closureEmailDeliveriesTable)
                 .where(inArray(closureEmailDeliveriesTable.resolutionId, resolutionIds));
+              await tx.delete(closurePushDeliveriesTable)
+                .where(inArray(closurePushDeliveriesTable.resolutionId, resolutionIds));
               await tx.delete(courseClosureResolutionsTable)
                 .where(inArray(courseClosureResolutionsTable.id, resolutionIds));
             }

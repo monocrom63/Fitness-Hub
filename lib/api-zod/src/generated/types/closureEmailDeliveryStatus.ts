@@ -14,4 +14,5 @@ export const ClosureEmailDeliveryStatus = {
   sending: 'sending',
   sent: 'sent',
   failed: 'failed',
+  skipped: 'skipped',
 } as const;

@@ -1,10 +1,14 @@
+import { unregisterMemberPushSubscription } from '@workspace/api-client-react';
+
 const APP_ID = 'c1a30beb-bc79-45f6-9cdd-275e663dbcd6';
 const basePath = import.meta.env.BASE_URL.replace(/\/?$/, '/');
-const workerPath = `${basePath.slice(1)}onesignal/OneSignalSDKWorker.js`;
+const workerPath = `${basePath}onesignal/OneSignalSDKWorker.js`;
 const workerScope = `${basePath}onesignal/`;
 const OPTED_IN_KEY = 'fiudia-member-push-opted-in';
+const SUBSCRIPTION_KEY = 'fiudia-member-push-subscription-id';
 
 type PushSubscription = {
+  id: string | null;
   optedIn: boolean;
   optIn: () => Promise<void>;
   optOut: () => Promise<void>;
@@ -101,9 +105,27 @@ export function rememberPushChoice(optedIn: boolean) {
   else localStorage.removeItem(OPTED_IN_KEY);
 }
 
+export function storedPushSubscriptionId() {
+  return localStorage.getItem(SUBSCRIPTION_KEY);
+}
+
+export function rememberPushSubscriptionId(id: string | null) {
+  if (id) localStorage.setItem(SUBSCRIPTION_KEY, id);
+  else localStorage.removeItem(SUBSCRIPTION_KEY);
+}
+
 // A browser shared by multiple people must not keep an opted-in subscription
-// after a member signs out. Failed cleanup is retried on the signed-out page.
+// after a member signs out. Keep the ID if server cleanup fails.
 export async function optOutOnSignOut() {
+  const id = storedPushSubscriptionId();
+  if (id) {
+    try {
+      await unregisterMemberPushSubscription(id);
+      rememberPushSubscriptionId(null);
+    } catch {
+      // The SDK still needs to be opted out even if the API cannot be reached.
+    }
+  }
   if (!localStorage.getItem(OPTED_IN_KEY)) return;
   const sdk = await getOneSignal();
   await sdk.User.PushSubscription.optOut();

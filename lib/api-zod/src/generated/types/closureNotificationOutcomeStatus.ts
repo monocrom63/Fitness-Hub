@@ -15,4 +15,5 @@ export const ClosureNotificationOutcomeStatus = {
   failed: 'failed',
   pending: 'pending',
   sending: 'sending',
+  skipped: 'skipped',
 } as const;
