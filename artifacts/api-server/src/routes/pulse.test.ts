@@ -302,6 +302,48 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
           assert.equal(readOld?.isRead, true);
           assert.equal(readOld?.readCount, 1);
         });
+
+        await t.test("searches older titles and bodies within visibility, with filters and literal wildcards", async () => {
+          const token = `findable-${suffix.slice(0, 8)}`;
+          const [older] = await tx.insert(pulseMessagesTable).values({
+            organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id,
+            audience: "employees", title: `Old ${token}`, body: "Archive result", priority: "info",
+          }).returning();
+          const newer = await tx.insert(pulseMessagesTable).values(Array.from({ length: 35 }, (_, index) => ({
+            organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id,
+            audience: "employees", title: `Recent ${index}`, body: `Body ${token}`, priority: "info" as const,
+          }))).returning();
+          const [wrongOrg, wrongStudio, wrongAudience, retracted, literal] = await tx.insert(pulseMessagesTable).values([
+            { organizationId: orgB.id, studioId: studioB1.id, authorStaffId: authorB.id, audience: "all", title: token, body: "Foreign", priority: "info" },
+            { organizationId: orgA.id, studioId: studioA2.id, authorStaffId: authorA.id, audience: "all", title: token, body: "Other studio", priority: "info" },
+            { organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id, audience: "managers", title: token, body: "Managers only", priority: "info" },
+            { organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id, audience: "employees", title: token, body: "Withdrawn", priority: "info", retractedAt: new Date() },
+            { organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id, audience: "employees", title: "Unique 40%_ done", body: "Literal symbols", priority: "info" },
+          ]).returning();
+          const readStaff = staffByKey.get("employeeA1")!.id;
+          await tx.insert(pulseReadsTable).values({ messageId: newer[0].id, staffId: readStaff });
+          const query = async (path: string) => {
+            const result = await call<PulseRow[]>(users.employeeA1, path);
+            assert.equal(result.status, 200);
+            return result.data;
+          };
+          const search = `search=${encodeURIComponent(token.toUpperCase())}`;
+          const first = await query(`/pulse?${search}`);
+          const second = await query(`/pulse?${search}&beforeId=${first.at(-1)!.id}`);
+          const ids = [...first, ...second].map(row => row.id);
+          assert.equal(first.length, 30);
+          assert.equal(ids.length, 36);
+          assert.equal(new Set(ids).size, 36);
+          assert.ok(ids.includes(older.id), "old matching title remains searchable beyond first page");
+          assert.ok(!ids.some(id => [wrongOrg.id, wrongStudio.id, wrongAudience.id, retracted.id].includes(id)));
+          const unread = await query(`/pulse?${search}&unreadOnly=true`);
+          assert.ok(!unread.some(row => row.id === newer[0].id));
+          assert.deepEqual((await query(`/pulse?search=${encodeURIComponent("40%_")}`)).map(row => row.id), [literal.id]);
+          assert.equal((await query(`/pulse?search=${encodeURIComponent("40%")}`)).length, 1);
+          assert.equal((await call(users.employeeA1, "/pulse?search=%20%20")).status, 400);
+          assert.equal((await call(users.employeeA1, `/pulse?search=${"a".repeat(121)}`)).status, 400);
+          assert.equal((await call(null, `/pulse?${search}`)).status, 401);
+        });
       } finally {
         await new Promise<void>((resolve, reject) => {
           server.close((error) => error ? reject(error) : resolve());

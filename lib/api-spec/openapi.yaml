@@ -555,9 +555,13 @@ paths:
           in: query
           description: Show only messages not yet read by the signed-in staff member
           schema: { type: boolean }
+        - name: search
+          in: query
+          description: Find visible announcements by title or body, including older messages
+          schema: { type: string, minLength: 1, maxLength: 120 }
       responses:
         "200":
-          description: Up to 30 visible messages matching the filter, with read state, newest first
+          description: Up to 30 visible messages matching the filters, with read state, newest first
           content:
             application/json:
               schema:

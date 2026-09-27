@@ -658,11 +658,14 @@ export const CreateCheckInResponse = zod.object({
  * @summary List Pulse messages visible to the signed-in staff member
  */
 
+export const listPulseQuerySearchMax = 120;
+
 
 
 export const ListPulseQueryParams = zod.object({
   "beforeId": zod.coerce.number().int().min(1).optional().describe('Load messages older than this message ID'),
-  "unreadOnly": zod.coerce.boolean().optional().describe('Show only messages not yet read by the signed-in staff member')
+  "unreadOnly": zod.coerce.boolean().optional().describe('Show only messages not yet read by the signed-in staff member'),
+  "search": zod.coerce.string().min(1).max(listPulseQuerySearchMax).optional().describe('Find visible announcements by title or body, including older messages')
 })
 
 export const ListPulseResponseItem = zod.object({

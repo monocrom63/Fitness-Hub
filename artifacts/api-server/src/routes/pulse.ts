@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, lt, notExists, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, lt, notExists, or } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreatePulseMessageBody,
@@ -108,12 +108,15 @@ router.get("/pulse", async (req, res): Promise<void> => {
   if (!staff) return;
   const params = ListPulseQueryParams.safeParse(req.query);
   // Zod's boolean coercion treats the string "false" as true; accept only literal query values.
-  if (!params.success || (req.query.unreadOnly !== undefined &&
+  if (!params.success || (req.query.search !== undefined && !params.data.search?.trim()) ||
+      (req.query.unreadOnly !== undefined &&
       req.query.unreadOnly !== "true" && req.query.unreadOnly !== "false")) {
     res.status(400).json({ error: "Ungültiger Nachrichtenfilter oder Cursor." });
     return;
   }
 
+  // Escape SQL LIKE wildcards: user input is a literal substring, not a pattern.
+  const searchPattern = params.data.search?.trim().replace(/[\\%_]/g, "\\$&");
   const studioIds = await getAccessibleStudioIds(staff, database);
   const messages = await database
     .select({
@@ -135,6 +138,10 @@ router.get("/pulse", async (req, res): Promise<void> => {
     .where(and(
       visibleMessages(staff, studioIds),
       isNull(pulseMessagesTable.retractedAt),
+      searchPattern ? or(
+        ilike(pulseMessagesTable.title, `%${searchPattern}%`),
+        ilike(pulseMessagesTable.body, `%${searchPattern}%`),
+      ) : undefined,
       params.data.beforeId ? lt(pulseMessagesTable.id, params.data.beforeId) : undefined,
       req.query.unreadOnly === "true" ? notExists(
         database.select({ id: pulseReadsTable.id }).from(pulseReadsTable).where(and(

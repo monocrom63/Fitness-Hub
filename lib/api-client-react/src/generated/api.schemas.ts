@@ -493,5 +493,11 @@ beforeId?: number;
  * Show only messages not yet read by the signed-in staff member
  */
 unreadOnly?: boolean;
+/**
+ * Find visible announcements by title or body, including older messages
+ * @minLength 1
+ * @maxLength 120
+ */
+search?: string;
 };
 
