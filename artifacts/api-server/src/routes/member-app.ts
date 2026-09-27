@@ -4,7 +4,7 @@ import {
   BookMemberCourseParams, BookMemberCourseResponse,
   CancelMemberCourseParams, CancelMemberCourseResponse,
   ClaimMembershipBody, ClaimMembershipResponse,
-  GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesResponse,
+  GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
   ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
   UpdateMemberNotificationSettingsBody, UpdateMemberNotificationSettingsResponse,
@@ -41,9 +41,9 @@ export async function linkedMember(userId: string) {
 
 type LinkedMember = NonNullable<Awaited<ReturnType<typeof linkedMember>>>;
 
-async function memberCourses(member: LinkedMember) {
+async function memberCourses(member: LinkedMember, requestedId?: number) {
   if (!(await isModuleEnabled(member.organizationId, "courses"))) return [];
-  const courses = await db.select({
+  const upcoming = await db.select({
     id: coursesTable.id,
     title: coursesTable.title,
     instructor: coursesTable.instructor,
@@ -58,6 +58,32 @@ async function memberCourses(member: LinkedMember) {
       gte(coursesTable.startsAt, new Date()),
       inArray(coursesTable.status, ["scheduled", "full"]),
     )).orderBy(asc(coursesTable.startsAt)).limit(60);
+  const courses = [...upcoming];
+  if (requestedId !== undefined && !courses.some(course => course.id === requestedId)) {
+    // Older courses are exposed only through a notification belonging to this
+    // member, and only while the course still belongs to their studio.
+    const [notice] = await db.select({ id: memberNotificationsTable.id })
+      .from(memberNotificationsTable)
+      .where(and(
+        eq(memberNotificationsTable.memberId, member.id),
+        eq(memberNotificationsTable.courseId, requestedId),
+      )).limit(1);
+    if (notice) {
+      const [target] = await db.select({
+        id: coursesTable.id,
+        title: coursesTable.title,
+        instructor: coursesTable.instructor,
+        startsAt: coursesTable.startsAt,
+        endsAt: coursesTable.endsAt,
+        capacity: coursesTable.capacity,
+        enrolled: coursesTable.enrolled,
+        room: coursesTable.room,
+      }).from(coursesTable)
+        .where(and(eq(coursesTable.id, requestedId), eq(coursesTable.studioId, member.studioId)))
+        .limit(1);
+      if (target) courses.push(target);
+    }
+  }
   if (!courses.length) return [];
   const ids = courses.map((course) => course.id);
   const allBookings = await db.select({
@@ -170,7 +196,9 @@ router.get("/member/courses", async (req, res): Promise<void> => {
   if (!(await isModuleEnabled(member.organizationId, "courses"))) {
     res.status(404).json({ error: "Kurse sind für diese Organisation nicht verfügbar." }); return;
   }
-  res.json(ListMemberCoursesResponse.parse(await memberCourses(member)));
+  const query = ListMemberCoursesQueryParams.safeParse(req.query);
+  if (!query.success) { res.status(400).json({ error: "Ungültiger Kurs." }); return; }
+  res.json(ListMemberCoursesResponse.parse(await memberCourses(member, query.data.courseId)));
 });
 
 router.post("/member/courses/:id/book", async (req, res): Promise<void> => {

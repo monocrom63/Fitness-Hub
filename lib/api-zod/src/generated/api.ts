@@ -576,8 +576,15 @@ export const MarkMemberNotificationReadResponse = zod.object({
 
 
 /**
- * @summary Upcoming courses and own booking states at the member's studio
+ * @summary Upcoming courses and own booking states, optionally including a course linked from an own notification
  */
+
+
+
+export const ListMemberCoursesQueryParams = zod.object({
+  "courseId": zod.coerce.number().int().min(1).optional().describe('Include a past course only when the signed-in member has a notification for it')
+})
+
 export const ListMemberCoursesResponseItem = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),

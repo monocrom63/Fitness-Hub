@@ -460,10 +460,15 @@ paths:
     get:
       operationId: listMemberCourses
       tags: [member-app]
-      summary: Upcoming courses and own booking states at the member's studio
+      summary: Upcoming courses and own booking states, optionally including a course linked from an own notification
+      parameters:
+        - name: courseId
+          in: query
+          description: Include a past course only when the signed-in member has a notification for it
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
-          description: Accessible upcoming courses
+          description: Accessible upcoming courses and, when requested, the course from an own notification
           content:
             application/json:
               schema:

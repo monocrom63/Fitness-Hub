@@ -127,6 +127,46 @@ test("members can read and acknowledge only their own course notifications", asy
       ((await request(other.clerkUserId, "GET", "/member/notifications")).body as Array<{ id: number }>).map(item => item.id),
       [otherNotice.id],
     );
+
+    // A notification remains actionable as a link after its course has left the
+    // upcoming list, but must not expose unrelated historical courses.
+    await db.update(coursesTable).set({
+      startsAt: new Date(Date.now() - 2 * 86400000),
+      endsAt: new Date(Date.now() - 2 * 86400000 + 3600000),
+    }).where(eq(coursesTable.id, course.id));
+    const [unnotified] = await db.insert(coursesTable).values({
+      studioId: studio.id, title: "Ohne Hinweis", instructor: "Trainer",
+      startsAt: new Date(Date.now() - 3 * 86400000),
+      endsAt: new Date(Date.now() - 3 * 86400000 + 3600000),
+      capacity: 2, room: "B",
+    }).returning();
+    const [foreignStudio] = await db.insert(studiosTable).values({
+      organizationId: organization.id, name: "Other studio", city: "Berlin",
+    }).returning();
+    const [foreignCourse] = await db.insert(coursesTable).values({
+      studioId: foreignStudio.id, title: "Other studio course", instructor: "Trainer",
+      startsAt: new Date(Date.now() - 4 * 86400000),
+      endsAt: new Date(Date.now() - 4 * 86400000 + 3600000),
+      capacity: 2, room: "C",
+    }).returning();
+    const [foreignBooking] = await db.insert(courseBookingsTable).values({
+      courseId: foreignCourse.id, memberId: own.id, status: "confirmed",
+    }).returning();
+    await db.insert(memberNotificationsTable).values({
+      bookingId: foreignBooking.id, memberId: own.id, courseId: foreignCourse.id,
+      title: "Stale notification", body: "Other studio",
+    });
+    const courseIds = async (user: string | null, path: string) => {
+      const result = await request(user, "GET", path);
+      assert.equal(result.status, 200);
+      return (result.body as Array<{ id: number }>).map(item => item.id);
+    };
+    assert.deepEqual(await courseIds(own.clerkUserId, "/member/courses"), []);
+    assert.deepEqual(await courseIds(own.clerkUserId, `/member/courses?courseId=${course.id}`), [course.id]);
+    assert.deepEqual(await courseIds(own.clerkUserId, `/member/courses?courseId=${unnotified.id}`), []);
+    assert.deepEqual(await courseIds(own.clerkUserId, `/member/courses?courseId=${foreignCourse.id}`), []);
+    assert.deepEqual(await courseIds(waiting.clerkUserId, `/member/courses?courseId=${course.id}`), [course.id]);
+    assert.equal((await request(own.clerkUserId, "GET", "/member/courses?courseId=invalid")).status, 400);
   } finally {
     if (server?.listening) {
       await new Promise<void>((resolve, reject) =>

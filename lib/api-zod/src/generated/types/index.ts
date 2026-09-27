@@ -26,6 +26,7 @@ export * from './healthStatus';
 export * from './invitation';
 export * from './invitationInput';
 export * from './invitationStatus';
+export * from './listMemberCoursesParams';
 export * from './listMembersParams';
 export * from './listPulseParams';
 export * from './me';

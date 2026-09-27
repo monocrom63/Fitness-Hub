@@ -31,6 +31,7 @@ import type {
   HealthStatus,
   Invitation,
   InvitationInput,
+  ListMemberCoursesParams,
   ListMembersParams,
   ListPulseParams,
   Me,
@@ -1897,20 +1898,27 @@ export const useMarkMemberNotificationRead = <TError = ErrorType<void>,
       return useMutation(getMarkMemberNotificationReadMutationOptions(options));
     }
 
-export const getListMemberCoursesUrl = () => {
+export const getListMemberCoursesUrl = (params?: ListMemberCoursesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/member/courses`
+  return stringifiedParams.length > 0 ? `/api/member/courses?${stringifiedParams}` : `/api/member/courses`
 }
 
 /**
- * @summary Upcoming courses and own booking states at the member's studio
+ * @summary Upcoming courses and own booking states, optionally including a course linked from an own notification
  */
-export const listMemberCourses = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberCourse[]> => {
+export const listMemberCourses = async (params?: ListMemberCoursesParams, options?: Parameters<typeof customFetch>[1]): Promise<MemberCourse[]> => {
 
-  return customFetch<MemberCourse[]>(getListMemberCoursesUrl(),
+  return customFetch<MemberCourse[]>(getListMemberCoursesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1923,23 +1931,23 @@ export const listMemberCourses = async ( options?: Parameters<typeof customFetch
 
 
 
-export const getListMemberCoursesQueryKey = () => {
+export const getListMemberCoursesQueryKey = (params?: ListMemberCoursesParams,) => {
     return [
-    `/api/member/courses`
+    `/api/member/courses`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListMemberCoursesQueryOptions = <TData = Awaited<ReturnType<typeof listMemberCourses>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListMemberCoursesQueryOptions = <TData = Awaited<ReturnType<typeof listMemberCourses>>, TError = ErrorType<unknown>>(params?: ListMemberCoursesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListMemberCoursesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListMemberCoursesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberCourses>>> = ({ signal }) => listMemberCourses({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberCourses>>> = ({ signal }) => listMemberCourses(params, { signal, ...requestOptions });
 
 
 
@@ -1953,15 +1961,15 @@ export type ListMemberCoursesQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Upcoming courses and own booking states at the member's studio
+ * @summary Upcoming courses and own booking states, optionally including a course linked from an own notification
  */
 
 export function useListMemberCourses<TData = Awaited<ReturnType<typeof listMemberCourses>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListMemberCoursesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListMemberCoursesQueryOptions(options)
+  const queryOptions = getListMemberCoursesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

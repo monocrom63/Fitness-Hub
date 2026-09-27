@@ -142,6 +142,7 @@ function CourseRow({ course, targeted = false }: { course: MemberCourse; targete
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const booked = course.bookingStatus === 'confirmed' || course.bookingStatus === 'waitlisted';
+  const isPast = new Date(course.startsAt).getTime() <= Date.now();
   const reserve = async () => {
     setError(''); setMessage('');
     try {
@@ -158,19 +159,19 @@ function CourseRow({ course, targeted = false }: { course: MemberCourse; targete
     <div className="course-day"><strong>{dayNumber(course.startsAt)}</strong><span>{monthLabel(course.startsAt)}</span></div>
     <div className="course-detail"><div className="eyebrow">{new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(course.startsAt))} · {timeLabel(course.startsAt)} – {timeLabel(course.endsAt)} Uhr</div><h3 data-testid={`text-course-title-${course.id}`}>{course.title}</h3><p>mit {course.instructor} · {course.studioName}</p></div>
     <div className="course-meta"><p><MapPin /> {course.room}</p><p><Users /> {course.enrolled} / {course.capacity} Plätze belegt</p></div>
-    <div className="course-action"><StatusChip course={course} />{booked ? <button type="button" className="button button-quiet" onClick={() => setConfirmCancel(true)} disabled={cancel.isPending} data-testid={`button-cancel-course-${course.id}`}>Stornieren</button> : <button type="button" className="button button-primary" onClick={() => { void reserve(); }} disabled={book.isPending} data-testid={`button-book-course-${course.id}`}>{book.isPending ? 'Wird gebucht …' : course.enrolled >= course.capacity ? 'Warteliste' : 'Platz buchen'} <ArrowRight size={14} /></button>}</div>
+    <div className="course-action">{isPast ? <span className="status-chip none" data-testid={`status-course-past-${course.id}`}>Vergangener Kurs</span> : <><StatusChip course={course} />{booked ? <button type="button" className="button button-quiet" onClick={() => setConfirmCancel(true)} disabled={cancel.isPending} data-testid={`button-cancel-course-${course.id}`}>Stornieren</button> : <button type="button" className="button button-primary" onClick={() => { void reserve(); }} disabled={book.isPending} data-testid={`button-book-course-${course.id}`}>{book.isPending ? 'Wird gebucht …' : course.enrolled >= course.capacity ? 'Warteliste' : 'Platz buchen'} <ArrowRight size={14} /></button>}</>}</div>
     {(error || message) && <div className={error ? 'form-error' : 'course-feedback'} role="status" data-testid={`status-course-action-${course.id}`}>{error || message}</div>}
     {confirmCancel && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancel.isPending) setConfirmCancel(false); }}><div className="dialog-card" role="alertdialog" aria-modal="true" aria-labelledby={`dialog-title-${course.id}`} aria-describedby={`dialog-description-${course.id}`}><button className="dialog-close" type="button" onClick={() => setConfirmCancel(false)} disabled={cancel.isPending} aria-label="Schließen" data-testid={`button-close-cancel-${course.id}`}><X size={18} /></button><div className="empty-icon"><CalendarDays size={22} /></div><h3 id={`dialog-title-${course.id}`}>Platz freigeben?</h3><p id={`dialog-description-${course.id}`}>Du möchtest deine {course.bookingStatus === 'waitlisted' ? 'Wartelistenposition' : 'Buchung'} für „{course.title}“ am {dateLabel(course.startsAt)} stornieren.</p>{error && <div className="form-error" role="alert">{error}</div>}<div className="dialog-actions"><button type="button" className="button button-quiet" onClick={() => setConfirmCancel(false)} disabled={cancel.isPending} data-testid={`button-keep-course-${course.id}`}>Platz behalten</button><button type="button" className="button button-danger" onClick={() => { void remove(); }} disabled={cancel.isPending} data-testid={`button-confirm-cancel-${course.id}`}>{cancel.isPending ? 'Wird storniert …' : 'Ja, stornieren'}</button></div></div></div>}
   </article>;
 }
 function CoursesPage() {
-  const courses = useListMemberCourses();
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const requestedId = params.get('courseId');
   const parsedId = requestedId && /^[1-9]\d*$/.test(requestedId) ? Number(requestedId) : null;
   const targetId = parsedId !== null && Number.isSafeInteger(parsedId) ? parsedId : null;
+  const courses = useListMemberCourses(targetId !== null ? { courseId: targetId } : undefined);
   const filter = params.get('filter') === 'mine' ? 'mine' : 'all';
   const setFilter = (next: 'all' | 'mine') => {
     const nextParams = new URLSearchParams(search);
@@ -189,9 +190,9 @@ function CoursesPage() {
       course.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }, [targetId, filter, targetVisible, courses.data]);
-  return <div className="page"><PageHeader eyebrow="Kurse" title="Finde deinen Moment." description="Alle kommenden Kurse in deinem Studio. Such dir aus, was zu deinem Tag passt." />
+  return <div className="page"><PageHeader eyebrow="Kurse" title="Finde deinen Moment." description="Alle kommenden Kurse in deinem Studio. Über deine Hinweise kannst du auch vergangene Kurse wiederfinden." />
     {courses.isLoading ? <div className="skeleton-page"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> : courses.isError ? <ErrorView onRetry={() => { void courses.refetch(); }} /> : <>
-      {targetId !== null && !targetExists && <div className="course-feedback" role="status" data-testid="status-course-unavailable">Dieser Kurs ist nicht mehr im aktuellen Kursplan verfügbar.</div>}
+      {targetId !== null && !targetExists && <div className="course-feedback" role="status" data-testid="status-course-unavailable">Dieser Kurs ist für dich nicht verfügbar.</div>}
       {targetExists && !targetVisible && <div className="course-feedback" role="status" data-testid="status-course-filtered">Dieser Kurs ist nicht unter „Meine Plätze“ zu finden. <button type="button" className="text-link" onClick={() => setFilter('all')} data-testid="button-show-target-course">Alle Kurse ansehen</button></div>}
       <div className="course-toolbar"><div className="filter-group" role="group" aria-label="Kurse filtern"><button type="button" className={filter === 'all' ? 'selected' : ''} onClick={() => setFilter('all')} data-testid="button-filter-all">Alle Kurse</button><button type="button" className={filter === 'mine' ? 'selected' : ''} onClick={() => setFilter('mine')} data-testid="button-filter-mine">Meine Plätze</button></div><span data-testid="text-course-count">{visible.length} {visible.length === 1 ? 'Kurs' : 'Kurse'}</span></div>
       {visible.length ? <div className="course-list">{visible.map(course => <CourseRow key={course.id} course={course} targeted={course.id === targetId} />)}</div> : <EmptyView icon={<CalendarDays size={22} />} title={filter === 'mine' ? 'Noch kein Platz gebucht.' : 'Gerade keine Kurse geplant.'} description={filter === 'mine' ? 'Schau dich im Kursplan um und sichere dir deinen ersten Platz.' : 'Dein Studio hat im Moment keine kommenden Kurse eingetragen.'} action={filter === 'mine' ? <button type="button" className="button button-secondary" onClick={() => setFilter('all')} data-testid="button-show-all-courses">Alle Kurse ansehen <ArrowRight size={15} /></button> : undefined} />}

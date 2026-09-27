@@ -509,6 +509,14 @@ status?: MemberStatus;
 studioId?: number;
 };
 
+export type ListMemberCoursesParams = {
+/**
+ * Include a past course only when the signed-in member has a notification for it
+ * @minimum 1
+ */
+courseId?: number;
+};
+
 export type ListPulseParams = {
 /**
  * Load messages older than this message ID
