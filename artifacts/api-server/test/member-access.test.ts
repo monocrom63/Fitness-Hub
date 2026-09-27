@@ -167,6 +167,31 @@ test("member records remain inside the caller's studio and organization", async 
       assert.equal(unchanged.phone, "333");
     });
 
+    await t.test("a stale cross-organization staff assignment cannot create a member", async () => {
+      const email = `stale-assignment-${run}@example.com`;
+      const input = { ...draft(studioB.id), email };
+      const foreignStudio = await api(mismatchedManager.clerkUserId, "POST", "/members", input);
+      assert.equal(foreignStudio.status, 403);
+      assert.equal(JSON.stringify(foreignStudio.body).includes(email), false);
+      // Merely switching the submitted studio to the manager's original organization
+      // must not grant access either: the assignment still points to the foreign studio.
+      const ownOrganization = await api(mismatchedManager.clerkUserId, "POST", "/members", {
+        ...input, studioId: studioA1.id,
+      });
+      assert.equal(ownOrganization.status, 403);
+      const rows = await db.select({ id: membersTable.id, studioId: membersTable.studioId })
+        .from(membersTable).where(eq(membersTable.email, email));
+      assert.deepEqual(rows, []);
+
+      const legitimate = await api<MemberView>(managerB.clerkUserId, "POST", "/members", input);
+      assert.equal(legitimate.status, 201);
+      assert.equal(legitimate.body.studioId, studioB.id);
+      assert.deepEqual(
+        await db.select({ studioId: membersTable.studioId }).from(membersTable).where(eq(membersTable.email, email)),
+        [{ studioId: studioB.id }],
+      );
+    });
+
     await t.test("a foreign member ID cannot be edited or returned", async () => {
       for (const [user, id] of [
         [employeeA1.clerkUserId, memberA2.id],
