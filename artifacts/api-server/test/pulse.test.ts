@@ -9,6 +9,7 @@ import {
   organizationsTable,
   pulseMessagesTable,
   pulseReadsTable,
+  roomClosuresTable,
   staffTable,
   studiosTable,
   pool,
@@ -81,12 +82,19 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal(result.body.audience, audience);
       assert.equal(result.body.isRead, true);
       assert.equal(result.body.readCount, 1);
+      assert.equal(result.body.roomClosureId, null);
       return result.body.id as number;
     };
     const list = async (staff: typeof district) => {
       const result = await api(user(staff), "GET", "/pulse");
       assert.equal(result.status, 200, JSON.stringify(result.body));
-      return result.body as Array<{ id: number; isRead: boolean; readCount: number; canManage: boolean }>;
+      return result.body as Array<{
+        id: number;
+        isRead: boolean;
+        readCount: number;
+        canManage: boolean;
+        roomClosureId: number | null;
+      }>;
     };
 
     await t.test("unauthenticated and employee publishing is denied", async () => {
@@ -130,6 +138,41 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.ok((await list(managerA)).some((m) => m.id === ownEmployees));
       assert.ok((await list(employeeA)).some((m) => m.id === ownEmployees));
       assert.ok(!(await list(managerB)).some((m) => m.id === ownEmployees));
+    });
+
+    await t.test("room closure alerts expose their closure link and corrections preserve it", async () => {
+      const [closure] = await db.insert(roomClosuresTable).values({
+        studioId: studioA.id,
+        roomName: "Studio A Room",
+        fromDate: "2030-05-10",
+        toDate: "2030-05-10",
+        reason: "Maintenance",
+        responsible: "Facilities",
+        createdByStaffId: managerA.id,
+      }).returning();
+      const [alert] = await db.insert(pulseMessagesTable).values({
+        organizationId: orgA.id,
+        studioId: studioA.id,
+        roomClosureId: closure.id,
+        authorStaffId: managerA.id,
+        title: "Room closure alert",
+        body: "Room unavailable.",
+        priority: "important",
+        audience: "managers",
+      }).returning();
+      const managerAlert = (await list(managerA)).find(({ id }) => id === alert.id);
+      assert.equal(managerAlert?.roomClosureId, closure.id);
+      const ordinaryNotice = (await list(managerA)).find(({ id }) => id === global);
+      assert.equal(ordinaryNotice?.roomClosureId, null);
+
+      const corrected = await api(user(managerA), "PATCH", `/pulse/${alert.id}`, {
+        title: "Updated room closure alert",
+        body: "Room remains unavailable.",
+        priority: "urgent",
+        revision: 1,
+      });
+      assert.equal(corrected.status, 200);
+      assert.equal(corrected.body.roomClosureId, closure.id);
     });
 
     await t.test("read endpoints reject invisible messages without creating receipts", async () => {

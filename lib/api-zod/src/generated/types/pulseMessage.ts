@@ -20,6 +20,8 @@ export interface PulseMessage {
   studioId: number | null;
   /** @nullable */
   studioName: string | null;
+  /** @nullable */
+  roomClosureId: number | null;
   authorName: string;
   createdAt: Date;
   /** @nullable */

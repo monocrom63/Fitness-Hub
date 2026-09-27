@@ -1,4 +1,5 @@
 import {
+  date,
   integer,
   pgTable,
   serial,
@@ -135,6 +136,35 @@ export const coursesTable = pgTable("fiudia_courses", {
     .defaultNow(),
 });
 
+export const roomsTable = pgTable(
+  "fiudia_rooms",
+  {
+    id: serial("id").primaryKey(),
+    studioId: integer("studio_id")
+      .notNull()
+      .references(() => studiosTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("fiudia_room_studio_name").on(table.studioId, table.name)],
+);
+
+export const roomClosuresTable = pgTable("fiudia_room_closures", {
+  id: serial("id").primaryKey(),
+  studioId: integer("studio_id")
+    .notNull()
+    .references(() => studiosTable.id, { onDelete: "cascade" }),
+  roomName: text("room_name").notNull(),
+  fromDate: date("from_date", { mode: "string" }).notNull(),
+  toDate: date("to_date", { mode: "string" }).notNull(),
+  reason: text("reason").notNull(),
+  responsible: text("responsible").notNull(),
+  createdByStaffId: integer("created_by_staff_id")
+    .notNull()
+    .references(() => staffTable.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const courseBookingsTable = pgTable(
   "fiudia_course_bookings",
   {
@@ -169,6 +199,56 @@ export const memberNotificationsTable = pgTable("fiudia_member_notifications", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const courseClosureResolutionsTable = pgTable(
+  "fiudia_course_closure_resolutions",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => coursesTable.id, { onDelete: "cascade" }),
+    closureId: integer("closure_id")
+      .notNull()
+      .references(() => roomClosuresTable.id, { onDelete: "restrict" }),
+    action: text("action").notNull(),
+    targetRoom: text("target_room"),
+    channel: text("channel").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("fiudia_course_closure_resolution_course_closure").on(table.courseId, table.closureId),
+    unique("fiudia_course_closure_resolution_idempotency").on(table.idempotencyKey),
+  ],
+);
+
+export const closureEmailDeliveriesTable = pgTable(
+  "fiudia_closure_email_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    resolutionId: integer("resolution_id")
+      .notNull()
+      .references(() => courseClosureResolutionsTable.id, { onDelete: "restrict" }),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => courseBookingsTable.id, { onDelete: "cascade" }),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => membersTable.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    status: text("status").notNull().default("pending"),
+    error: text("error"),
+    providerId: text("provider_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    claimToken: text("claim_token"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("fiudia_closure_email_resolution_booking").on(table.resolutionId, table.bookingId),
+  ],
+);
+
 export const checkInsTable = pgTable("fiudia_check_ins", {
   id: serial("id").primaryKey(),
   memberId: integer("member_id")
@@ -192,6 +272,9 @@ export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
     .references(() => organizationsTable.id, { onDelete: "cascade" }),
   studioId: integer("studio_id").references(() => studiosTable.id, {
     onDelete: "cascade",
+  }),
+  roomClosureId: integer("room_closure_id").references(() => roomClosuresTable.id, {
+    onDelete: "set null",
   }),
   authorStaffId: integer("author_staff_id")
     .notNull()

@@ -276,6 +276,249 @@ export const CreateCourseResponse = zod.object({
 
 
 /**
+ * @summary List manager-visible rooms in a studio
+ */
+export const ListStudioRoomsParams = zod.object({
+  "studioId": zod.coerce.number().int()
+})
+
+export const ListStudioRoomsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "studioId": zod.number().int(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListStudioRoomsResponse = zod.array(ListStudioRoomsResponseItem)
+
+
+/**
+ * @summary Add a room asset to a studio
+ */
+export const CreateStudioRoomParams = zod.object({
+  "studioId": zod.coerce.number().int()
+})
+
+export const createStudioRoomBodyNameMax = 80;
+
+
+
+export const CreateStudioRoomBody = zod.object({
+  "name": zod.string().min(1).max(createStudioRoomBodyNameMax)
+})
+
+export const CreateStudioRoomResponse = zod.object({
+  "id": zod.number().int(),
+  "studioId": zod.number().int(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List room closures in a studio
+ */
+export const ListStudioRoomClosuresParams = zod.object({
+  "studioId": zod.coerce.number().int()
+})
+
+export const ListStudioRoomClosuresResponseItem = zod.object({
+  "id": zod.number().int(),
+  "studioId": zod.number().int(),
+  "roomName": zod.string(),
+  "fromDate": zod.coerce.date(),
+  "toDate": zod.coerce.date(),
+  "reason": zod.string(),
+  "responsible": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListStudioRoomClosuresResponse = zod.array(ListStudioRoomClosuresResponseItem)
+
+
+/**
+ * @summary Close a room for an inclusive range of local calendar dates
+ */
+export const CreateStudioRoomClosureParams = zod.object({
+  "studioId": zod.coerce.number().int()
+})
+
+export const createStudioRoomClosureBodyRoomNameMax = 80;
+
+export const createStudioRoomClosureBodyReasonMax = 500;
+
+export const createStudioRoomClosureBodyResponsibleMax = 160;
+
+
+
+export const CreateStudioRoomClosureBody = zod.object({
+  "roomName": zod.string().min(1).max(createStudioRoomClosureBodyRoomNameMax),
+  "fromDate": zod.coerce.date(),
+  "toDate": zod.coerce.date(),
+  "reason": zod.string().min(1).max(createStudioRoomClosureBodyReasonMax),
+  "responsible": zod.string().min(1).max(createStudioRoomClosureBodyResponsibleMax)
+})
+
+export const CreateStudioRoomClosureResponse = zod.object({
+  "id": zod.number().int(),
+  "studioId": zod.number().int(),
+  "roomName": zod.string(),
+  "fromDate": zod.coerce.date(),
+  "toDate": zod.coerce.date(),
+  "reason": zod.string(),
+  "responsible": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a room closure
+ */
+export const DeleteStudioRoomClosureParams = zod.object({
+  "studioId": zod.coerce.number().int(),
+  "closureId": zod.coerce.number().int()
+})
+
+export const DeleteStudioRoomClosureResponse = zod.void()
+
+
+/**
+ * @summary List non-cancelled courses intersecting a closure
+ */
+export const ListClosureAffectedCoursesParams = zod.object({
+  "studioId": zod.coerce.number().int(),
+  "closureId": zod.coerce.number().int()
+})
+
+export const ListClosureAffectedCoursesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "status": zod.enum(['scheduled', 'full', 'cancelled']),
+  "alternativeRooms": zod.array(zod.string()),
+  "resolved": zod.boolean()
+})
+export const ListClosureAffectedCoursesResponse = zod.array(ListClosureAffectedCoursesResponseItem)
+
+
+/**
+ * @summary List persisted course resolutions and email delivery outcomes for a closure
+ */
+export const ListClosureResolutionsParams = zod.object({
+  "studioId": zod.coerce.number().int(),
+  "closureId": zod.coerce.number().int()
+})
+
+export const ListClosureResolutionsResponseItem = zod.object({
+  "resolutionId": zod.number().int(),
+  "courseId": zod.number().int(),
+  "courseTitle": zod.string(),
+  "action": zod.enum(['relocate', 'cancel']),
+  "room": zod.string().nullable(),
+  "channel": zod.enum(['in_app', 'email']),
+  "deliveryCounts": zod.object({
+  "total": zod.number().int(),
+  "pending": zod.number().int(),
+  "sending": zod.number().int(),
+  "sent": zod.number().int(),
+  "failed": zod.number().int()
+}),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "memberId": zod.number().int(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "attemptedAt": zod.coerce.date().nullable()
+}))
+})
+export const ListClosureResolutionsResponse = zod.array(ListClosureResolutionsResponseItem)
+
+
+/**
+ * @summary Relocate or cancel an affected course and notify booked members
+ */
+export const ResolveCourseRoomClosureParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const resolveCourseRoomClosureBodyRoomMax = 80;
+
+export const resolveCourseRoomClosureBodyIdempotencyKeyMin = 8;
+export const resolveCourseRoomClosureBodyIdempotencyKeyMax = 128;
+
+
+
+export const ResolveCourseRoomClosureBody = zod.object({
+  "closureId": zod.number().int(),
+  "action": zod.enum(['relocate', 'cancel']),
+  "room": zod.string().min(1).max(resolveCourseRoomClosureBodyRoomMax).optional(),
+  "channel": zod.enum(['in_app', 'email', 'push', 'whatsapp']),
+  "idempotencyKey": zod.string().min(resolveCourseRoomClosureBodyIdempotencyKeyMin).max(resolveCourseRoomClosureBodyIdempotencyKeyMax)
+})
+
+export const ResolveCourseRoomClosureResponse = zod.object({
+  "resolutionId": zod.number().int(),
+  "courseId": zod.number().int(),
+  "action": zod.enum(['relocate', 'cancel']),
+  "room": zod.string().nullable(),
+  "channel": zod.enum(['in_app', 'email']),
+  "notifications": zod.array(zod.object({
+  "memberId": zod.number().int(),
+  "channel": zod.enum(['in_app', 'email']),
+  "status": zod.enum(['created', 'sent', 'failed', 'pending', 'sending']),
+  "detail": zod.string().nullable()
+}))
+})
+
+
+/**
+ * @summary Inspect persisted per-member email delivery states
+ */
+export const GetClosureEmailDeliveriesParams = zod.object({
+  "resolutionId": zod.coerce.number().int()
+})
+
+export const GetClosureEmailDeliveriesResponse = zod.object({
+  "resolutionId": zod.number().int(),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "memberId": zod.number().int(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "attemptedAt": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
+ * Claims eligible deliveries atomically; uses a stable provider idempotency key and returns per-member states. No request body is required.
+ * @summary Retry failed or recover expired in-progress email deliveries
+ */
+export const RetryClosureEmailDeliveriesParams = zod.object({
+  "resolutionId": zod.coerce.number().int()
+})
+
+export const RetryClosureEmailDeliveriesResponse = zod.object({
+  "resolutionId": zod.number().int(),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "memberId": zod.number().int(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "attemptedAt": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
  * @summary List confirmed and waitlisted members for an accessible course
  */
 export const ListCourseBookingsParams = zod.object({
@@ -687,6 +930,7 @@ export const ListPulseResponseItem = zod.object({
   "revision": zod.number().int().min(1),
   "studioId": zod.number().int().nullable(),
   "studioName": zod.string().nullable(),
+  "roomClosureId": zod.number().int().nullable(),
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
   "editedAt": zod.coerce.date().nullable(),
@@ -727,6 +971,7 @@ export const CreatePulseMessageResponse = zod.object({
   "revision": zod.number().int().min(1),
   "studioId": zod.number().int().nullable(),
   "studioName": zod.string().nullable(),
+  "roomClosureId": zod.number().int().nullable(),
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
   "editedAt": zod.coerce.date().nullable(),
@@ -771,6 +1016,7 @@ export const UpdatePulseMessageResponse = zod.object({
   "revision": zod.number().int().min(1),
   "studioId": zod.number().int().nullable(),
   "studioName": zod.string().nullable(),
+  "roomClosureId": zod.number().int().nullable(),
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
   "editedAt": zod.coerce.date().nullable(),

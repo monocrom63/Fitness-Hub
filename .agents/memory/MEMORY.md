@@ -8,3 +8,4 @@
 - [Post-merge workflow ports](post-merge-workflow-ports.md) — a failed managed workflow after merge may be a duplicate listener, even while the old service still answers requests.
 - [Pulse corrections](pulse-corrections.md) — corrections reset prior read receipts; retractions hide messages but retain their audit record.
 - [Artifact CLI builds](artifact-cli-builds.md) — direct shell builds lack artifact-scoped workflow variables; supply the artifact base path and port explicitly.
+- [Course-change delivery](course-change-delivery.md) — keep notification work durable across closure deletion, page reloads, and provider failures.

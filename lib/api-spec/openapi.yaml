@@ -231,6 +231,206 @@ paths:
           description: Sign-in required
         "403":
           description: Insufficient role or studio access
+        "409":
+          description: The room is closed or already occupied during the requested course interval
+  /studios/{studioId}/rooms:
+    parameters:
+      - name: studioId
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listStudioRooms
+      tags: [portal]
+      summary: List manager-visible rooms in a studio
+      responses:
+        "200":
+          description: Room assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RoomAsset" }
+        "403": { description: Manager access required }
+    post:
+      operationId: createStudioRoom
+      tags: [portal]
+      summary: Add a room asset to a studio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoomInput" }
+      responses:
+        "201":
+          description: Room created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoomAsset" }
+        "400": { description: Invalid room name }
+        "403": { description: Manager access required }
+        "409": { description: Room already exists }
+  /studios/{studioId}/closures:
+    parameters:
+      - name: studioId
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listStudioRoomClosures
+      tags: [portal]
+      summary: List room closures in a studio
+      responses:
+        "200":
+          description: Closures
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/RoomClosure" }
+        "403": { description: Manager access required }
+    post:
+      operationId: createStudioRoomClosure
+      tags: [portal]
+      summary: Close a room for an inclusive range of local calendar dates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoomClosureInput" }
+      responses:
+        "201":
+          description: Closure created, with managers-only Pulse alert
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoomClosure" }
+        "400": { description: Invalid date range or closure details }
+        "403": { description: Manager access required }
+        "404": { description: Room asset not found in this studio }
+        "409": { description: Closure overlaps an existing closure for this room }
+  /studios/{studioId}/closures/{closureId}:
+    parameters:
+      - name: studioId
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: closureId
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteStudioRoomClosure
+      tags: [portal]
+      summary: Delete a room closure
+      responses:
+        "204": { description: Closure deleted }
+        "403": { description: Manager access required }
+        "404": { description: Closure not found }
+        "409": { description: Cannot delete a closure with course resolutions or delivery history }
+  /studios/{studioId}/closures/{closureId}/courses:
+    get:
+      operationId: listClosureAffectedCourses
+      tags: [portal]
+      summary: List non-cancelled courses intersecting a closure
+      parameters:
+        - name: studioId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: closureId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Affected courses and alternative rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ClosureAffectedCourse" }
+        "403": { description: Manager access required }
+        "404": { description: Closure not found }
+  /studios/{studioId}/closures/{closureId}/resolutions:
+    get:
+      operationId: listClosureResolutions
+      tags: [portal]
+      summary: List persisted course resolutions and email delivery outcomes for a closure
+      parameters:
+        - name: studioId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: closureId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Resolutions and durable per-recipient notification states
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ClosureCourseResolution" }
+        "403": { description: Manager access required }
+        "404": { description: Closure not found }
+  /courses/{id}/closure-resolution:
+    post:
+      operationId: resolveCourseRoomClosure
+      tags: [portal]
+      summary: Relocate or cancel an affected course and notify booked members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourseClosureResolutionInput" }
+      responses:
+        "200":
+          description: Resolution and notification delivery outcomes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseClosureResolution" }
+        "400": { description: Invalid resolution request }
+        "403": { description: Manager access required }
+        "404": { description: Course not found }
+        "409": { description: "Unsupported channel, stale closure, or conflict" }
+  /closure-resolutions/{resolutionId}/email-deliveries:
+    parameters:
+      - name: resolutionId
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getClosureEmailDeliveries
+      tags: [portal]
+      summary: Inspect persisted per-member email delivery states
+      responses:
+        "200":
+          description: Current email delivery states
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClosureEmailDeliveryReport" }
+        "403": { description: Manager access required }
+        "404": { description: Resolution not found }
+    post:
+      operationId: retryClosureEmailDeliveries
+      tags: [portal]
+      summary: Retry failed or recover expired in-progress email deliveries
+      description: Claims eligible deliveries atomically; uses a stable provider idempotency key and returns per-member states. No request body is required.
+      responses:
+        "200":
+          description: Delivery states after retry attempts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClosureEmailDeliveryReport" }
+        "403": { description: Manager access required }
+        "404": { description: Resolution not found }
   /courses/{id}/bookings:
     get:
       operationId: listCourseBookings
@@ -889,6 +1089,129 @@ components:
         endsAt: { type: string, format: date-time }
         capacity: { type: integer, minimum: 1, maximum: 200 }
         room: { type: string, minLength: 1, maxLength: 80 }
+    RoomAsset:
+      type: object
+      required: [id, studioId, name, createdAt]
+      properties:
+        id: { type: integer }
+        studioId: { type: integer }
+        name: { type: string }
+        createdAt: { type: string, format: date-time }
+    RoomInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+    RoomClosure:
+      type: object
+      required: [id, studioId, roomName, fromDate, toDate, reason, responsible, createdAt]
+      properties:
+        id: { type: integer }
+        studioId: { type: integer }
+        roomName: { type: string }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        reason: { type: string }
+        responsible: { type: string }
+        createdAt: { type: string, format: date-time }
+    RoomClosureInput:
+      type: object
+      required: [roomName, fromDate, toDate, reason, responsible]
+      properties:
+        roomName: { type: string, minLength: 1, maxLength: 80 }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        responsible: { type: string, minLength: 1, maxLength: 160 }
+    ClosureAffectedCourse:
+      type: object
+      required: [id, title, instructor, studioId, studioName, startsAt, endsAt, capacity, enrolled, room, status, alternativeRooms, resolved]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        instructor: { type: string }
+        studioId: { type: integer }
+        studioName: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer }
+        enrolled: { type: integer }
+        room: { type: string }
+        status: { type: string, enum: [scheduled, full, cancelled] }
+        alternativeRooms:
+          type: array
+          items: { type: string }
+        resolved: { type: boolean }
+    CourseClosureResolutionInput:
+      type: object
+      required: [closureId, action, channel, idempotencyKey]
+      properties:
+        closureId: { type: integer }
+        action: { type: string, enum: [relocate, cancel] }
+        room: { type: string, minLength: 1, maxLength: 80 }
+        channel: { type: string, enum: [in_app, email, push, whatsapp] }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 128 }
+    ClosureNotificationOutcome:
+      type: object
+      required: [memberId, channel, status, detail]
+      properties:
+        memberId: { type: integer }
+        channel: { type: string, enum: [in_app, email] }
+        status: { type: string, enum: [created, sent, failed, pending, sending] }
+        detail: { type: ["string", "null"] }
+    CourseClosureResolution:
+      type: object
+      required: [resolutionId, courseId, action, room, channel, notifications]
+      properties:
+        resolutionId: { type: integer }
+        courseId: { type: integer }
+        action: { type: string, enum: [relocate, cancel] }
+        room: { type: ["string", "null"] }
+        channel: { type: string, enum: [in_app, email] }
+        notifications:
+          type: array
+          items: { $ref: "#/components/schemas/ClosureNotificationOutcome" }
+    ClosureEmailDelivery:
+      type: object
+      required: [id, memberId, status, attemptCount, error, attemptedAt]
+      properties:
+        id: { type: integer }
+        memberId: { type: integer }
+        status: { type: string, enum: [pending, sending, sent, failed] }
+        attemptCount: { type: integer }
+        error: { type: ["string", "null"] }
+        attemptedAt: { type: ["string", "null"], format: date-time }
+    ClosureEmailDeliveryReport:
+      type: object
+      required: [resolutionId, deliveries]
+      properties:
+        resolutionId: { type: integer }
+        deliveries:
+          type: array
+          items: { $ref: "#/components/schemas/ClosureEmailDelivery" }
+    ClosureEmailDeliveryCounts:
+      type: object
+      required: [total, pending, sending, sent, failed]
+      properties:
+        total: { type: integer }
+        pending: { type: integer }
+        sending: { type: integer }
+        sent: { type: integer }
+        failed: { type: integer }
+    ClosureCourseResolution:
+      type: object
+      required: [resolutionId, courseId, courseTitle, action, room, channel, deliveryCounts, deliveries]
+      properties:
+        resolutionId: { type: integer }
+        courseId: { type: integer }
+        courseTitle: { type: string }
+        action: { type: string, enum: [relocate, cancel] }
+        room: { type: ["string", "null"] }
+        channel: { type: string, enum: [in_app, email] }
+        deliveryCounts: { $ref: "#/components/schemas/ClosureEmailDeliveryCounts" }
+        deliveries:
+          type: array
+          items: { $ref: "#/components/schemas/ClosureEmailDelivery" }
     StaffBookingInput:
       type: object
       required: [memberId]
@@ -1050,7 +1373,7 @@ components:
     PulseMessage:
       type: object
       required:
-        [id, title, body, priority, audience, revision, studioId, studioName, authorName, createdAt, editedAt, isRead, readCount, canManage]
+        [id, title, body, priority, audience, revision, studioId, studioName, roomClosureId, authorName, createdAt, editedAt, isRead, readCount, canManage]
       properties:
         id: { type: integer }
         title: { type: string }
@@ -1060,6 +1383,7 @@ components:
         revision: { type: integer, minimum: 1 }
         studioId: { type: ["integer", "null"] }
         studioName: { type: ["string", "null"] }
+        roomClosureId: { type: ["integer", "null"] }
         authorName: { type: string }
         createdAt: { type: string, format: date-time }
         editedAt: { type: ["string", "null"], format: date-time }

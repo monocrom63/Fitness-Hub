@@ -215,6 +215,226 @@ export interface CourseInput {
   room: string;
 }
 
+export interface RoomAsset {
+  id: number;
+  studioId: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface RoomInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+}
+
+export interface RoomClosure {
+  id: number;
+  studioId: number;
+  roomName: string;
+  fromDate: string;
+  toDate: string;
+  reason: string;
+  responsible: string;
+  createdAt: string;
+}
+
+export interface RoomClosureInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  roomName: string;
+  fromDate: string;
+  toDate: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  reason: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  responsible: string;
+}
+
+export type ClosureAffectedCourseStatus = typeof ClosureAffectedCourseStatus[keyof typeof ClosureAffectedCourseStatus];
+
+
+export const ClosureAffectedCourseStatus = {
+  scheduled: 'scheduled',
+  full: 'full',
+  cancelled: 'cancelled',
+} as const;
+
+export interface ClosureAffectedCourse {
+  id: number;
+  title: string;
+  instructor: string;
+  studioId: number;
+  studioName: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  enrolled: number;
+  room: string;
+  status: ClosureAffectedCourseStatus;
+  alternativeRooms: string[];
+  resolved: boolean;
+}
+
+export type CourseClosureResolutionInputAction = typeof CourseClosureResolutionInputAction[keyof typeof CourseClosureResolutionInputAction];
+
+
+export const CourseClosureResolutionInputAction = {
+  relocate: 'relocate',
+  cancel: 'cancel',
+} as const;
+
+export type CourseClosureResolutionInputChannel = typeof CourseClosureResolutionInputChannel[keyof typeof CourseClosureResolutionInputChannel];
+
+
+export const CourseClosureResolutionInputChannel = {
+  in_app: 'in_app',
+  email: 'email',
+  push: 'push',
+  whatsapp: 'whatsapp',
+} as const;
+
+export interface CourseClosureResolutionInput {
+  closureId: number;
+  action: CourseClosureResolutionInputAction;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  room?: string;
+  channel: CourseClosureResolutionInputChannel;
+  /**
+     * @minLength 8
+     * @maxLength 128
+     */
+  idempotencyKey: string;
+}
+
+export type ClosureNotificationOutcomeChannel = typeof ClosureNotificationOutcomeChannel[keyof typeof ClosureNotificationOutcomeChannel];
+
+
+export const ClosureNotificationOutcomeChannel = {
+  in_app: 'in_app',
+  email: 'email',
+} as const;
+
+export type ClosureNotificationOutcomeStatus = typeof ClosureNotificationOutcomeStatus[keyof typeof ClosureNotificationOutcomeStatus];
+
+
+export const ClosureNotificationOutcomeStatus = {
+  created: 'created',
+  sent: 'sent',
+  failed: 'failed',
+  pending: 'pending',
+  sending: 'sending',
+} as const;
+
+export interface ClosureNotificationOutcome {
+  memberId: number;
+  channel: ClosureNotificationOutcomeChannel;
+  status: ClosureNotificationOutcomeStatus;
+  /** @nullable */
+  detail: string | null;
+}
+
+export type CourseClosureResolutionAction = typeof CourseClosureResolutionAction[keyof typeof CourseClosureResolutionAction];
+
+
+export const CourseClosureResolutionAction = {
+  relocate: 'relocate',
+  cancel: 'cancel',
+} as const;
+
+export type CourseClosureResolutionChannel = typeof CourseClosureResolutionChannel[keyof typeof CourseClosureResolutionChannel];
+
+
+export const CourseClosureResolutionChannel = {
+  in_app: 'in_app',
+  email: 'email',
+} as const;
+
+export interface CourseClosureResolution {
+  resolutionId: number;
+  courseId: number;
+  action: CourseClosureResolutionAction;
+  /** @nullable */
+  room: string | null;
+  channel: CourseClosureResolutionChannel;
+  notifications: ClosureNotificationOutcome[];
+}
+
+export type ClosureEmailDeliveryStatus = typeof ClosureEmailDeliveryStatus[keyof typeof ClosureEmailDeliveryStatus];
+
+
+export const ClosureEmailDeliveryStatus = {
+  pending: 'pending',
+  sending: 'sending',
+  sent: 'sent',
+  failed: 'failed',
+} as const;
+
+export interface ClosureEmailDelivery {
+  id: number;
+  memberId: number;
+  status: ClosureEmailDeliveryStatus;
+  attemptCount: number;
+  /** @nullable */
+  error: string | null;
+  /** @nullable */
+  attemptedAt: string | null;
+}
+
+export interface ClosureEmailDeliveryReport {
+  resolutionId: number;
+  deliveries: ClosureEmailDelivery[];
+}
+
+export interface ClosureEmailDeliveryCounts {
+  total: number;
+  pending: number;
+  sending: number;
+  sent: number;
+  failed: number;
+}
+
+export type ClosureCourseResolutionAction = typeof ClosureCourseResolutionAction[keyof typeof ClosureCourseResolutionAction];
+
+
+export const ClosureCourseResolutionAction = {
+  relocate: 'relocate',
+  cancel: 'cancel',
+} as const;
+
+export type ClosureCourseResolutionChannel = typeof ClosureCourseResolutionChannel[keyof typeof ClosureCourseResolutionChannel];
+
+
+export const ClosureCourseResolutionChannel = {
+  in_app: 'in_app',
+  email: 'email',
+} as const;
+
+export interface ClosureCourseResolution {
+  resolutionId: number;
+  courseId: number;
+  courseTitle: string;
+  action: ClosureCourseResolutionAction;
+  /** @nullable */
+  room: string | null;
+  channel: ClosureCourseResolutionChannel;
+  deliveryCounts: ClosureEmailDeliveryCounts;
+  deliveries: ClosureEmailDelivery[];
+}
+
 export interface StaffBookingInput {
   memberId: number;
 }
@@ -434,6 +654,8 @@ export interface PulseMessage {
   studioId: number | null;
   /** @nullable */
   studioName: string | null;
+  /** @nullable */
+  roomClosureId: number | null;
   authorName: string;
   createdAt: string;
   /** @nullable */

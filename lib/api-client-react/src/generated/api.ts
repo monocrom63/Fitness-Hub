@@ -23,8 +23,13 @@ import type {
   BookingCancellationInput,
   CheckIn,
   CheckInInput,
+  ClosureAffectedCourse,
+  ClosureCourseResolution,
+  ClosureEmailDeliveryReport,
   Course,
   CourseBooking,
+  CourseClosureResolution,
+  CourseClosureResolutionInput,
   CourseInput,
   CourseRosterBooking,
   Dashboard,
@@ -55,6 +60,10 @@ import type {
   PulseInput,
   PulseMessage,
   PulseRead,
+  RoomAsset,
+  RoomClosure,
+  RoomClosureInput,
+  RoomInput,
   StaffBookingInput,
   StudioSummary
 } from './api.schemas';
@@ -907,6 +916,819 @@ export const useCreateCourse = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateCourseMutationOptions(options));
+    }
+
+export const getListStudioRoomsUrl = (studioId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/rooms`
+}
+
+/**
+ * @summary List manager-visible rooms in a studio
+ */
+export const listStudioRooms = async (studioId: number, options?: Parameters<typeof customFetch>[1]): Promise<RoomAsset[]> => {
+
+  return customFetch<RoomAsset[]>(getListStudioRoomsUrl(studioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStudioRoomsQueryKey = (studioId: number,) => {
+    return [
+    `/api/studios/${studioId}/rooms`
+    ] as const;
+    }
+
+
+export const getListStudioRoomsQueryOptions = <TData = Awaited<ReturnType<typeof listStudioRooms>>, TError = ErrorType<void>>(studioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStudioRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStudioRoomsQueryKey(studioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStudioRooms>>> = ({ signal }) => listStudioRooms(studioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: studioId !== null && studioId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStudioRooms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStudioRoomsQueryResult = NonNullable<Awaited<ReturnType<typeof listStudioRooms>>>
+export type ListStudioRoomsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List manager-visible rooms in a studio
+ */
+
+export function useListStudioRooms<TData = Awaited<ReturnType<typeof listStudioRooms>>, TError = ErrorType<void>>(
+ studioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStudioRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStudioRoomsQueryOptions(studioId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateStudioRoomUrl = (studioId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/rooms`
+}
+
+/**
+ * @summary Add a room asset to a studio
+ */
+export const createStudioRoom = async (studioId: number,
+    roomInput: RoomInput, options?: Parameters<typeof customFetch>[1]): Promise<RoomAsset> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RoomAsset>(getCreateStudioRoomUrl(studioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(roomInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStudioRoomMutationKey = () => ['createStudioRoom'] as const;
+
+export const getCreateStudioRoomMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudioRoom>>, TError,CreateStudioRoomMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStudioRoom>>, TError,CreateStudioRoomMutationVariables, TContext> => {
+
+const mutationKey = getCreateStudioRoomMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStudioRoom>>, CreateStudioRoomMutationVariables> = (props) => {
+          const {studioId,data} = props ?? {};
+
+          return  createStudioRoom(studioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStudioRoomMutationResult = NonNullable<Awaited<ReturnType<typeof createStudioRoom>>>
+    export type CreateStudioRoomMutationBody = BodyType<RoomInput>
+    export type CreateStudioRoomMutationError = ErrorType<void>
+    export type CreateStudioRoomMutationVariables = {studioId: number;data: BodyType<RoomInput>}
+
+    /**
+ * @summary Add a room asset to a studio
+ */
+export const useCreateStudioRoom = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudioRoom>>, TError,CreateStudioRoomMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStudioRoom>>,
+        TError,
+        CreateStudioRoomMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateStudioRoomMutationOptions(options));
+    }
+
+export const getListStudioRoomClosuresUrl = (studioId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/closures`
+}
+
+/**
+ * @summary List room closures in a studio
+ */
+export const listStudioRoomClosures = async (studioId: number, options?: Parameters<typeof customFetch>[1]): Promise<RoomClosure[]> => {
+
+  return customFetch<RoomClosure[]>(getListStudioRoomClosuresUrl(studioId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStudioRoomClosuresQueryKey = (studioId: number,) => {
+    return [
+    `/api/studios/${studioId}/closures`
+    ] as const;
+    }
+
+
+export const getListStudioRoomClosuresQueryOptions = <TData = Awaited<ReturnType<typeof listStudioRoomClosures>>, TError = ErrorType<void>>(studioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStudioRoomClosures>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStudioRoomClosuresQueryKey(studioId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStudioRoomClosures>>> = ({ signal }) => listStudioRoomClosures(studioId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: studioId !== null && studioId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStudioRoomClosures>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStudioRoomClosuresQueryResult = NonNullable<Awaited<ReturnType<typeof listStudioRoomClosures>>>
+export type ListStudioRoomClosuresQueryError = ErrorType<void>
+
+
+/**
+ * @summary List room closures in a studio
+ */
+
+export function useListStudioRoomClosures<TData = Awaited<ReturnType<typeof listStudioRoomClosures>>, TError = ErrorType<void>>(
+ studioId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStudioRoomClosures>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStudioRoomClosuresQueryOptions(studioId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateStudioRoomClosureUrl = (studioId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/closures`
+}
+
+/**
+ * @summary Close a room for an inclusive range of local calendar dates
+ */
+export const createStudioRoomClosure = async (studioId: number,
+    roomClosureInput: RoomClosureInput, options?: Parameters<typeof customFetch>[1]): Promise<RoomClosure> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RoomClosure>(getCreateStudioRoomClosureUrl(studioId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(roomClosureInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStudioRoomClosureMutationKey = () => ['createStudioRoomClosure'] as const;
+
+export const getCreateStudioRoomClosureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudioRoomClosure>>, TError,CreateStudioRoomClosureMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStudioRoomClosure>>, TError,CreateStudioRoomClosureMutationVariables, TContext> => {
+
+const mutationKey = getCreateStudioRoomClosureMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStudioRoomClosure>>, CreateStudioRoomClosureMutationVariables> = (props) => {
+          const {studioId,data} = props ?? {};
+
+          return  createStudioRoomClosure(studioId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStudioRoomClosureMutationResult = NonNullable<Awaited<ReturnType<typeof createStudioRoomClosure>>>
+    export type CreateStudioRoomClosureMutationBody = BodyType<RoomClosureInput>
+    export type CreateStudioRoomClosureMutationError = ErrorType<void>
+    export type CreateStudioRoomClosureMutationVariables = {studioId: number;data: BodyType<RoomClosureInput>}
+
+    /**
+ * @summary Close a room for an inclusive range of local calendar dates
+ */
+export const useCreateStudioRoomClosure = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudioRoomClosure>>, TError,CreateStudioRoomClosureMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStudioRoomClosure>>,
+        TError,
+        CreateStudioRoomClosureMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateStudioRoomClosureMutationOptions(options));
+    }
+
+export const getDeleteStudioRoomClosureUrl = (studioId: number,
+    closureId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/closures/${closureId}`
+}
+
+/**
+ * @summary Delete a room closure
+ */
+export const deleteStudioRoomClosure = async (studioId: number,
+    closureId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteStudioRoomClosureUrl(studioId,closureId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteStudioRoomClosureMutationKey = () => ['deleteStudioRoomClosure'] as const;
+
+export const getDeleteStudioRoomClosureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudioRoomClosure>>, TError,DeleteStudioRoomClosureMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteStudioRoomClosure>>, TError,DeleteStudioRoomClosureMutationVariables, TContext> => {
+
+const mutationKey = getDeleteStudioRoomClosureMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteStudioRoomClosure>>, DeleteStudioRoomClosureMutationVariables> = (props) => {
+          const {studioId,closureId} = props ?? {};
+
+          return  deleteStudioRoomClosure(studioId,closureId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteStudioRoomClosureMutationResult = NonNullable<Awaited<ReturnType<typeof deleteStudioRoomClosure>>>
+
+    export type DeleteStudioRoomClosureMutationError = ErrorType<void>
+    export type DeleteStudioRoomClosureMutationVariables = {studioId: number;closureId: number}
+
+    /**
+ * @summary Delete a room closure
+ */
+export const useDeleteStudioRoomClosure = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudioRoomClosure>>, TError,DeleteStudioRoomClosureMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteStudioRoomClosure>>,
+        TError,
+        DeleteStudioRoomClosureMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteStudioRoomClosureMutationOptions(options));
+    }
+
+export const getListClosureAffectedCoursesUrl = (studioId: number,
+    closureId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/closures/${closureId}/courses`
+}
+
+/**
+ * @summary List non-cancelled courses intersecting a closure
+ */
+export const listClosureAffectedCourses = async (studioId: number,
+    closureId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosureAffectedCourse[]> => {
+
+  return customFetch<ClosureAffectedCourse[]>(getListClosureAffectedCoursesUrl(studioId,closureId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClosureAffectedCoursesQueryKey = (studioId: number,
+    closureId: number,) => {
+    return [
+    `/api/studios/${studioId}/closures/${closureId}/courses`
+    ] as const;
+    }
+
+
+export const getListClosureAffectedCoursesQueryOptions = <TData = Awaited<ReturnType<typeof listClosureAffectedCourses>>, TError = ErrorType<void>>(studioId: number,
+    closureId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClosureAffectedCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClosureAffectedCoursesQueryKey(studioId,closureId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClosureAffectedCourses>>> = ({ signal }) => listClosureAffectedCourses(studioId,closureId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: studioId !== null && studioId !== undefined && closureId !== null && closureId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClosureAffectedCourses>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClosureAffectedCoursesQueryResult = NonNullable<Awaited<ReturnType<typeof listClosureAffectedCourses>>>
+export type ListClosureAffectedCoursesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List non-cancelled courses intersecting a closure
+ */
+
+export function useListClosureAffectedCourses<TData = Awaited<ReturnType<typeof listClosureAffectedCourses>>, TError = ErrorType<void>>(
+ studioId: number,
+    closureId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClosureAffectedCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClosureAffectedCoursesQueryOptions(studioId,closureId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListClosureResolutionsUrl = (studioId: number,
+    closureId: number,) => {
+
+
+
+
+  return `/api/studios/${studioId}/closures/${closureId}/resolutions`
+}
+
+/**
+ * @summary List persisted course resolutions and email delivery outcomes for a closure
+ */
+export const listClosureResolutions = async (studioId: number,
+    closureId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosureCourseResolution[]> => {
+
+  return customFetch<ClosureCourseResolution[]>(getListClosureResolutionsUrl(studioId,closureId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClosureResolutionsQueryKey = (studioId: number,
+    closureId: number,) => {
+    return [
+    `/api/studios/${studioId}/closures/${closureId}/resolutions`
+    ] as const;
+    }
+
+
+export const getListClosureResolutionsQueryOptions = <TData = Awaited<ReturnType<typeof listClosureResolutions>>, TError = ErrorType<void>>(studioId: number,
+    closureId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClosureResolutions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClosureResolutionsQueryKey(studioId,closureId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClosureResolutions>>> = ({ signal }) => listClosureResolutions(studioId,closureId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: studioId !== null && studioId !== undefined && closureId !== null && closureId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClosureResolutions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClosureResolutionsQueryResult = NonNullable<Awaited<ReturnType<typeof listClosureResolutions>>>
+export type ListClosureResolutionsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List persisted course resolutions and email delivery outcomes for a closure
+ */
+
+export function useListClosureResolutions<TData = Awaited<ReturnType<typeof listClosureResolutions>>, TError = ErrorType<void>>(
+ studioId: number,
+    closureId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClosureResolutions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClosureResolutionsQueryOptions(studioId,closureId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getResolveCourseRoomClosureUrl = (id: number,) => {
+
+
+
+
+  return `/api/courses/${id}/closure-resolution`
+}
+
+/**
+ * @summary Relocate or cancel an affected course and notify booked members
+ */
+export const resolveCourseRoomClosure = async (id: number,
+    courseClosureResolutionInput: CourseClosureResolutionInput, options?: Parameters<typeof customFetch>[1]): Promise<CourseClosureResolution> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CourseClosureResolution>(getResolveCourseRoomClosureUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(courseClosureResolutionInput)
+  }
+);}
+
+
+
+
+
+export const getResolveCourseRoomClosureMutationKey = () => ['resolveCourseRoomClosure'] as const;
+
+export const getResolveCourseRoomClosureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveCourseRoomClosure>>, TError,ResolveCourseRoomClosureMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveCourseRoomClosure>>, TError,ResolveCourseRoomClosureMutationVariables, TContext> => {
+
+const mutationKey = getResolveCourseRoomClosureMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveCourseRoomClosure>>, ResolveCourseRoomClosureMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resolveCourseRoomClosure(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveCourseRoomClosureMutationResult = NonNullable<Awaited<ReturnType<typeof resolveCourseRoomClosure>>>
+    export type ResolveCourseRoomClosureMutationBody = BodyType<CourseClosureResolutionInput>
+    export type ResolveCourseRoomClosureMutationError = ErrorType<void>
+    export type ResolveCourseRoomClosureMutationVariables = {id: number;data: BodyType<CourseClosureResolutionInput>}
+
+    /**
+ * @summary Relocate or cancel an affected course and notify booked members
+ */
+export const useResolveCourseRoomClosure = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveCourseRoomClosure>>, TError,ResolveCourseRoomClosureMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveCourseRoomClosure>>,
+        TError,
+        ResolveCourseRoomClosureMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolveCourseRoomClosureMutationOptions(options));
+    }
+
+export const getGetClosureEmailDeliveriesUrl = (resolutionId: number,) => {
+
+
+
+
+  return `/api/closure-resolutions/${resolutionId}/email-deliveries`
+}
+
+/**
+ * @summary Inspect persisted per-member email delivery states
+ */
+export const getClosureEmailDeliveries = async (resolutionId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosureEmailDeliveryReport> => {
+
+  return customFetch<ClosureEmailDeliveryReport>(getGetClosureEmailDeliveriesUrl(resolutionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClosureEmailDeliveriesQueryKey = (resolutionId: number,) => {
+    return [
+    `/api/closure-resolutions/${resolutionId}/email-deliveries`
+    ] as const;
+    }
+
+
+export const getGetClosureEmailDeliveriesQueryOptions = <TData = Awaited<ReturnType<typeof getClosureEmailDeliveries>>, TError = ErrorType<void>>(resolutionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClosureEmailDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClosureEmailDeliveriesQueryKey(resolutionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClosureEmailDeliveries>>> = ({ signal }) => getClosureEmailDeliveries(resolutionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: resolutionId !== null && resolutionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClosureEmailDeliveries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClosureEmailDeliveriesQueryResult = NonNullable<Awaited<ReturnType<typeof getClosureEmailDeliveries>>>
+export type GetClosureEmailDeliveriesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect persisted per-member email delivery states
+ */
+
+export function useGetClosureEmailDeliveries<TData = Awaited<ReturnType<typeof getClosureEmailDeliveries>>, TError = ErrorType<void>>(
+ resolutionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClosureEmailDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClosureEmailDeliveriesQueryOptions(resolutionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRetryClosureEmailDeliveriesUrl = (resolutionId: number,) => {
+
+
+
+
+  return `/api/closure-resolutions/${resolutionId}/email-deliveries`
+}
+
+/**
+ * Claims eligible deliveries atomically; uses a stable provider idempotency key and returns per-member states. No request body is required.
+ * @summary Retry failed or recover expired in-progress email deliveries
+ */
+export const retryClosureEmailDeliveries = async (resolutionId: number, options?: Parameters<typeof customFetch>[1]): Promise<ClosureEmailDeliveryReport> => {
+
+  return customFetch<ClosureEmailDeliveryReport>(getRetryClosureEmailDeliveriesUrl(resolutionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRetryClosureEmailDeliveriesMutationKey = () => ['retryClosureEmailDeliveries'] as const;
+
+export const getRetryClosureEmailDeliveriesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryClosureEmailDeliveries>>, TError,RetryClosureEmailDeliveriesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryClosureEmailDeliveries>>, TError,RetryClosureEmailDeliveriesMutationVariables, TContext> => {
+
+const mutationKey = getRetryClosureEmailDeliveriesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryClosureEmailDeliveries>>, RetryClosureEmailDeliveriesMutationVariables> = (props) => {
+          const {resolutionId} = props ?? {};
+
+          return  retryClosureEmailDeliveries(resolutionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryClosureEmailDeliveriesMutationResult = NonNullable<Awaited<ReturnType<typeof retryClosureEmailDeliveries>>>
+
+    export type RetryClosureEmailDeliveriesMutationError = ErrorType<void>
+    export type RetryClosureEmailDeliveriesMutationVariables = {resolutionId: number}
+
+    /**
+ * @summary Retry failed or recover expired in-progress email deliveries
+ */
+export const useRetryClosureEmailDeliveries = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryClosureEmailDeliveries>>, TError,RetryClosureEmailDeliveriesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryClosureEmailDeliveries>>,
+        TError,
+        RetryClosureEmailDeliveriesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRetryClosureEmailDeliveriesMutationOptions(options));
     }
 
 export const getListCourseBookingsUrl = (id: number,) => {

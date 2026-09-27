@@ -7,6 +7,7 @@ import modulesRouter from "./modules";
 import memberAppRouter from "./member-app";
 import memberInvitationsRouter from "./member-invitations";
 import courseBookingsRouter from "./course-bookings";
+import roomAssetsRouter from "./room-assets";
 import { requireModule } from "../lib/module-access";
 
 const router: IRouter = Router();
@@ -19,6 +20,7 @@ router.use("/courses/:id/bookings", requireModule("members"));
 router.use("/courses", requireModule("courses"));
 router.use("/pulse", requireModule("pulse"));
 router.use("/team", requireModule("team"));
+router.use(roomAssetsRouter);
 router.use(portalRouter);
 router.use(courseBookingsRouter);
 router.use(pulseRouter);

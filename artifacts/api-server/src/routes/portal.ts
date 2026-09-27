@@ -9,6 +9,7 @@ import {
   inArray,
   lt,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
@@ -38,6 +39,7 @@ import {
   membersTable,
   organizationsTable,
   pulseMessagesTable,
+  roomClosuresTable,
   staffTable,
   studiosTable,
 } from "@workspace/db";
@@ -51,6 +53,7 @@ import {
   type StaffContext,
 } from "../lib/fiudia-access";
 import { isModuleEnabled } from "../lib/module-access";
+import { closureIntersectsInterval, hasOverlappingLiveCourse } from "../lib/room-closures";
 
 const router: IRouter = Router();
 const CHECK_IN_MILESTONES = new Set([10, 25, 50, 100, 250, 500]);
@@ -680,7 +683,21 @@ router.post("/courses", async (req, res): Promise<void> => {
     return;
   }
 
-  const { course, studio } = await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-room:${body.data.studioId}:${body.data.room}`}))`);
+    const closures = await tx.select({
+      fromDate: roomClosuresTable.fromDate,
+      toDate: roomClosuresTable.toDate,
+    }).from(roomClosuresTable).where(and(
+      eq(roomClosuresTable.studioId, body.data.studioId),
+      eq(roomClosuresTable.roomName, body.data.room),
+    ));
+    if (closures.some((closure) => closureIntersectsInterval(closure.fromDate, closure.toDate, startsAt, endsAt))) {
+      return { error: "Dieser Raum ist während des Kursintervalls geschlossen." as const };
+    }
+    if (await hasOverlappingLiveCourse(body.data.studioId, body.data.room, startsAt, endsAt, tx)) {
+      return { error: "In diesem Raum liegt bereits ein überlappender Kurs." as const };
+    }
     const [createdCourse] = await tx
       .insert(coursesTable)
       .values({ ...body.data, startsAt, endsAt })
@@ -706,6 +723,11 @@ router.post("/courses", async (req, res): Promise<void> => {
     }
     return { course: createdCourse, studio: courseStudio };
   });
+  if ("error" in created) {
+    res.status(409).json({ error: created.error });
+    return;
+  }
+  const { course, studio } = created;
   res.status(201).json(
     CreateCourseResponse.parse(serializeCourse({ ...course, studioName: studio.name })),
   );
