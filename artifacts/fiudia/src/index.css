@@ -405,11 +405,32 @@ button { cursor: pointer; }
 .workspace-switcher strong, .workspace-switcher span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-switcher strong { font-size: .76rem; font-weight: 700; }
 .workspace-switcher span { margin-top: 2px; color: rgba(242,244,249,.55); font-size: .68rem; }
-.workspace-picker { min-width: 0; flex: 1; display: grid; gap: 2px; cursor: pointer; }
-.workspace-picker select { width: 100%; min-width: 0; padding: 0; appearance: none; border: 0; outline: none; background: transparent; color: #f2f4f9; font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; text-overflow: ellipsis; }
-.workspace-picker select:focus-visible { outline: 2px solid #c8bbff; outline-offset: 3px; border-radius: 3px; }
-.workspace-picker select:disabled { cursor: default; opacity: .65; }
-.workspace-picker option { color: #20293d; background: #fff; }
+.workspace-switcher .workspace-dot { display: grid; place-items: center; margin-top: 0; color: #20293d; font-size: .64rem; }
+.workspace-menu { position: relative; margin: 0 5px 25px; }
+.workspace-menu .workspace-switcher { width: 100%; margin: 0; }
+.workspace-trigger { color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.workspace-trigger:hover, .workspace-trigger-open { border-color: rgba(200,187,255,.42); background: rgba(255,255,255,.085); }
+.workspace-trigger-open { box-shadow: 0 0 0 3px rgba(200,187,255,.08); }
+.workspace-trigger:focus-visible, .workspace-option:focus-visible { outline: 2px solid #c8bbff; outline-offset: 3px; }
+.workspace-trigger:disabled { cursor: default; opacity: .7; }
+.workspace-trigger .workspace-copy { display: block; min-width: 0; flex: 1; margin: 0; }
+.workspace-trigger .workspace-copy strong { color: #f2f4f9; }
+.workspace-trigger .workspace-chevron { flex: 0 0 auto; color: #c8bbff; transform: rotate(-90deg); transition: transform .2s ease; }
+.workspace-trigger-open .workspace-chevron { transform: rotate(0); }
+.workspace-options { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; width: 100%; padding: 8px; border: 1px solid rgba(200,187,255,.26); border-radius: 12px; background: #273047; box-shadow: 0 18px 36px rgba(6,10,24,.32); animation: workspace-options-in .18s ease-out both; }
+.workspace-options-heading { padding: 7px 9px 8px; color: #c8bbff; font-size: .59rem; font-weight: 800; letter-spacing: .12em; }
+.workspace-options-list { display: grid; gap: 3px; max-height: min(280px, 45vh); overflow-y: auto; }
+.workspace-option { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: #f2f4f9; text-align: left; cursor: pointer; }
+.workspace-option:hover, .workspace-option-active { background: rgba(200,187,255,.14); }
+.workspace-option-active { color: #fff; }
+.workspace-option-icon { display: grid; place-items: center; flex: 0 0 27px; width: 27px; height: 27px; border-radius: 7px; background: rgba(200,187,255,.18); color: #d5caff; font-size: .63rem; font-weight: 800; }
+.workspace-option-copy { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.workspace-option-copy strong, .workspace-option-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-option-copy strong { font-size: .72rem; font-weight: 700; }
+.workspace-option-copy small { color: rgba(242,244,249,.55); font-size: .64rem; }
+.workspace-option > svg { flex: 0 0 auto; color: #c8bbff; }
+@keyframes workspace-options-in { from { opacity: 0; transform: translateY(-5px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .workspace-trigger, .workspace-trigger .workspace-chevron { transition: none; } .workspace-options { animation: none; } }
 .workspace-dot { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 9px; background: #c8bbff; color: #20293d; font-size: .64rem; font-weight: 800; }
 .main-nav { display: grid; gap: 4px; }
 .nav-link { display: flex; align-items: center; gap: 11px; min-height: 42px; padding: 0 12px; border-radius: 9px; color: rgba(242,244,249,.64); font-size: .82rem; font-weight: 600; text-decoration: none; }

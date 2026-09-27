@@ -171,6 +171,9 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
   const [location, setLocation] = useLocation();
   const { selectedStudioId, selectedStudioName, selectStudio, studios } = useStudioScope();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const studioRef = useRef<HTMLDivElement>(null);
+  const studioTriggerRef = useRef<HTMLButtonElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const { signOut } = useClerk();
@@ -190,6 +193,24 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [profileOpen]);
+  useEffect(() => {
+    if (!studioOpen) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!studioRef.current?.contains(event.target as Node)) setStudioOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setStudioOpen(false);
+        studioTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [studioOpen]);
   const nav = [
     { href: '/dashboard', label: 'Today', icon: LayoutDashboard },
     ...(moduleEnabled(modules, 'pulse') ? [{ href: '/pulse', label: 'Pulse', icon: Activity }] : []),
@@ -202,23 +223,41 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar-top"><Brand light /><button className="icon-button sidebar-close" onClick={() => setMobileOpen(false)} data-testid="button-close-navigation"><X size={18} /></button></div>
-      <div className="workspace-switcher">
-        <div className="workspace-dot">{initials(selectedStudioName || me.organizationName || 'F')}</div>
-        {me.role === 'district_manager'
-          ? <label className="workspace-picker">
-            <select aria-label="Aktives Studio wechseln" value={selectedStudioId ?? ''} disabled={!studios.data?.length} onChange={event => {
-              if (location === '/rooms') setLocation('/rooms', { replace: true });
-              selectStudio(Number(event.target.value));
-              setMobileOpen(false);
-            }} data-testid="select-active-studio">
-              {!selectedStudioId && <option value="">{studios.isLoading ? 'Studios laden …' : 'Kein Studio vorhanden'}</option>}
-              {studios.data?.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}
-            </select>
-            <span>{me.organizationName || 'Organisation'} · Studio wechseln</span>
-          </label>
-          : <div><strong>{me.studioName || 'Dein Workspace'}</strong><span>{me.organizationName || 'Neue Organisation'}</span></div>}
-        {me.role === 'district_manager' && <ChevronDown size={16} aria-hidden="true" />}
-      </div>
+      {me.role === 'district_manager'
+        ? <div className="workspace-menu" ref={studioRef}>
+          <button type="button" ref={studioTriggerRef} className={`workspace-switcher workspace-trigger ${studioOpen ? 'workspace-trigger-open' : ''}`}
+            aria-label="Aktives Studio wechseln" aria-expanded={studioOpen}
+            aria-controls={studioOpen ? 'studio-switcher-options' : undefined}
+            disabled={!studios.data?.length}
+            onClick={() => setStudioOpen(open => !open)} data-testid="select-active-studio">
+            <span className="workspace-dot">{initials(selectedStudioName || me.organizationName || 'F')}</span>
+            <span className="workspace-copy"><strong>{selectedStudioName || (studios.isLoading ? 'Studios laden …' : 'Kein Studio vorhanden')}</strong><span>{me.organizationName || 'Organisation'} · Studio wechseln</span></span>
+            <ChevronDown className="workspace-chevron" size={16} aria-hidden="true" />
+          </button>
+          {studioOpen && <div className="workspace-options" id="studio-switcher-options" aria-label="Studio auswählen">
+            <div className="workspace-options-heading">DEINE STUDIOS</div>
+            <div className="workspace-options-list">
+              {studios.data?.map(studio => <button type="button" key={studio.id}
+                className={`workspace-option ${studio.id === selectedStudioId ? 'workspace-option-active' : ''}`}
+                aria-current={studio.id === selectedStudioId ? 'true' : undefined}
+                onClick={() => {
+                  if (location === '/rooms') setLocation('/rooms', { replace: true });
+                  selectStudio(studio.id);
+                  setStudioOpen(false);
+                  setMobileOpen(false);
+                  if (!mobileOpen) studioTriggerRef.current?.focus();
+                }} data-testid={`button-select-studio-${studio.id}`}>
+                <span className="workspace-option-icon">{initials(studio.name)}</span>
+                <span className="workspace-option-copy"><strong>{studio.name}</strong><small>{studio.city}</small></span>
+                {studio.id === selectedStudioId && <Check size={16} aria-hidden="true" />}
+              </button>)}
+            </div>
+          </div>}
+        </div>
+        : <div className="workspace-switcher">
+          <span className="workspace-dot">{initials(me.studioName || me.organizationName || 'F')}</span>
+          <div><strong>{me.studioName || 'Dein Workspace'}</strong><span>{me.organizationName || 'Neue Organisation'}</span></div>
+        </div>}
       <nav className="main-nav">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`nav-link ${location === href ? 'nav-link-active' : ''}`} data-testid={`link-nav-${label.toLowerCase()}`}><Icon size={18} /><span>{label}</span>{href === '/members' && <span className="nav-count">live</span>}</Link>)}</nav>
       <div className="sidebar-note"><Sparkles size={16} /><span>Ein guter Tag beginnt mit Übersicht.</span></div>
       <div className="sidebar-bottom"><Link href="/settings" className="nav-link" data-testid="link-nav-settings"><Settings2 size={18} /><span>Einstellungen</span></Link><button className="profile-row" onClick={logOut} data-testid="button-sign-out"><span className="avatar avatar-small">{initials(me.userName)}</span><span className="profile-copy"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></span><LogOut size={16} /></button></div>
