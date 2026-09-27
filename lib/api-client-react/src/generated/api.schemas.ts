@@ -472,6 +472,28 @@ export interface PulseCorrection {
   priority: PulsePriority;
 }
 
+export type PulseHistoryChangeField = typeof PulseHistoryChangeField[keyof typeof PulseHistoryChangeField];
+
+
+export const PulseHistoryChangeField = {
+  title: 'title',
+  body: 'body',
+  priority: 'priority',
+} as const;
+
+export interface PulseHistoryChange {
+  field: PulseHistoryChangeField;
+  before: string;
+  after: string;
+}
+
+export interface PulseHistoryEntry {
+  id: number;
+  editorName: string;
+  editedAt: string;
+  changes: PulseHistoryChange[];
+}
+
 export interface PulseRead {
   messageId: number;
   readAt: string;

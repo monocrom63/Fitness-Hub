@@ -663,6 +663,28 @@ paths:
           description: Message is not visible to this staff member
         "404":
           description: Message not found
+  /pulse/{id}/history:
+    get:
+      operationId: listPulseHistory
+      tags: [pulse]
+      summary: Show the correction history of a visible Pulse message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Corrections from oldest to newest, with changed fields only
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PulseHistoryEntry" }
+        "400": { description: Invalid message ID }
+        "401": { description: Sign-in required }
+        "403": { description: No staff access }
+        "404": { description: Message not visible or retracted }
   /team/invitations:
     get:
       operationId: listInvitations
@@ -1053,6 +1075,23 @@ components:
         title: { type: string, minLength: 2, maxLength: 140 }
         body: { type: string, minLength: 1, maxLength: 2000 }
         priority: { $ref: "#/components/schemas/PulsePriority" }
+    PulseHistoryChange:
+      type: object
+      required: [field, before, after]
+      properties:
+        field: { type: string, enum: [title, body, priority] }
+        before: { type: string }
+        after: { type: string }
+    PulseHistoryEntry:
+      type: object
+      required: [id, editorName, editedAt, changes]
+      properties:
+        id: { type: integer }
+        editorName: { type: string }
+        editedAt: { type: string, format: date-time }
+        changes:
+          type: array
+          items: { $ref: "#/components/schemas/PulseHistoryChange" }
     PulseRead:
       type: object
       required: [messageId, readAt]

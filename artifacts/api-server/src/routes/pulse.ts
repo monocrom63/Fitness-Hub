@@ -3,6 +3,8 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreatePulseMessageBody,
   CreatePulseMessageResponse,
+  ListPulseHistoryParams,
+  ListPulseHistoryResponse,
   ListPulseQueryParams,
   ListPulseResponse,
   MarkPulseReadParams,
@@ -14,6 +16,7 @@ import {
 } from "@workspace/api-zod";
 import {
   db,
+  pulseCorrectionsTable,
   pulseMessagesTable,
   pulseReadsTable,
   staffTable,
@@ -193,6 +196,44 @@ router.get("/pulse", async (req, res): Promise<void> => {
   );
 });
 
+router.get("/pulse/:id/history", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const params = ListPulseHistoryParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Ungültige Meldungs-ID." });
+    return;
+  }
+
+  const studioIds = await getAccessibleStudioIds(staff, database);
+  const [visible] = await database.select({ id: pulseMessagesTable.id })
+    .from(pulseMessagesTable)
+    .where(and(
+      eq(pulseMessagesTable.id, params.data.id),
+      isNull(pulseMessagesTable.retractedAt),
+      visibleMessages(staff, studioIds),
+    )).limit(1);
+  if (!visible) {
+    res.status(404).json({ error: "Meldung nicht gefunden." });
+    return;
+  }
+
+  const corrections = await database.select().from(pulseCorrectionsTable)
+    .where(eq(pulseCorrectionsTable.messageId, visible.id))
+    .orderBy(pulseCorrectionsTable.id);
+  res.json(ListPulseHistoryResponse.parse(corrections.map(correction => ({
+    id: correction.id,
+    editorName: correction.editorName,
+    editedAt: correction.editedAt.toISOString(),
+    changes: ([
+      ["title", correction.oldTitle, correction.newTitle],
+      ["body", correction.oldBody, correction.newBody],
+      ["priority", correction.oldPriority, correction.newPriority],
+    ] as const).filter(([, before, after]) => before !== after)
+      .map(([field, before, after]) => ({ field, before, after })),
+  }))));
+});
+
 router.post("/pulse", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
@@ -279,24 +320,55 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
   }
   const original = await requireEditableMessage(staff, params.data.id, res);
   if (!original) return;
-  const updated = await database.transaction(async (tx) => {
+  const next = {
+    title: body.data.title.trim(),
+    body: body.data.body.trim(),
+    priority: body.data.priority,
+  };
+  const result = await database.transaction(async (tx) => {
+    // Lock before capturing the "before" snapshot, so concurrent edits cannot
+    // write a history entry for a version that was already replaced.
+    const [previous] = await tx.select().from(pulseMessagesTable).where(and(
+      eq(pulseMessagesTable.id, original.id),
+      eq(pulseMessagesTable.organizationId, staff.organizationId),
+      isNull(pulseMessagesTable.retractedAt),
+    )).for("update").limit(1);
+    if (!previous) return { status: "missing" as const };
+    if (previous.title === next.title && previous.body === next.body && previous.priority === next.priority) {
+      return { status: "unchanged" as const };
+    }
+    const editedAt = new Date();
     const [message] = await tx.update(pulseMessagesTable).set({
-      title: body.data.title.trim(),
-      body: body.data.body.trim(),
-      priority: body.data.priority,
-      editedAt: new Date(),
-    }).where(and(eq(pulseMessagesTable.id, original.id), isNull(pulseMessagesTable.retractedAt))).returning();
-    if (!message) return null;
+      ...next,
+      editedAt,
+    }).where(eq(pulseMessagesTable.id, previous.id)).returning();
+    await tx.insert(pulseCorrectionsTable).values({
+      messageId: message.id,
+      editorStaffId: staff.id,
+      editorName: staff.fullName,
+      oldTitle: previous.title,
+      newTitle: message.title,
+      oldBody: previous.body,
+      newBody: message.body,
+      oldPriority: previous.priority,
+      newPriority: message.priority,
+      editedAt,
+    });
     await tx.delete(pulseReadsTable).where(eq(pulseReadsTable.messageId, message.id));
     // A correction invalidates every receipt for the previous text. The correcting
     // manager has seen the new version even when someone else wrote the original.
     await tx.insert(pulseReadsTable).values({ messageId: message.id, staffId: staff.id });
-    return message;
+    return { status: "updated" as const, message };
   });
-  if (!updated) {
+  if (result.status === "missing") {
     res.status(404).json({ error: "Meldung nicht gefunden." });
     return;
   }
+  if (result.status === "unchanged") {
+    res.status(400).json({ error: "Die Meldung wurde nicht verändert." });
+    return;
+  }
+  const updated = result.message;
   const [studio] = updated.studioId === null ? [null] : await database
     .select({ name: studiosTable.name }).from(studiosTable)
     .where(eq(studiosTable.id, updated.studioId)).limit(1);

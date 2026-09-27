@@ -206,7 +206,34 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal(corrected?.title, correction.title);
       assert.equal(corrected?.isRead, false);
       assert.equal(corrected?.canManage, false);
+      const historyUrl = `/pulse/${studioAAll}/history`;
+      assert.equal((await api(null, "GET", historyUrl)).status, 401);
+      assert.equal((await api(user(employeeA), "GET", "/pulse/nope/history")).status, 400);
+      assert.equal((await api(user(managerB), "GET", historyUrl)).status, 404);
+      assert.equal((await api(user(employeeB), "GET", historyUrl)).status, 404);
+      assert.equal((await api(user(otherDistrict), "GET", historyUrl)).status, 404);
+      const firstHistory = await api(user(employeeA), "GET", historyUrl);
+      assert.equal(firstHistory.status, 200);
+      assert.equal(firstHistory.body.length, 1);
+      assert.equal(firstHistory.body[0].editorName, "District A");
+      assert.ok(firstHistory.body[0].editedAt);
+      assert.deepEqual(firstHistory.body[0].changes, [
+        { field: "title", before: "Studio A all", after: correction.title },
+        { field: "body", before: "A scoped message", after: correction.body },
+        { field: "priority", before: "info", after: correction.priority },
+      ]);
+      assert.equal((await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, correction)).status, 400);
+      const second = await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, body: "Noch ein Hinweis" });
+      assert.equal(second.status, 200);
+      const history = await api(user(employeeA), "GET", historyUrl);
+      assert.equal(history.status, 200);
+      assert.equal(history.body.length, 2);
+      assert.equal(history.body[1].editorName, "Manager A");
+      assert.deepEqual(history.body[1].changes, [
+        { field: "body", before: correction.body, after: "Noch ein Hinweis" },
+      ]);
       assert.equal((await api(user(district), "DELETE", `/pulse/${studioAAll}`)).status, 204);
+      assert.equal((await api(user(employeeA), "GET", historyUrl)).status, 404);
       assert.equal((await api(user(managerA), "DELETE", `/pulse/${studioAAll}`)).status, 404);
       assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`)).status, 404);
       assert.ok(!(await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`)).body.some((message: { id: number }) => message.id === studioAAll));

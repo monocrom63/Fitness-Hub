@@ -783,6 +783,29 @@ export const MarkPulseReadResponse = zod.object({
 
 
 /**
+ * @summary Show the correction history of a visible Pulse message
+ */
+
+
+
+export const ListPulseHistoryParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const ListPulseHistoryResponseItem = zod.object({
+  "id": zod.number().int(),
+  "editorName": zod.string(),
+  "editedAt": zod.coerce.date(),
+  "changes": zod.array(zod.object({
+  "field": zod.enum(['title', 'body', 'priority']),
+  "before": zod.string(),
+  "after": zod.string()
+}))
+})
+export const ListPulseHistoryResponse = zod.array(ListPulseHistoryResponseItem)
+
+
+/**
  * @summary List invitations available to the signed-in manager
  */
 export const ListInvitationsResponseItem = zod.object({

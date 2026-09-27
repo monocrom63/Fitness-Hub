@@ -50,6 +50,7 @@ import type {
   ModuleUpdate,
   OnboardingInput,
   PulseCorrection,
+  PulseHistoryEntry,
   PulseInput,
   PulseMessage,
   PulseRead,
@@ -2695,6 +2696,83 @@ export const useMarkPulseRead = <TError = ErrorType<void>,
       > => {
       return useMutation(getMarkPulseReadMutationOptions(options));
     }
+
+export const getListPulseHistoryUrl = (id: number,) => {
+
+
+
+
+  return `/api/pulse/${id}/history`
+}
+
+/**
+ * @summary Show the correction history of a visible Pulse message
+ */
+export const listPulseHistory = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PulseHistoryEntry[]> => {
+
+  return customFetch<PulseHistoryEntry[]>(getListPulseHistoryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPulseHistoryQueryKey = (id: number,) => {
+    return [
+    `/api/pulse/${id}/history`
+    ] as const;
+    }
+
+
+export const getListPulseHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listPulseHistory>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPulseHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPulseHistoryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPulseHistory>>> = ({ signal }) => listPulseHistory(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPulseHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPulseHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listPulseHistory>>>
+export type ListPulseHistoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Show the correction history of a visible Pulse message
+ */
+
+export function useListPulseHistory<TData = Awaited<ReturnType<typeof listPulseHistory>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPulseHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPulseHistoryQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListInvitationsUrl = () => {
 

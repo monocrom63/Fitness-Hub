@@ -207,6 +207,22 @@ export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
   retractedAt: timestamp("retracted_at", { withTimezone: true }),
 });
 
+export const pulseCorrectionsTable = pgTable("fiudia_pulse_corrections", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id")
+    .notNull()
+    .references(() => pulseMessagesTable.id, { onDelete: "cascade" }),
+  editorStaffId: integer("editor_staff_id").notNull(),
+  editorName: text("editor_name").notNull(),
+  oldTitle: text("old_title").notNull(),
+  newTitle: text("new_title").notNull(),
+  oldBody: text("old_body").notNull(),
+  newBody: text("new_body").notNull(),
+  oldPriority: text("old_priority").notNull(),
+  newPriority: text("new_priority").notNull(),
+  editedAt: timestamp("edited_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const pulseReadsTable = pgTable(
   "fiudia_pulse_reads",
   {
