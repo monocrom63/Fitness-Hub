@@ -419,7 +419,8 @@ button { cursor: pointer; }
 .workspace-trigger-open .workspace-chevron { transform: rotate(0); }
 .workspace-options { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; width: 100%; padding: 8px; border: 1px solid rgba(200,187,255,.26); border-radius: 12px; background: #273047; box-shadow: 0 18px 36px rgba(6,10,24,.32); animation: workspace-options-in .18s ease-out both; }
 .workspace-options-heading { padding: 7px 9px 8px; color: #c8bbff; font-size: .59rem; font-weight: 800; letter-spacing: .12em; }
-.workspace-options-list { display: grid; gap: 3px; max-height: min(280px, 45vh); overflow-y: auto; }
+.workspace-options-list { display: grid; gap: 3px; max-height: min(280px, 45vh); overflow-y: auto; scrollbar-width: none; }
+.workspace-options-list::-webkit-scrollbar { display: none; }
 .workspace-option { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: #f2f4f9; text-align: left; cursor: pointer; }
 .workspace-option:hover, .workspace-option-active { background: rgba(200,187,255,.14); }
 .workspace-option-active { color: #fff; }
