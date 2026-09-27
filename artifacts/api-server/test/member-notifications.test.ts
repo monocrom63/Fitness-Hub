@@ -10,6 +10,19 @@ import {
 } from "@workspace/db";
 import memberAppRouter from "../src/routes/member-app";
 import { BookingError, cancelCourseBooking } from "../src/lib/course-bookings";
+import { promotionNotice, waitlistEmailDraft } from "../src/lib/waitlist-email";
+
+test("waitlist email draft has the intended sender and no HTML or provider side effects", () => {
+  const notice = promotionNotice("Testkurs", new Date("2026-10-01T16:00:00Z"));
+  const draft = waitlistEmailDraft("member@example.invalid", notice);
+  assert.deepEqual(draft, {
+    from: "mail@fiudia.com",
+    to: "member@example.invalid",
+    subject: "Fiudia: Dein Kursplatz ist bestätigt",
+    text: `${notice.body}\n\nDein Fiudia-Team`,
+  });
+  assert.match(draft.text, /Testkurs.*2026.*Uhr/);
+});
 
 test("members can read and acknowledge only their own course notifications", async () => {
   const suffix = randomUUID();

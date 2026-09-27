@@ -1,22 +1,11 @@
 import { and, asc, count, eq } from "drizzle-orm";
 import { courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable } from "@workspace/db";
+import { promotionNotice, waitlistEmailDraft } from "./waitlist-email";
 
 export class BookingError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
-}
-
-function courseDateTime(date: Date) {
-  return new Intl.DateTimeFormat("de-DE", {
-    timeZone: "Europe/Berlin",
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 export async function bookCourse(
@@ -149,14 +138,17 @@ export async function cancelCourseBooking(
         }
         await tx.update(courseBookingsTable).set({ status: "confirmed" })
           .where(eq(courseBookingsTable.id, candidate.id));
+        const notice = promotionNotice(course.title, course.startsAt);
+        const draft = candidate.memberEmailEnabled && candidate.memberEmail.trim()
+          ? waitlistEmailDraft(candidate.memberEmail, notice) : null;
         await tx.insert(memberNotificationsTable).values({
           bookingId: candidate.id,
           memberId: candidate.memberId,
           courseId,
-          title: "Dein Kursplatz ist bestätigt",
-          body: `Du bist für „${course.title}“ am ${courseDateTime(course.startsAt)} Uhr von der Warteliste nachgerückt. Deinen Platz findest du unter „Meine Plätze“.`,
-          // Record the opt-in at promotion time, but never dispatch an email here.
-          emailRequested: candidate.memberEmailEnabled && candidate.memberEmail.trim() ? 1 : 0,
+          title: notice.title,
+          body: notice.body,
+          // A draft is only prepared for opted-in members; nothing is dispatched.
+          emailRequested: draft ? 1 : 0,
         });
         promoted = true;
         break;
