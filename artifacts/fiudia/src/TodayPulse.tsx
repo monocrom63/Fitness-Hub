@@ -7,6 +7,7 @@ import {
   useGetDashboard, useListPulse, useListStudios, useMarkPulseRead, useRetractPulseMessage, useUpdatePulseMessage,
 } from '@workspace/api-client-react';
 import type { Me, ModuleKey, ModuleSetting, PulseAudience, PulseMessage, PulsePriority } from '@workspace/api-client-react';
+import { pulseArchiveQueryOptions } from './PulseArchiveQuery';
 
 const berlin = 'Europe/Berlin';
 const berlinDate = new Intl.DateTimeFormat('de-DE', { timeZone: berlin, weekday: 'long', day: 'numeric', month: 'long' });
@@ -97,17 +98,7 @@ export function PulsePage({ me }: { me: Me }) {
   const [filter, setFilter] = useState<'all' | 'unread'>(() => new URLSearchParams(search).get('filter') === 'unread' ? 'unread' : 'all');
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const query = useInfiniteQuery({
-    queryKey: [...getListPulseQueryKey(), 'history', filter, searchTerm],
-    queryFn: ({ pageParam, signal }) => listPulse({
-      ...(pageParam ? { beforeId: pageParam } : {}),
-      ...(filter === 'unread' ? { unreadOnly: true } : {}),
-      ...(searchTerm ? { search: searchTerm } : {}),
-    }, { signal }),
-    initialPageParam: 0,
-    getNextPageParam: lastPage => lastPage.length === 30 ? lastPage[lastPage.length - 1].id : undefined,
-    refetchInterval: 60000,
-  });
+  const query = useInfiniteQuery(pulseArchiveQueryOptions(filter, searchTerm));
   const create = useCreatePulseMessage();
   const update = useUpdatePulseMessage();
   const retract = useRetractPulseMessage();
