@@ -8,6 +8,7 @@ import {
 } from '@workspace/api-client-react';
 import type { Me, ModuleKey, ModuleSetting, PulseAudience, PulseMessage, PulsePriority } from '@workspace/api-client-react';
 import { pulseArchiveQueryOptions } from './PulseArchiveQuery';
+import { pulseArchiveHref, readPulseArchiveLocation } from './PulseArchiveLocation';
 import { PulseHistory } from './PulseHistory';
 
 const berlin = 'Europe/Berlin';
@@ -96,9 +97,15 @@ export function PulsePage({ me }: { me: Me }) {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const composeRequested = new URLSearchParams(search).get('compose') === '1';
-  const [filter, setFilter] = useState<'all' | 'unread'>(() => new URLSearchParams(search).get('filter') === 'unread' ? 'unread' : 'all');
-  const [searchInput, setSearchInput] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filter, searchTerm } = readPulseArchiveLocation(search);
+  const [searchInput, setSearchInput] = useState(searchTerm);
+  useEffect(() => setSearchInput(searchTerm), [searchTerm]);
+  const setFilter = (next: 'all' | 'unread') => setLocation(pulseArchiveHref(search, { filter: next }));
+  const applySearch = (term: string) => {
+    const normalized = term.trim().slice(0, 120);
+    setSearchInput(normalized);
+    setLocation(pulseArchiveHref(search, { searchTerm: normalized }));
+  };
   const query = useInfiniteQuery(pulseArchiveQueryOptions(filter, searchTerm));
   const create = useCreatePulseMessage();
   const update = useUpdatePulseMessage();
@@ -115,7 +122,14 @@ export function PulsePage({ me }: { me: Me }) {
   const selectedStudioValid = !!studios.data?.some(studio => String(studio.id) === form.studioId);
   const editingUnchanged = !!editing && editing.title === form.title.trim() && editing.body === form.body.trim() && editing.priority === form.priority;
   useEffect(() => { if (composeRequested && me.role !== 'studio_employee') setOpen(true); }, [composeRequested, me.role]);
-  const close = () => { setOpen(false); setEditing(null); setForm(emptyForm()); if (composeRequested) setLocation('/pulse', { replace: true }); };
+  const close = () => {
+    setOpen(false); setEditing(null); setForm(emptyForm());
+    if (composeRequested) {
+      const params = new URLSearchParams(search);
+      params.delete('compose');
+      setLocation(`/pulse${params.size ? `?${params}` : ''}`, { replace: true });
+    }
+  };
   const messages = (query.data?.pages.flat() || []).sort((a, b) => Number(a.isRead) - Number(b.isRead) || b.id - a.id);
   const startEdit = (message: PulseMessage) => {
     update.reset();
@@ -142,9 +156,9 @@ export function PulsePage({ me }: { me: Me }) {
     retract.mutate({ id: message.id }, { onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }) });
   };
   return <div className="pulse-page"><div className="pulse-intro"><div><div className="eyebrow">Fiudia / Zusammenarbeit</div><h1>Pulse.</h1><p>Was dein Team wissen sollte. Nur Nachrichten für deinen Arbeitsbereich.</p></div>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => { create.reset(); setEditing(null); setForm(emptyForm()); setOpen(true); }} data-testid="button-create-pulse"><Plus size={17} /> Nachricht verfassen</button>}</div>
-    <form className="pulse-search" role="search" onSubmit={event => { event.preventDefault(); setSearchTerm(searchInput.trim()); }}>
+    <form className="pulse-search" role="search" onSubmit={event => { event.preventDefault(); applySearch(searchInput); }}>
       <label htmlFor="pulse-search-input">Nachrichten durchsuchen</label>
-      <div className="pulse-search-controls"><input id="pulse-search-input" type="search" maxLength={120} value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Titel oder Nachrichtentext" data-testid="input-pulse-search" /><button className="button button-dark" type="submit" data-testid="button-pulse-search"><Search size={15} /> Suchen</button>{searchTerm && <button className="button button-outline" type="button" onClick={() => { setSearchInput(''); setSearchTerm(''); }} data-testid="button-clear-pulse-search">Suche löschen</button>}</div>
+      <div className="pulse-search-controls"><input id="pulse-search-input" type="search" maxLength={120} value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Titel oder Nachrichtentext" data-testid="input-pulse-search" /><button className="button button-dark" type="submit" data-testid="button-pulse-search"><Search size={15} /> Suchen</button>{searchTerm && <button className="button button-outline" type="button" onClick={() => applySearch('')} data-testid="button-clear-pulse-search">Suche löschen</button>}</div>
     </form>
     <div className="pulse-tools"><div className="pulse-tabs" aria-label="Nachrichten filtern"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')} data-testid="button-pulse-all">Alle</button><button className={filter === 'unread' ? 'active' : ''} onClick={() => setFilter('unread')} data-testid="button-pulse-unread">Ungelesen</button></div>{!query.isLoading && !query.isError && <span className="pulse-count">{messages.length} {searchTerm ? 'Treffer' : messages.length === 1 ? 'Nachricht' : 'Nachrichten'} angezeigt{query.hasNextPage ? ' · weitere laden' : ''}</span>}</div>
     {query.isLoading ? <Skeleton count={3} /> : query.isError && !query.data ? <StatusError retry={() => query.refetch()} /> : messages.length ? <div className="pulse-feed">{messages.map(message =>
