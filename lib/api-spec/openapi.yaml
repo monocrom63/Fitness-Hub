@@ -88,6 +88,31 @@ paths:
           description: Sign-in required
         "403":
           description: Fiudia access has not been assigned
+    post:
+      operationId: createStudio
+      tags: [portal]
+      summary: Create a studio in the signed-in district manager's organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudioInput"
+      responses:
+        "201":
+          description: Studio created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudioSummary"
+        "400":
+          description: Invalid studio details
+        "401":
+          description: Sign-in required
+        "403":
+          description: District manager role required
+        "409":
+          description: A studio with the same name and city already exists in this organization
   /dashboard:
     get:
       operationId: getDashboard
@@ -1190,6 +1215,12 @@ components:
         id: { type: integer }
         name: { type: string }
         city: { type: string }
+    StudioInput:
+      type: object
+      required: [name, city]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 120 }
+        city: { type: string, minLength: 2, maxLength: 120 }
     DashboardMetric:
       type: object
       required: [label, value, delta, tone]

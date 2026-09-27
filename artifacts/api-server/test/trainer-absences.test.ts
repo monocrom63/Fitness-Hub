@@ -137,6 +137,33 @@ test("manager records an absence, resolves all affected courses and notifies mem
     assert.equal(availableStudios.status, 200);
     assert.deepEqual(availableStudios.body.map((item: any) => item.id).sort((a: number, b: number) => a - b),
       [studio.id, otherStudio.id].sort((a, b) => a - b));
+    const studioDraft = { name: "  Studio West  ", city: "  Berlin  ", organizationId: -123 };
+    assert.equal((await api("", "POST", "/studios", studioDraft)).status, 401);
+    assert.equal((await api(manager.clerkUserId, "POST", "/studios", studioDraft)).status, 403);
+    assert.equal((await api(employee.clerkUserId, "POST", "/studios", studioDraft)).status, 403);
+    assert.equal((await api(districtManager.clerkUserId, "POST", "/studios",
+      { name: "   ", city: "Berlin" })).status, 400);
+    const newStudio = await api(districtManager.clerkUserId, "POST", "/studios", studioDraft);
+    assert.equal(newStudio.status, 201, JSON.stringify(newStudio.body));
+    assert.equal(newStudio.body.name, "Studio West");
+    assert.equal(newStudio.body.city, "Berlin");
+    const [storedStudio] = await db.select().from(studiosTable).where(eq(studiosTable.id, newStudio.body.id));
+    assert.equal(storedStudio.organizationId, organizationId, "organization comes from the signed-in district manager");
+    assert.equal((await api(districtManager.clerkUserId, "POST", "/studios",
+      { name: "studio west", city: "BERLIN" })).status, 409);
+    const simultaneous = await Promise.all([0, 1].map(() =>
+      api(districtManager.clerkUserId, "POST", "/studios", { name: "Studio Süd", city: "Potsdam" })));
+    assert.deepEqual(simultaneous.map(result => result.status).sort(), [201, 409]);
+    const updatedStudios = await api(districtManager.clerkUserId, "GET", "/studios");
+    assert.equal(updatedStudios.body.filter((item: any) => item.name === "Studio Süd").length, 1);
+    assert.ok(updatedStudios.body.some((item: any) => item.id === newStudio.body.id));
+    const managerStudios = await api(manager.clerkUserId, "GET", "/studios");
+    assert.ok(!managerStudios.body.some((item: any) => item.id === newStudio.body.id));
+    const courseInNewStudio = await api(districtManager.clerkUserId, "POST", "/courses", {
+      ...newCourse("Lina", slot(14), slot(15), "New studio room"), studioId: newStudio.body.id,
+    });
+    assert.equal(courseInNewStudio.status, 201, JSON.stringify(courseInNewStudio.body));
+    assert.equal(courseInNewStudio.body.studioName, "Studio West");
     const districtCourse = await api(districtManager.clerkUserId, "POST", "/courses", {
       ...newCourse("Lina", slot(14), slot(15), "District Room"), studioId: otherStudio.id,
     });

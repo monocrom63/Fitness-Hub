@@ -553,6 +553,18 @@ button { cursor: pointer; }
 .module-list { overflow: hidden; border: 1px solid hsl(var(--card-border)); border-radius: 15px; background: hsl(var(--card)); }
 .module-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 70px; padding: 14px 20px; border-bottom: 1px solid hsl(var(--border)); }
 .module-row:last-child { border-bottom: 0; }
+.studio-settings { margin-bottom: 36px; }
+.studio-settings-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 16px; }
+.studio-settings-head p, .studio-settings-status { margin: 0; color: hsl(var(--muted-foreground)); font-size: .78rem; line-height: 1.6; }
+.studio-settings-head .button { flex-shrink: 0; }
+.studio-create-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; padding: 18px; border: 1px solid hsl(var(--card-border)); border-radius: 15px; background: hsl(var(--card)); }
+.studio-create-actions { display: flex; align-items: end; gap: 8px; grid-column: 1 / -1; }
+.studio-create-form .form-error { grid-column: 1 / -1; margin: 0; }
+.studio-settings .booking-result { margin: 0 0 18px; }
+@media (max-width: 600px) {
+  .studio-settings-head { align-items: stretch; flex-direction: column; }
+  .studio-create-form { grid-template-columns: 1fr; }
+}
 .module-row strong, .module-row span { display: block; }
 .module-row strong { font-size: .83rem; }
 .module-row span { margin-top: 3px; color: hsl(var(--muted-foreground)); font-size: .72rem; }

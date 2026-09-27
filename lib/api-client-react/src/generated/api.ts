@@ -69,6 +69,7 @@ import type {
   RoomClosureInput,
   RoomInput,
   StaffBookingInput,
+  StudioInput,
   StudioSummary,
   TrainerAbsence,
   TrainerAbsenceCourse,
@@ -424,6 +425,94 @@ export function useListStudios<TData = Awaited<ReturnType<typeof listStudios>>, 
 
 
 
+
+export const getCreateStudioUrl = () => {
+
+
+
+
+  return `/api/studios`
+}
+
+/**
+ * @summary Create a studio in the signed-in district manager's organization
+ */
+export const createStudio = async (studioInput: StudioInput, options?: Parameters<typeof customFetch>[1]): Promise<StudioSummary> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StudioSummary>(getCreateStudioUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(studioInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStudioMutationKey = () => ['createStudio'] as const;
+
+export const getCreateStudioMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudio>>, TError,CreateStudioMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStudio>>, TError,CreateStudioMutationVariables, TContext> => {
+
+const mutationKey = getCreateStudioMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStudio>>, CreateStudioMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createStudio(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStudioMutationResult = NonNullable<Awaited<ReturnType<typeof createStudio>>>
+    export type CreateStudioMutationBody = BodyType<StudioInput>
+    export type CreateStudioMutationError = ErrorType<void>
+    export type CreateStudioMutationVariables = {data: BodyType<StudioInput>}
+
+    /**
+ * @summary Create a studio in the signed-in district manager's organization
+ */
+export const useCreateStudio = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudio>>, TError,CreateStudioMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStudio>>,
+        TError,
+        CreateStudioMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateStudioMutationOptions(options));
+    }
 
 export const getGetDashboardUrl = () => {
 

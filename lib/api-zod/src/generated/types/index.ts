@@ -86,6 +86,7 @@ export * from './roomClosure';
 export * from './roomClosureInput';
 export * from './roomInput';
 export * from './staffBookingInput';
+export * from './studioInput';
 export * from './studioSummary';
 export * from './trainerAbsence';
 export * from './trainerAbsenceCourse';

@@ -20,6 +20,8 @@ import {
   CreateCourseResponse,
   CreateMemberBody,
   CreateMemberResponse,
+  CreateStudioBody,
+  CreateStudioResponse,
   CompleteOnboardingBody,
   CompleteOnboardingResponse,
   GetDashboardResponse,
@@ -257,6 +259,44 @@ router.get("/studios", async (req, res): Promise<void> => {
     )
     .orderBy(asc(studiosTable.name));
   res.json(ListStudiosResponse.parse(studios));
+});
+
+router.post("/studios", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  if (staff.role !== "district_manager") {
+    res.status(403).json({ error: "Nur Bezirksleitungen können Studios anlegen." });
+    return;
+  }
+  const body = CreateStudioBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Bitte Studio-Name und Stadt mit jeweils 2 bis 120 Zeichen angeben." });
+    return;
+  }
+  const name = body.data.name.trim();
+  const city = body.data.city.trim();
+  if (name.length < 2 || city.length < 2) {
+    res.status(400).json({ error: "Bitte Studio-Name und Stadt mit jeweils 2 bis 120 Zeichen angeben." });
+    return;
+  }
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-studio-create:${staff.organizationId}`}))`);
+    const [existing] = await tx.select({ id: studiosTable.id }).from(studiosTable).where(and(
+      eq(studiosTable.organizationId, staff.organizationId),
+      sql<boolean>`lower(btrim(${studiosTable.name})) = lower(${name})`,
+      sql<boolean>`lower(btrim(${studiosTable.city})) = lower(${city})`,
+    )).limit(1);
+    if (existing) return { error: "In dieser Stadt gibt es bereits ein Studio mit diesem Namen." as const };
+    const [studio] = await tx.insert(studiosTable)
+      .values({ organizationId: staff.organizationId, name, city })
+      .returning({ id: studiosTable.id, name: studiosTable.name, city: studiosTable.city });
+    return { studio };
+  });
+  if ("error" in result) {
+    res.status(409).json({ error: result.error });
+    return;
+  }
+  res.status(201).json(CreateStudioResponse.parse(result.studio));
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {

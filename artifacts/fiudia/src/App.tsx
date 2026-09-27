@@ -22,6 +22,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ActionStrip, PulsePage, TodayPage } from './TodayPulse';
 import RoomClosuresPage from './RoomClosuresPage';
+import StudioManagement from './StudioManagement';
 import TrainerAbsencesPage from './TrainerAbsencesPage';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -508,7 +509,7 @@ function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; mod
 
 function ProtectedRoute({ page }: { page: 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' }) {
   return <AuthenticatedData>{(me, modules, retryModules, modulesError) => {
-    if (page === 'settings') return <SettingsPage me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />;
+    if (page === 'settings') return <><SettingsPage me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />{me.role === 'district_manager' && <StudioManagement />}</>;
     if (page === 'dashboard') return <DashboardPage me={me} modules={modules} />;
     if (page === 'rooms') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <RoomClosuresPage me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Räume sind nur für Studio- und District-Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
     if (page === 'trainer-absences') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <TrainerAbsencesPage me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Trainer-Ausfälle sind nur für Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;

@@ -78,6 +78,29 @@ export const ListStudiosResponse = zod.array(ListStudiosResponseItem)
 
 
 /**
+ * @summary Create a studio in the signed-in district manager's organization
+ */
+export const createStudioBodyNameMin = 2;
+export const createStudioBodyNameMax = 120;
+
+export const createStudioBodyCityMin = 2;
+export const createStudioBodyCityMax = 120;
+
+
+
+export const CreateStudioBody = zod.object({
+  "name": zod.string().min(createStudioBodyNameMin).max(createStudioBodyNameMax),
+  "city": zod.string().min(createStudioBodyCityMin).max(createStudioBodyCityMax)
+})
+
+export const CreateStudioResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "city": zod.string()
+})
+
+
+/**
  * @summary Get metrics and activity tailored to the signed-in user's role
  */
 export const GetDashboardResponse = zod.object({

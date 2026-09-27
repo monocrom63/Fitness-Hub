@@ -67,6 +67,19 @@ export interface StudioSummary {
   city: string;
 }
 
+export interface StudioInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  name: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  city: string;
+}
+
 export type DashboardMetricTone = typeof DashboardMetricTone[keyof typeof DashboardMetricTone];
 
 
