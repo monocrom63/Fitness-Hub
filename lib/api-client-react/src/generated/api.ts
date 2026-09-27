@@ -2468,7 +2468,7 @@ export const getUpdatePulseMessageUrl = (id: number,) => {
 }
 
 /**
- * Title, body and priority can change; audience and studio remain fixed. Prior read receipts are reset.
+ * Title, body and priority can change when the submitted revision matches the current message; audience and studio remain fixed. Prior read receipts are reset only for successful corrections.
  * @summary Correct a published Pulse message as its manager-author or a district manager
  */
 export const updatePulseMessage = async (id: number,

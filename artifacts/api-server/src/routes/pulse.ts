@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, inArray, isNull, lt, notExists, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, lt, notExists, or, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreatePulseMessageBody,
@@ -129,6 +129,7 @@ router.get("/pulse", async (req, res): Promise<void> => {
       body: pulseMessagesTable.body,
       priority: pulseMessagesTable.priority,
       audience: pulseMessagesTable.audience,
+      revision: pulseMessagesTable.revision,
       studioId: pulseMessagesTable.studioId,
       studioName: studiosTable.name,
       authorName: staffTable.fullName,
@@ -296,6 +297,7 @@ router.post("/pulse", async (req, res): Promise<void> => {
       body: message.body,
       priority: message.priority,
       audience: message.audience,
+      revision: message.revision,
       studioId: message.studioId,
       studioName: studio?.name ?? null,
       authorName: staff.fullName,
@@ -314,7 +316,7 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
   const params = UpdatePulseMessageParams.safeParse(req.params);
   const body = UpdatePulseMessageBody.safeParse(req.body);
   if (!params.success || !body.success || body.data.title.trim().length < 2 || !body.data.body.trim() ||
-      !req.body || Object.keys(req.body).some(key => !["title", "body", "priority"].includes(key))) {
+      !req.body || Object.keys(req.body).some(key => !["title", "body", "priority", "revision"].includes(key))) {
     res.status(400).json({ error: "Titel oder Nachricht sind ungültig." });
     return;
   }
@@ -334,6 +336,7 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
       isNull(pulseMessagesTable.retractedAt),
     )).for("update").limit(1);
     if (!previous) return { status: "missing" as const };
+    if (previous.revision !== body.data.revision) return { status: "conflict" as const };
     if (previous.title === next.title && previous.body === next.body && previous.priority === next.priority) {
       return { status: "unchanged" as const };
     }
@@ -341,6 +344,7 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
     const [message] = await tx.update(pulseMessagesTable).set({
       ...next,
       editedAt,
+      revision: sql`${pulseMessagesTable.revision} + 1`,
     }).where(eq(pulseMessagesTable.id, previous.id)).returning();
     await tx.insert(pulseCorrectionsTable).values({
       messageId: message.id,
@@ -364,6 +368,10 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Meldung nicht gefunden." });
     return;
   }
+  if (result.status === "conflict") {
+    res.status(409).json({ error: "Die Meldung wurde zwischenzeitlich korrigiert. Lade die aktuelle Fassung, bevor du sie erneut bearbeitest." });
+    return;
+  }
   if (result.status === "unchanged") {
     res.status(400).json({ error: "Die Meldung wurde nicht verändert." });
     return;
@@ -376,7 +384,7 @@ router.patch("/pulse/:id", async (req, res): Promise<void> => {
     .from(staffTable).where(eq(staffTable.id, updated.authorStaffId)).limit(1);
   res.json(UpdatePulseMessageResponse.parse({
     id: updated.id, title: updated.title, body: updated.body,
-    priority: updated.priority, audience: updated.audience,
+    priority: updated.priority, audience: updated.audience, revision: updated.revision,
     studioId: updated.studioId, studioName: studio?.name ?? null,
     authorName: author.fullName, createdAt: updated.createdAt.toISOString(),
     editedAt: updated.editedAt?.toISOString() ?? null,

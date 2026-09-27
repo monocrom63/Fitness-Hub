@@ -668,12 +668,16 @@ export const ListPulseQueryParams = zod.object({
   "search": zod.coerce.string().min(1).max(listPulseQuerySearchMax).optional().describe('Find visible announcements by title or body, including older messages')
 })
 
+
+
+
 export const ListPulseResponseItem = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
   "body": zod.string(),
   "priority": zod.enum(['info', 'important', 'urgent']),
   "audience": zod.enum(['all', 'managers', 'employees']),
+  "revision": zod.number().int().min(1),
   "studioId": zod.number().int().nullable(),
   "studioName": zod.string().nullable(),
   "authorName": zod.string(),
@@ -704,12 +708,16 @@ export const CreatePulseMessageBody = zod.object({
   "studioId": zod.number().int().nullable()
 })
 
+
+
+
 export const CreatePulseMessageResponse = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
   "body": zod.string(),
   "priority": zod.enum(['info', 'important', 'urgent']),
   "audience": zod.enum(['all', 'managers', 'employees']),
+  "revision": zod.number().int().min(1),
   "studioId": zod.number().int().nullable(),
   "studioName": zod.string().nullable(),
   "authorName": zod.string(),
@@ -722,7 +730,7 @@ export const CreatePulseMessageResponse = zod.object({
 
 
 /**
- * Title, body and priority can change; audience and studio remain fixed. Prior read receipts are reset.
+ * Title, body and priority can change when the submitted revision matches the current message; audience and studio remain fixed. Prior read receipts are reset only for successful corrections.
  * @summary Correct a published Pulse message as its manager-author or a district manager
  */
 export const UpdatePulseMessageParams = zod.object({
@@ -736,11 +744,16 @@ export const updatePulseMessageBodyBodyMax = 2000;
 
 
 
+
 export const UpdatePulseMessageBody = zod.object({
   "title": zod.string().min(updatePulseMessageBodyTitleMin).max(updatePulseMessageBodyTitleMax),
   "body": zod.string().min(1).max(updatePulseMessageBodyBodyMax),
-  "priority": zod.enum(['info', 'important', 'urgent'])
+  "priority": zod.enum(['info', 'important', 'urgent']),
+  "revision": zod.number().int().min(1)
 })
+
+
+
 
 export const UpdatePulseMessageResponse = zod.object({
   "id": zod.number().int(),
@@ -748,6 +761,7 @@ export const UpdatePulseMessageResponse = zod.object({
   "body": zod.string(),
   "priority": zod.enum(['info', 'important', 'urgent']),
   "audience": zod.enum(['all', 'managers', 'employees']),
+  "revision": zod.number().int().min(1),
   "studioId": zod.number().int().nullable(),
   "studioName": zod.string().nullable(),
   "authorName": zod.string(),

@@ -182,7 +182,7 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
     });
 
     await t.test("manager-authors and district managers can correct or retract without changing the audience", async () => {
-      const correction = { title: "Korrigierter Plan", body: "Neuer Termin", priority: "important" };
+      const correction = { title: "Korrigierter Plan", body: "Neuer Termin", priority: "important", revision: 1 };
       assert.equal((await api(user(employeeA), "PATCH", `/pulse/${studioAAll}`, correction)).status, 403);
       assert.equal((await api(user(managerB), "PATCH", `/pulse/${studioAAll}`, correction)).status, 403);
       assert.equal((await api(user(otherDistrict), "PATCH", `/pulse/${studioAAll}`, correction)).status, 404);
@@ -199,6 +199,7 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal(updated.body.authorName, "Manager A");
       assert.equal(updated.body.studioId, studioA.id);
       assert.equal(updated.body.audience, "all");
+      assert.equal(updated.body.revision, 2);
       assert.ok(updated.body.editedAt);
       assert.equal(updated.body.readCount, 1);
       const employeePage = await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`);
@@ -222,9 +223,11 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
         { field: "body", before: "A scoped message", after: correction.body },
         { field: "priority", before: "info", after: correction.priority },
       ]);
-      assert.equal((await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, correction)).status, 400);
-      const second = await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, body: "Noch ein Hinweis" });
+      assert.equal((await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, correction)).status, 409);
+      assert.equal((await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, revision: 2 })).status, 400);
+      const second = await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, body: "Noch ein Hinweis", revision: 2 });
       assert.equal(second.status, 200);
+      assert.equal(second.body.revision, 3);
       const history = await api(user(employeeA), "GET", historyUrl);
       assert.equal(history.status, 200);
       assert.equal(history.body.length, 2);
@@ -250,6 +253,34 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       const authored = await publish(managerA, studioA.id, "all", "Author correction");
       assert.equal((await api(user(managerA), "PATCH", `/pulse/${authored}`, correction)).status, 200);
       assert.equal((await api(user(managerA), "DELETE", `/pulse/${authored}`)).status, 204);
+    });
+
+    await t.test("simultaneous corrections accept only one revision and leave no rejected audit entry", async () => {
+      const id = await publish(managerA, studioA.id, "all", "Parallel plan");
+      const url = `/pulse/${id}`;
+      const first = { title: "Parallel plan A", body: "First manager", priority: "info", revision: 1 };
+      const second = { title: "Parallel plan B", body: "District manager", priority: "urgent", revision: 1 };
+      assert.equal((await api(user(managerA), "PATCH", url, { ...first, revision: 0 })).status, 400);
+      assert.equal((await api(user(managerA), "PATCH", url, { title: first.title, body: first.body, priority: first.priority })).status, 400);
+      const outcomes = await Promise.all([
+        api(user(managerA), "PATCH", url, first),
+        api(user(district), "PATCH", url, second),
+      ]);
+      assert.deepEqual(outcomes.map(outcome => outcome.status).sort(), [200, 409]);
+      const winner = outcomes.find(outcome => outcome.status === 200)!.body;
+      assert.equal(winner.revision, 2);
+      assert.equal((await api(user(employeeA), "GET", "/pulse")).body.find((message: { id: number }) => message.id === id)?.title, winner.title);
+      const history = await api(user(employeeA), "GET", `${url}/history`);
+      assert.equal(history.status, 200);
+      assert.equal(history.body.length, 1);
+      const reads = await db.select().from(pulseReadsTable).where(eq(pulseReadsTable.messageId, id));
+      assert.equal(reads.length, 1);
+      const stale = await api(user(district), "PATCH", url, { ...first, revision: 1 });
+      assert.equal(stale.status, 409);
+      assert.equal((await api(user(employeeA), "GET", `${url}/history`)).body.length, 1);
+      const retry = await api(user(district), "PATCH", url, { ...(winner.title === first.title ? second : first), revision: winner.revision });
+      assert.equal(retry.status, 200);
+      assert.equal(retry.body.revision, 3);
     });
 
     assert.equal((await db.select().from(pulseMessagesTable).where(eq(pulseMessagesTable.organizationId, orgB.id))).length, 1);

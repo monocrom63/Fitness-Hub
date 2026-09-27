@@ -428,6 +428,8 @@ export interface PulseMessage {
   body: string;
   priority: PulsePriority;
   audience: PulseAudience;
+  /** @minimum 1 */
+  revision: number;
   /** @nullable */
   studioId: number | null;
   /** @nullable */
@@ -470,6 +472,8 @@ export interface PulseCorrection {
      */
   body: string;
   priority: PulsePriority;
+  /** @minimum 1 */
+  revision: number;
 }
 
 export type PulseHistoryChangeField = typeof PulseHistoryChangeField[keyof typeof PulseHistoryChangeField];

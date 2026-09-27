@@ -200,6 +200,7 @@ export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
   body: text("body").notNull(),
   priority: text("priority").notNull().default("info"),
   audience: text("audience").notNull().default("all"),
+  revision: integer("revision").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

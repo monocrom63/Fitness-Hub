@@ -107,6 +107,8 @@ export function PulsePage({ me }: { me: Me }) {
   const [open, setOpen] = useState(() => composeRequested && me.role !== 'studio_employee');
   const [editing, setEditing] = useState<PulseMessage | null>(null);
   const [historyOpenId, setHistoryOpenId] = useState<number | null>(null);
+  const [refreshingConflict, setRefreshingConflict] = useState(false);
+  const [conflictRefreshFailed, setConflictRefreshFailed] = useState(false);
   const [form, setForm] = useState({ title: '', body: '', priority: 'info' as PulsePriority, audience: 'all' as PulseAudience, scope: 'organization', studioId: '' });
   const emptyForm = () => ({ title: '', body: '', priority: 'info' as PulsePriority, audience: 'all' as PulseAudience, scope: 'organization', studioId: '' });
   const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: me.role === 'district_manager' && open && form.scope === 'studio' } });
@@ -117,6 +119,7 @@ export function PulsePage({ me }: { me: Me }) {
   const messages = (query.data?.pages.flat() || []).sort((a, b) => Number(a.isRead) - Number(b.isRead) || b.id - a.id);
   const startEdit = (message: PulseMessage) => {
     update.reset();
+    setConflictRefreshFailed(false);
     setEditing(message);
     setForm({ title: message.title, body: message.body, priority: message.priority, audience: message.audience, scope: message.studioId === null ? 'organization' : 'studio', studioId: String(message.studioId ?? '') });
     setOpen(true);
@@ -124,7 +127,7 @@ export function PulsePage({ me }: { me: Me }) {
   const publish = (event: React.FormEvent) => {
     event.preventDefault();
     if (editing) {
-      update.mutate({ id: editing.id, data: { title: form.title.trim(), body: form.body.trim(), priority: form.priority } }, {
+      update.mutate({ id: editing.id, data: { title: form.title.trim(), body: form.body.trim(), priority: form.priority, revision: editing.revision } }, {
         onSuccess: () => { client.invalidateQueries({ queryKey: getListPulseQueryKey() }); client.invalidateQueries({ queryKey: getListPulseHistoryQueryKey(editing.id) }); close(); },
       });
       return;
@@ -164,7 +167,8 @@ export function PulsePage({ me }: { me: Me }) {
           <div className="field-grid"><label className="field">Priorität<select value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value as PulsePriority })} data-testid="select-pulse-priority"><option value="info">Info</option><option value="important">Wichtig</option><option value="urgent">Dringend</option></select></label>{!editing && <label className="field">Empfänger<select value={form.audience} onChange={event => setForm({ ...form, audience: event.target.value as PulseAudience })} data-testid="select-pulse-audience"><option value="all">Alle</option><option value="managers">Leitung</option><option value="employees">Studio-Team</option></select></label>}</div>
           {editing ? <p className="pulse-meta">Empfänger und Studio bleiben unverändert. Bisherige Lesebestätigungen werden für die Korrektur zurückgesetzt.</p> : me.role === 'district_manager' ? <label className="field">Gültigkeitsbereich<select value={form.scope} onChange={event => setForm({ ...form, scope: event.target.value, studioId: '' })} data-testid="select-pulse-scope"><option value="organization">Gesamte Organisation</option><option value="studio">Ein bestimmtes Studio</option></select></label> : <p className="pulse-meta">Studio: {me.studioName || 'Dein Studio'}</p>}
           {!editing && me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading ? <div className="pulse-studio-status" role="status">Studios werden geladen …</div> : studios.isError ? <div className="pulse-studio-status" role="alert">Studios konnten nicht geladen werden. <button type="button" onClick={() => studios.refetch()} data-testid="button-retry-pulse-studios">Erneut versuchen</button></div> : studios.data?.length ? <label className="field">Studio<select required value={form.studioId} onChange={event => setForm({ ...form, studioId: event.target.value })} data-testid="select-pulse-studio"><option value="">Studio auswählen</option>{studios.data.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}</select></label> : <div className="pulse-studio-status" role="status">Keine zugänglichen Studios vorhanden.</div>)}
-          {(create.isError || update.isError) && <p className="pulse-form-error" role="alert">Nachricht konnte nicht gespeichert werden. Prüfe die Angaben und versuche es erneut.</p>}
+          {update.error?.status === 409 ? <div className="pulse-form-error" role="alert"><p>Diese Meldung wurde inzwischen von jemand anderem korrigiert. Deine Änderungen wurden nicht gespeichert.</p><button type="button" className="button button-outline" disabled={refreshingConflict} onClick={async () => { setRefreshingConflict(true); setConflictRefreshFailed(false); try { await client.invalidateQueries({ queryKey: getListPulseQueryKey() }, { throwOnError: true }); close(); } catch { setConflictRefreshFailed(true); } finally { setRefreshingConflict(false); } }}>{refreshingConflict ? 'Wird geladen …' : 'Änderungen verwerfen und aktuelle Fassung laden'}</button>{conflictRefreshFailed && <p>Die aktuelle Fassung konnte nicht geladen werden. Bitte erneut versuchen.</p>}</div>
+            : (create.isError || update.isError) && <p className="pulse-form-error" role="alert">Nachricht konnte nicht gespeichert werden. Prüfe die Angaben und versuche es erneut.</p>}
           <button className="button button-dark button-wide" disabled={create.isPending || update.isPending || editingUnchanged || (!editing && ((me.role === 'studio_manager' && !me.studioId) || (me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading || studios.isError || !selectedStudioValid))))} data-testid="button-publish-pulse"><Mail size={16} /> {create.isPending || update.isPending ? 'Wird gespeichert …' : editingUnchanged ? 'Keine Änderungen' : editing ? 'Korrektur speichern' : 'Nachricht veröffentlichen'}</button>
         </form>
       </div>

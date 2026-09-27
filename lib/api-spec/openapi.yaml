@@ -602,7 +602,7 @@ paths:
       operationId: updatePulseMessage
       tags: [pulse]
       summary: Correct a published Pulse message as its manager-author or a district manager
-      description: Title, body and priority can change; audience and studio remain fixed. Prior read receipts are reset.
+      description: Title, body and priority can change when the submitted revision matches the current message; audience and studio remain fixed. Prior read receipts are reset only for successful corrections.
       parameters:
         - name: id
           in: path
@@ -625,6 +625,7 @@ paths:
         "401": { description: Sign-in required }
         "403": { description: Insufficient permission }
         "404": { description: Message not found or already retracted }
+        "409": { description: Message has been corrected since it was loaded }
     delete:
       operationId: retractPulseMessage
       tags: [pulse]
@@ -1044,13 +1045,14 @@ components:
     PulseMessage:
       type: object
       required:
-        [id, title, body, priority, audience, studioId, studioName, authorName, createdAt, editedAt, isRead, readCount, canManage]
+        [id, title, body, priority, audience, revision, studioId, studioName, authorName, createdAt, editedAt, isRead, readCount, canManage]
       properties:
         id: { type: integer }
         title: { type: string }
         body: { type: string }
         priority: { $ref: "#/components/schemas/PulsePriority" }
         audience: { $ref: "#/components/schemas/PulseAudience" }
+        revision: { type: integer, minimum: 1 }
         studioId: { type: ["integer", "null"] }
         studioName: { type: ["string", "null"] }
         authorName: { type: string }
@@ -1070,11 +1072,12 @@ components:
         studioId: { type: ["integer", "null"] }
     PulseCorrection:
       type: object
-      required: [title, body, priority]
+      required: [title, body, priority, revision]
       properties:
         title: { type: string, minLength: 2, maxLength: 140 }
         body: { type: string, minLength: 1, maxLength: 2000 }
         priority: { $ref: "#/components/schemas/PulsePriority" }
+        revision: { type: integer, minimum: 1 }
     PulseHistoryChange:
       type: object
       required: [field, before, after]

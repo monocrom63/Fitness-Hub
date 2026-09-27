@@ -19,4 +19,6 @@ export interface PulseCorrection {
      */
   body: string;
   priority: PulsePriority;
+  /** @minimum 1 */
+  revision: number;
 }

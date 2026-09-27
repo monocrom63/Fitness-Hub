@@ -14,3 +14,9 @@ For corrections made before revision tracking existed, never infer or fabricate 
 **Why:** The prior message version and the correcting person's identity were not persisted, so an accurate history cannot be recovered from the current message.
 
 **How to apply:** Present complete before/after details only for recorded corrections; label older corrections without records as lacking historical detail.
+
+Concurrent corrections must compare a monotonically increasing version while holding the message lock; do not rely on the edit timestamp as a concurrency token.
+
+**Why:** Two corrections can have the same timestamp resolution, and a stale form must not overwrite another manager's correction or add a misleading audit entry.
+
+**How to apply:** When adding a new correction path, require the version the editor saw and reject a mismatch before changing the message, history, or read receipts.
