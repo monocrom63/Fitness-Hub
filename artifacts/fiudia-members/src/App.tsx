@@ -15,6 +15,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { afterAuthPath, clearInvite, invitePath, pendingInvite as getPendingInvite, rememberInvite } from './invitation-return';
+import { getOneSignal, optOutOnSignOut, rememberPushChoice, supportsPushEnvironment } from './lib/onesignal';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -88,6 +89,13 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
   const [location] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const leave = () => {
+    // A blocked SDK/CDN request must never prevent the member from signing out.
+    void Promise.race([
+      optOutOnSignOut().catch(() => {}),
+      new Promise<void>(resolve => setTimeout(resolve, 1500)),
+    ]).then(() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` }));
+  };
   const notifications = useMemberNotifications(Boolean(member && home?.coursesEnabled));
   const unread = notifications.data?.filter(item => !item.readAt).length ?? 0;
   const nav = [
@@ -104,10 +112,10 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
       <nav className="rail-nav" aria-label="Hauptnavigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`rail-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${href === '/' ? 'today' : href.slice(1)}`}><Icon /><span className="nav-label">{label}</span>{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`} data-testid="status-unread-count">{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
       <div className="rail-bottom">
         <div className="rail-note"><div><strong>Dein Tempo zählt.</strong>Ein guter Trainingstag beginnt damit, dass du einfach auftauchst.</div></div>
-        <div className="rail-user"><span className="avatar">{initials(member?.fullName || user?.fullName || 'Fiudia')}</span><span>{member?.fullName || user?.fullName || 'Mein Konto'}<small>{member?.studioName || 'Noch kein Studio verbunden'}</small></span><button className="signout" type="button" onClick={() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` })} aria-label="Abmelden" title="Abmelden" data-testid="button-sign-out"><LogOut size={17} /></button></div>
+        <div className="rail-user"><span className="avatar">{initials(member?.fullName || user?.fullName || 'Fiudia')}</span><span>{member?.fullName || user?.fullName || 'Mein Konto'}<small>{member?.studioName || 'Noch kein Studio verbunden'}</small></span><button className="signout" type="button" onClick={leave} aria-label="Abmelden" title="Abmelden" data-testid="button-sign-out"><LogOut size={17} /></button></div>
       </div>
     </aside>
-    <div className="main"><div className="mobile-header"><Brand /><button className="signout" type="button" onClick={() => signOut({ redirectUrl: `${window.location.origin}${basePath}/sign-in` })} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{children}</div>
+    <div className="main"><div className="mobile-header"><Brand /><button className="signout" type="button" onClick={leave} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{children}</div>
     <nav className="mobile-nav" aria-label="Mobile Navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} data-testid={`link-mobile-${href === '/' ? 'today' : href.slice(1)}`}><Icon size={19} strokeWidth={1.7} />{label}{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`}>{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
   </div>;
 }
@@ -197,6 +205,82 @@ function CheckInsPage() {
     <div className="footer-line">Deine Besuche bleiben deine Geschichte.</div>
   </div>;
 }
+function PushPreference() {
+  const [state, setState] = useState<'loading' | 'ready' | 'unsupported' | 'error'>('loading');
+  const [optedIn, setOptedIn] = useState(false);
+  const [denied, setDenied] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    let detach = () => {};
+    if (!supportsPushEnvironment()) {
+      setState('unsupported');
+      return;
+    }
+    void getOneSignal().then(sdk => {
+      if (!active) return;
+      if (!sdk.Notifications.isPushSupported()) {
+        setState('unsupported');
+        return;
+      }
+      const refresh = () => {
+        if (!active) return;
+        const subscribed = sdk.User.PushSubscription.optedIn;
+        setOptedIn(subscribed);
+        setDenied(Notification.permission === 'denied');
+        if (subscribed) rememberPushChoice(true);
+      };
+      sdk.User.PushSubscription.addEventListener('change', refresh);
+      sdk.Notifications.addEventListener('permissionChange', refresh);
+      detach = () => {
+        sdk.User.PushSubscription.removeEventListener('change', refresh);
+        sdk.Notifications.removeEventListener('permissionChange', refresh);
+      };
+      refresh();
+      setState('ready');
+    }).catch(() => { if (active) setState('error'); });
+    return () => { active = false; detach(); };
+  }, []);
+
+  const toggle = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const sdk = await getOneSignal();
+      if (optedIn) await sdk.User.PushSubscription.optOut();
+      else await sdk.User.PushSubscription.optIn();
+      const subscribed = sdk.User.PushSubscription.optedIn;
+      setOptedIn(subscribed);
+      setDenied(Notification.permission === 'denied');
+      rememberPushChoice(subscribed);
+      if (!optedIn && !subscribed) {
+        setError(Notification.permission === 'denied'
+          ? 'Benachrichtigungen sind im Browser blockiert. Bitte ändere die Berechtigung in deinen Browser-Einstellungen.'
+          : 'Dieses Gerät konnte noch nicht für Push angemeldet werden. Bitte versuche es erneut.');
+      }
+    } catch {
+      setError('Die Push-Einstellung konnte nicht geändert werden. Bitte versuche es erneut.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <section className="soft-card email-preference" aria-labelledby="push-preference-title" data-testid="push-preference">
+    <div><h2 id="push-preference-title">Push auf diesem Gerät</h2>
+      <p>Du entscheidest, ob Fiudia auf diesem Gerät Browser-Benachrichtigungen anzeigen darf. Für Kursänderungen ist der Versand durch dein Studio noch nicht aktiviert.</p>
+      {state === 'ready' && <p role="status" data-testid="status-push-subscription">{optedIn ? 'Dieses Gerät ist für Push angemeldet.' : denied ? 'Benachrichtigungen sind im Browser blockiert.' : 'Dieses Gerät ist nicht für Push angemeldet.'}</p>}
+      {state === 'unsupported' && <p role="status">Dieser Browser oder diese Verbindung unterstützt keine Push-Benachrichtigungen.</p>}
+      {state === 'error' && <p role="alert">Push konnte hier nicht eingerichtet werden. Prüfe die OneSignal-Konfiguration für diese Website.</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </div>
+    <button className="button button-secondary" type="button" disabled={state !== 'ready' || busy || (denied && !optedIn)} onClick={() => { void toggle(); }} data-testid="button-toggle-push">
+      {busy ? 'Bitte warten …' : optedIn ? 'Gerät abmelden' : 'Benachrichtigungen erlauben'}
+    </button>
+  </section>;
+}
+
 function NotificationsPage({ home }: { home: MemberHome }) {
   const notifications = useMemberNotifications(true);
   const markRead = useNotificationRead();
@@ -210,6 +294,7 @@ function NotificationsPage({ home }: { home: MemberHome }) {
   };
   const items = [...(notifications.data || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return <div className="page"><PageHeader eyebrow="Hinweise" title="Deine Hinweise." description="Hier erfährst du, wenn sich etwas an deinen Kursbuchungen oder Wartelistenplätzen ändert." />
+    <PushPreference />
     <section className="soft-card email-preference" aria-labelledby="email-preference-title">
       <div><h2 id="email-preference-title">E-Mail für freie Kursplätze</h2>
         <p>Wenn du von der Warteliste nachrückst, kannst du zusätzlich einen E-Mail-Hinweis wünschen. Der Versand ist derzeit noch nicht aktiv; Hinweise erscheinen weiterhin hier.</p>
@@ -343,6 +428,14 @@ function Routes() {
 }
 function IdentityQueryBoundary() {
   const { isLoaded, isSignedIn, userId } = useAuth();
+  const previousUserId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn || (previousUserId.current && previousUserId.current !== userId)) {
+      void optOutOnSignOut().catch(() => {});
+    }
+    previousUserId.current = userId ?? null;
+  }, [isLoaded, isSignedIn, userId]);
   // A query cache belongs to one exact Clerk identity, never to the application.
   // Construct the new cache during render, before any member screen can read it.
   const client = useMemo(
