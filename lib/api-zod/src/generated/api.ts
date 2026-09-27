@@ -101,8 +101,39 @@ export const CreateStudioResponse = zod.object({
 
 
 /**
+ * @summary Update a studio's name and city
+ */
+export const UpdateStudioParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateStudioBodyNameMin = 2;
+export const updateStudioBodyNameMax = 120;
+
+export const updateStudioBodyCityMin = 2;
+export const updateStudioBodyCityMax = 120;
+
+
+
+export const UpdateStudioBody = zod.object({
+  "name": zod.string().min(updateStudioBodyNameMin).max(updateStudioBodyNameMax),
+  "city": zod.string().min(updateStudioBodyCityMin).max(updateStudioBodyCityMax)
+})
+
+export const UpdateStudioResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "city": zod.string()
+})
+
+
+/**
  * @summary Get metrics and activity tailored to the signed-in user's role
  */
+export const GetDashboardQueryParams = zod.object({
+  "studioId": zod.coerce.number().int().optional()
+})
+
 export const GetDashboardResponse = zod.object({
   "role": zod.enum(['district_manager', 'studio_manager', 'studio_employee']),
   "userName": zod.string(),
@@ -242,6 +273,10 @@ export const UpdateMemberResponse = zod.object({
 /**
  * @summary List upcoming courses visible to the signed-in user
  */
+export const ListCoursesQueryParams = zod.object({
+  "studioId": zod.coerce.number().int().optional()
+})
+
 export const ListCoursesResponseItem = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
@@ -301,6 +336,10 @@ export const CreateCourseResponse = zod.object({
 /**
  * @summary List trainer absences and affected courses for accessible studios (managers only)
  */
+export const ListTrainerAbsencesQueryParams = zod.object({
+  "studioId": zod.coerce.number().int().optional()
+})
+
 export const ListTrainerAbsencesResponseItem = zod.object({
   "id": zod.number().int(),
   "studioId": zod.number().int(),

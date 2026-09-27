@@ -24,8 +24,10 @@ import {
   CreateStudioResponse,
   CompleteOnboardingBody,
   CompleteOnboardingResponse,
+  GetDashboardQueryParams,
   GetDashboardResponse,
   GetMeResponse,
+  ListCoursesQueryParams,
   ListCoursesResponse,
   ListMembersQueryParams,
   ListMembersResponse,
@@ -33,6 +35,9 @@ import {
   UpdateMemberBody,
   UpdateMemberParams,
   UpdateMemberResponse,
+  UpdateStudioBody,
+  UpdateStudioParams,
+  UpdateStudioResponse,
 } from "@workspace/api-zod";
 import {
   checkInsTable,
@@ -299,10 +304,94 @@ router.post("/studios", async (req, res): Promise<void> => {
   res.status(201).json(CreateStudioResponse.parse(result.studio));
 });
 
+router.patch("/studios/:id", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  if (staff.role !== "district_manager") {
+    res.status(403).json({ error: "Nur Bezirksleitungen können Studios bearbeiten." });
+    return;
+  }
+  const params = UpdateStudioParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = UpdateStudioBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const name = body.data.name.trim();
+  const city = body.data.city.trim();
+  if (name.length < 2 || city.length < 2) {
+    res.status(400).json({ error: "Bitte Studio-Name und Stadt mit jeweils 2 bis 120 Zeichen angeben." });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-studio-create:${staff.organizationId}`}))`);
+    const [existingStudio] = await tx
+      .select({ id: studiosTable.id })
+      .from(studiosTable)
+      .where(and(
+        eq(studiosTable.id, params.data.id),
+        eq(studiosTable.organizationId, staff.organizationId),
+      ))
+      .limit(1);
+    if (!existingStudio) return { notFound: true as const };
+
+    const [duplicate] = await tx.select({ id: studiosTable.id }).from(studiosTable).where(and(
+      eq(studiosTable.organizationId, staff.organizationId),
+      sql<boolean>`lower(btrim(${studiosTable.name})) = lower(${name})`,
+      sql<boolean>`lower(btrim(${studiosTable.city})) = lower(${city})`,
+      sql<boolean>`${studiosTable.id} <> ${params.data.id}`,
+    )).limit(1);
+    if (duplicate) return { duplicate: true as const };
+
+    const [studio] = await tx.update(studiosTable)
+      .set({ name, city })
+      .where(and(
+        eq(studiosTable.id, params.data.id),
+        eq(studiosTable.organizationId, staff.organizationId),
+      ))
+      .returning({ id: studiosTable.id, name: studiosTable.name, city: studiosTable.city });
+    return { studio };
+  });
+  if ("notFound" in result) {
+    res.status(404).json({ error: "Studio nicht gefunden." });
+    return;
+  }
+  if ("duplicate" in result) {
+    res.status(409).json({ error: "In dieser Stadt gibt es bereits ein Studio mit diesem Namen." });
+    return;
+  }
+  res.json(UpdateStudioResponse.parse(result.studio));
+});
+
 router.get("/dashboard", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
-  const studioIds = await getAccessibleStudioIds(staff);
+  const query = GetDashboardQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  if (query.data.studioId !== undefined && !(await canAccessStudio(staff, query.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+  const accessibleStudioIds = await getAccessibleStudioIds(staff);
+  const studioIds = query.data.studioId === undefined
+    ? accessibleStudioIds
+    : accessibleStudioIds.filter((id) => id === query.data.studioId);
+  const [selectedStudio] = query.data.studioId === undefined ? [] : await db
+    .select({ name: studiosTable.name })
+    .from(studiosTable)
+    .where(and(
+      eq(studiosTable.id, query.data.studioId),
+      eq(studiosTable.organizationId, staff.organizationId),
+    ))
+    .limit(1);
   const { start, end } = berlinDayRange();
   const [membersEnabled, coursesEnabled] = await Promise.all([
     isModuleEnabled(staff.organizationId, "members"),
@@ -420,9 +509,9 @@ router.get("/dashboard", async (req, res): Promise<void> => {
       role: staff.role,
       userName: staff.fullName,
       studioName:
-        staff.role === "district_manager"
+        selectedStudio?.name ?? (staff.role === "district_manager"
           ? staff.organizationName
-          : staff.studioName ?? staff.organizationName,
+          : staff.studioName ?? staff.organizationName),
       metrics: [
         ...(membersEnabled
           ? [
@@ -666,7 +755,19 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
 router.get("/courses", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
-  const studioIds = await getAccessibleStudioIds(staff);
+  const query = ListCoursesQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  if (query.data.studioId !== undefined && !(await canAccessStudio(staff, query.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+  const accessibleStudioIds = await getAccessibleStudioIds(staff);
+  const studioIds = query.data.studioId === undefined
+    ? accessibleStudioIds
+    : accessibleStudioIds.filter((id) => id === query.data.studioId);
   const rows = studioIds.length
     ? await db
         .select({

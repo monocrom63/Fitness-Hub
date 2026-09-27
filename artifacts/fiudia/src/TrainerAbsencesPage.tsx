@@ -4,11 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowRight, Bell, CalendarDays, Check, ChevronDown, Clock3, Info, Plus, RefreshCw, ShieldCheck, UserRound, Users, X } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getListCoursesQueryKey, getListMemberCoursesQueryKey, getListMemberNotificationsQueryKey,
-  getListPulseQueryKey, getListTrainerAbsencesQueryKey, getListTrainerReplacementCandidatesQueryKey, getListStudiosQueryKey,
-  useCreateTrainerAbsence, useListCourses, useListStudios, useListTrainerAbsences, useListTrainerReplacementCandidates,
+  getListPulseQueryKey, getListTrainerAbsencesQueryKey, getListTrainerReplacementCandidatesQueryKey,
+  useCreateTrainerAbsence, useListCourses, useListTrainerAbsences, useListTrainerReplacementCandidates,
   useRequestTrainerReplacement, useResolveTrainerAbsenceCourse, useRetryTrainerAbsencePush,
 } from '@workspace/api-client-react';
 import type { Me, TrainerAbsence, TrainerAbsenceCourse } from '@workspace/api-client-react';
+import { useStudioScope } from './StudioScope';
 import './TrainerAbsencesPage.css';
 
 function errorText(error: unknown) {
@@ -196,18 +197,20 @@ function AbsenceCard({ absence, initiallyOpen }: { absence: TrainerAbsence; init
 export default function TrainerAbsencesPage({ me }: { me: Me }) {
   const client = useQueryClient();
   const district = me.role === 'district_manager';
-  const studios = useListStudios({ query: { enabled: district, queryKey: getListStudiosQueryKey() } });
-  const courses = useListCourses({ query: { queryKey: getListCoursesQueryKey() } });
-  const absences = useListTrainerAbsences({ query: { queryKey: getListTrainerAbsencesQueryKey(), refetchInterval: 20000 } });
+  const { selectedStudioId, selectStudio, studios } = useStudioScope();
+  const courseParams = district && selectedStudioId ? { studioId: selectedStudioId } : undefined;
+  const courses = useListCourses(courseParams, { query: { queryKey: getListCoursesQueryKey(courseParams) } });
+  const absenceParams = district && selectedStudioId ? { studioId: selectedStudioId } : undefined;
+  const absences = useListTrainerAbsences(absenceParams, { query: { queryKey: getListTrainerAbsencesQueryKey(absenceParams), refetchInterval: 20000 } });
   const create = useCreateTrainerAbsence();
-  const [selectedStudio, setSelectedStudio] = useState<number | null>(null);
   const [instructor, setInstructor] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [newId, setNewId] = useState<number | null>(null);
-  const studioId = district ? (selectedStudio ?? studios.data?.[0]?.id ?? 0) : (me.studioId ?? 0);
+  const studioIsAvailable = !district || (selectedStudioId !== null && studios.data?.some(studio => studio.id === selectedStudioId));
+  const studioId = district ? (studioIsAvailable ? selectedStudioId ?? 0 : 0) : (me.studioId ?? 0);
   const suggestions = [...new Set((courses.data || []).filter(course => course.studioId === studioId).map(course => course.instructor.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
   const visible = (absences.data || []).filter(absence => absence.studioId === studioId);
   const openCount = visible.reduce((total, absence) => total + absence.courses.filter(course => course.status === 'open' || course.status === 'requested').length, 0);
@@ -241,7 +244,7 @@ export default function TrainerAbsencesPage({ me }: { me: Me }) {
       <section className="ta-intake" aria-labelledby="ta-intake-title">
         <div className="ta-intake-top"><div className="ta-intake-kicker"><Plus size={15} /> Neue Meldung</div><h2 id="ta-intake-title">Ausfall erfassen</h2><p>Ein Name, ein Studio, ein Zeitraum. Die betroffenen Termine werden automatisch zugeordnet.</p></div>
         <form className="ta-form" onSubmit={submit}>
-          {district && <label className="ta-field">Studio<select value={studioId || ''} onChange={event => { setSelectedStudio(Number(event.target.value)); setSuccess(''); setNewId(null); }} disabled={studios.isLoading} data-testid="select-absence-studio">
+          {district && <label className="ta-field">Studio<select value={studioId || ''} onChange={event => selectStudio(Number(event.target.value))} disabled={studios.isLoading} data-testid="select-absence-studio">
             {studios.data?.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}
           </select></label>}
           {district && studios.isError && <div className="ta-error" role="alert">Studios konnten nicht geladen werden. <button type="button" className="ta-btn" onClick={() => void studios.refetch()} data-testid="button-retry-absence-studios">Erneut laden</button></div>}

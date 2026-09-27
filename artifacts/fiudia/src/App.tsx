@@ -23,6 +23,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { ActionStrip, PulsePage, TodayPage } from './TodayPulse';
 import RoomClosuresPage from './RoomClosuresPage';
 import StudioManagement from './StudioManagement';
+import { StudioScopeProvider, useStudioScope } from './StudioScope';
 import TrainerAbsencesPage from './TrainerAbsencesPage';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -167,7 +168,8 @@ function TextField({ label, name, value, onChange, type = 'text', placeholder }:
 }
 
 function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me; modules: ModuleSetting[] }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { selectedStudioId, selectedStudioName, selectStudio, studios } = useStudioScope();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -200,7 +202,23 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar-top"><Brand light /><button className="icon-button sidebar-close" onClick={() => setMobileOpen(false)} data-testid="button-close-navigation"><X size={18} /></button></div>
-      <div className="workspace-switcher"><div className="workspace-dot">{initials(me.studioName || me.organizationName || 'F')}</div><div><strong>{me.studioName || 'Dein Workspace'}</strong><span>{me.organizationName || 'Neue Organisation'}</span></div><ChevronDown size={16} /></div>
+      <div className="workspace-switcher">
+        <div className="workspace-dot">{initials(selectedStudioName || me.organizationName || 'F')}</div>
+        {me.role === 'district_manager'
+          ? <label className="workspace-picker">
+            <select aria-label="Aktives Studio wechseln" value={selectedStudioId ?? ''} disabled={!studios.data?.length} onChange={event => {
+              if (location === '/rooms') setLocation('/rooms', { replace: true });
+              selectStudio(Number(event.target.value));
+              setMobileOpen(false);
+            }} data-testid="select-active-studio">
+              {!selectedStudioId && <option value="">{studios.isLoading ? 'Studios laden …' : 'Kein Studio vorhanden'}</option>}
+              {studios.data?.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}
+            </select>
+            <span>{me.organizationName || 'Organisation'} · Studio wechseln</span>
+          </label>
+          : <div><strong>{me.studioName || 'Dein Workspace'}</strong><span>{me.organizationName || 'Neue Organisation'}</span></div>}
+        {me.role === 'district_manager' && <ChevronDown size={16} aria-hidden="true" />}
+      </div>
       <nav className="main-nav">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`nav-link ${location === href ? 'nav-link-active' : ''}`} data-testid={`link-nav-${label.toLowerCase()}`}><Icon size={18} /><span>{label}</span>{href === '/members' && <span className="nav-count">live</span>}</Link>)}</nav>
       <div className="sidebar-note"><Sparkles size={16} /><span>Ein guter Tag beginnt mit Übersicht.</span></div>
       <div className="sidebar-bottom"><Link href="/settings" className="nav-link" data-testid="link-nav-settings"><Settings2 size={18} /><span>Einstellungen</span></Link><button className="profile-row" onClick={logOut} data-testid="button-sign-out"><span className="avatar avatar-small">{initials(me.userName)}</span><span className="profile-copy"><strong>{me.userName || 'Fiudia Nutzer'}</strong><small>{roleLabel(me.role)}</small></span><LogOut size={16} /></button></div>
@@ -224,7 +242,9 @@ function AuthenticatedData({ children }: { children: (me: Me, modules: ModuleSet
   if (!meQuery.data?.isOnboarded) return <Redirect to="/onboarding" />;
   if (modulesQuery.isLoading) return <LoadingBlock label="Module werden geladen" />;
   const modules = modulesQuery.isError ? [] : modulesQuery.data || [];
-  return <AppShell me={meQuery.data} modules={modules}>{children(meQuery.data, modules, () => { void modulesQuery.refetch(); }, modulesQuery.isError)}</AppShell>;
+  return <StudioScopeProvider me={meQuery.data}>
+    <AppShell me={meQuery.data} modules={modules}>{children(meQuery.data, modules, () => { void modulesQuery.refetch(); }, modulesQuery.isError)}</AppShell>
+  </StudioScopeProvider>;
 }
 
 function HomeRedirect() {
@@ -271,7 +291,9 @@ function MembersContent({ me }: { me: Me }) {
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [selected, setSelected] = useState<Member | null>(null);
-  const memberParams = me.role !== 'studio_employee' && search ? { search } : undefined;
+  const memberParams = me.role === 'district_manager'
+    ? { studioId: me.studioId ?? undefined, ...(search ? { search } : {}) }
+    : me.role !== 'studio_employee' && search ? { search } : undefined;
   const membersQuery = useListMembers(memberParams, { query: { queryKey: getListMembersQueryKey(memberParams) } });
   const checkIn = useCreateCheckIn();
   const create = useCreateMember();
@@ -321,7 +343,9 @@ function MembersPage({ me }: { me: Me }) {
 }
 
 function MemberInvitationList({ onSelect }: { onSelect: (member: Member) => void }) {
-  const query = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey() } });
+  const { selectedStudioId } = useStudioScope();
+  const params = selectedStudioId ? { studioId: selectedStudioId } : undefined;
+  const query = useListMembers(params, { query: { queryKey: getListMembersQueryKey(params) } });
   return <section className="panel invitation-management" aria-label="Mitgliedereinladungen">
     <div className="panel-head"><div><div className="eyebrow">Sicherer Zugang</div><h3>Mitglieder einladen</h3></div><Mail size={19} className="muted-icon" /></div>
     <p className="booking-hint">Erstelle einen einmaligen Link für ein Mitglied mit hinterlegter E-Mail-Adresse.</p>
@@ -384,10 +408,12 @@ function CourseRoster({ course, onClose }: { course: Course; onClose: () => void
 
 function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const client = useQueryClient();
+  const { selectedStudioId, selectStudio } = useStudioScope();
   const district = me.role === 'district_manager';
   const manager = me.role === 'studio_manager' || me.role === 'district_manager';
   const canBookMembers = manager && moduleEnabled(modules, 'members');
-  const query = useListCourses({ query: { queryKey: getListCoursesQueryKey() } });
+  const courseParams = district && selectedStudioId ? { studioId: selectedStudioId } : undefined;
+  const query = useListCourses(courseParams, { query: { queryKey: getListCoursesQueryKey(courseParams) } });
   const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: district, refetchOnMount: 'always' } });
   const create = useCreateCourse();
   const booking = useCreateStaffCourseBooking();
@@ -395,7 +421,8 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const [bookingMemberId, setBookingMemberId] = useState('');
   const [bookingResult, setBookingResult] = useState<string | null>(null);
   const [rosterCourse, setRosterCourse] = useState<Course | null>(null);
-  const membersQuery = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey(), enabled: !!bookingCourse && canBookMembers } });
+  const bookingMemberParams = bookingCourse ? { studioId: bookingCourse.studioId } : undefined;
+  const membersQuery = useListMembers(bookingMemberParams, { query: { queryKey: getListMembersQueryKey(bookingMemberParams), enabled: !!bookingCourse && canBookMembers } });
   useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
   const [open, setOpen] = useState(false);
   const [selectedStudio, setSelectedStudio] = useState('');
@@ -422,6 +449,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
         void client.invalidateQueries({ queryKey: getListCoursesQueryKey() });
         void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         setOpen(false);
+        if (district && studioId) selectStudio(studioId);
       },
     });
   };
@@ -507,15 +535,30 @@ function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; mod
   return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Dein Profil und die Module deiner Organisation." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div><section className="module-settings"><div className="eyebrow">Organisation / Zugang</div><h2>Module</h2><p>{me.role === 'district_manager' ? 'Bestimme, welche Bereiche deiner Organisation zur Verfügung stehen.' : 'Für deinen Workspace verfügbare Bereiche.'}</p>{modulesError ? <ErrorBlock retry={retryModules} /> : <div className="module-list">{modules.filter(module => me.role === 'district_manager' || module.enabled).map(module => <div className="module-row" key={module.key} data-testid={`module-${module.key}`}><div><strong>{module.title}</strong><span>{module.enabled ? 'Aktiv' : 'Deaktiviert'}</span></div>{me.role === 'district_manager' && <button type="button" role="switch" aria-checked={module.enabled} aria-label={`${module.title} ${module.enabled ? 'deaktivieren' : 'aktivieren'}`} className={`module-switch ${module.enabled ? 'on' : ''}`} disabled={update.isPending} onClick={() => update.mutate({ key: module.key, data: { enabled: !module.enabled } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListModulesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} data-testid={`switch-module-${module.key}`}><i /></button>}</div>)}{!modules.some(module => module.enabled) && me.role !== 'district_manager' && <p>Keine weiteren Bereiche sind derzeit aktiviert.</p>}</div>}{update.isError && <p className="form-error" role="alert">Modul konnte nicht aktualisiert werden. Bitte erneut versuchen.</p>}</section></>;
 }
 
-function ProtectedRoute({ page }: { page: 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' }) {
-  return <AuthenticatedData>{(me, modules, retryModules, modulesError) => {
+type ProtectedPage = 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings';
+
+function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
+  page: ProtectedPage; me: Me; modules: ModuleSetting[]; retryModules: () => void; modulesError: boolean;
+}) {
+    const { selectedStudioId, selectedStudioName, studios } = useStudioScope();
+    const scopedMe = me.role === 'district_manager' ? { ...me, studioId: selectedStudioId, studioName: selectedStudioName } : me;
     if (page === 'settings') return <><SettingsPage me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />{me.role === 'district_manager' && <StudioManagement />}</>;
-    if (page === 'dashboard') return <DashboardPage me={me} modules={modules} />;
-    if (page === 'rooms') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <RoomClosuresPage me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Räume sind nur für Studio- und District-Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
-    if (page === 'trainer-absences') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <TrainerAbsencesPage me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Trainer-Ausfälle sind nur für Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
+    if (me.role === 'district_manager' && page !== 'team' && page !== 'pulse' && !selectedStudioId) {
+      if (studios.isLoading) return <LoadingBlock label="Studios werden geladen" />;
+      if (studios.isError) return <ErrorBlock retry={() => { void studios.refetch(); }} />;
+      return <div className="empty-state"><div className="empty-icon"><DoorOpen size={22} /></div><h3>Kein Studio vorhanden</h3><p>Lege unter Einstellungen ein Studio an, um diesen Bereich zu nutzen.</p><Link href="/settings" className="button button-dark">Zu den Einstellungen</Link></div>;
+    }
+    if (page === 'dashboard') return <DashboardPage me={scopedMe} modules={modules} />;
+    if (page === 'rooms') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <RoomClosuresPage key={selectedStudioId ?? 'none'} me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Räume sind nur für Studio- und District-Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
+    if (page === 'trainer-absences') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <TrainerAbsencesPage key={selectedStudioId ?? 'none'} me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Trainer-Ausfälle sind nur für Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
     if (!moduleEnabled(modules, page) || (page === 'team' && me.role === 'studio_employee')) return <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Dieses Modul ist für deinen Workspace nicht aktiviert.</p>{modulesError && <button className="button button-outline" onClick={retryModules}>Module erneut laden</button>}<Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
-    return page === 'pulse' ? <PulsePage me={me} /> : page === 'members' ? <MembersPage me={me} /> : page === 'courses' ? <CoursesPage me={me} modules={modules} /> : <TeamPage me={me} />;
-  }}</AuthenticatedData>;
+    return page === 'pulse' ? <PulsePage me={me} /> : page === 'members' ? <MembersPage key={selectedStudioId ?? 'none'} me={scopedMe} /> : page === 'courses' ? <CoursesPage key={selectedStudioId ?? 'none'} me={scopedMe} modules={modules} /> : <TeamPage me={me} />;
+}
+
+function ProtectedRoute({ page }: { page: ProtectedPage }) {
+  return <AuthenticatedData>{(me, modules, retryModules, modulesError) =>
+    <ProtectedContent page={page} me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />
+  }</AuthenticatedData>;
 }
 
 function NotFoundPage() {

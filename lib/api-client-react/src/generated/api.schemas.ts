@@ -874,9 +874,21 @@ export interface PulseRead {
   readAt: string;
 }
 
+export type GetDashboardParams = {
+studioId?: number;
+};
+
 export type ListMembersParams = {
 search?: string;
 status?: MemberStatus;
+studioId?: number;
+};
+
+export type ListCoursesParams = {
+studioId?: number;
+};
+
+export type ListTrainerAbsencesParams = {
 studioId?: number;
 };
 

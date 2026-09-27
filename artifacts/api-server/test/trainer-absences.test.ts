@@ -27,6 +27,7 @@ function futureBerlinDay() {
 test("manager records an absence, resolves all affected courses and notifies members without disclosing sickness", async () => {
   const suffix = randomUUID();
   let organizationId: number | undefined;
+  let foreignOrganizationId: number | undefined;
   let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
   const sends: Array<{ body: any }> = [];
   const proxy: TrainerPushProxy = async (_path, options) => {
@@ -42,6 +43,12 @@ test("manager records an absence, resolves all affected courses and notifies mem
     const [organization] = await db.insert(organizationsTable)
       .values({ name: `Trainer absence ${suffix}` }).returning();
     organizationId = organization.id;
+    const [foreignOrganization] = await db.insert(organizationsTable)
+      .values({ name: `Foreign trainer absence ${suffix}` }).returning();
+    foreignOrganizationId = foreignOrganization.id;
+    const [foreignStudio] = await db.insert(studiosTable).values({
+      organizationId: foreignOrganization.id, name: `Foreign ${suffix}`, city: "Cologne",
+    }).returning();
     const [studio, otherStudio] = await db.insert(studiosTable).values([
       { organizationId, name: `Studio ${suffix}`, city: "Berlin" },
       { organizationId, name: `Other ${suffix}`, city: "Berlin" },
@@ -111,6 +118,26 @@ test("manager records an absence, resolves all affected courses and notifies mem
     assert.equal(created.body.courses.length, 3);
     assert.equal((await api(manager.clerkUserId, "POST", "/trainer-absences", input)).status, 409);
     assert.deepEqual(await api(otherManager.clerkUserId, "GET", "/trainer-absences"), { status: 200, body: [] });
+    await db.insert(trainerAbsencesTable).values(Array.from({ length: 51 }, (_, index) => ({
+      studioId: otherStudio.id, instructor: `Limit fixture ${index}`, fromDate: day, toDate: day,
+      createdByStaffId: otherManager.id,
+    })));
+    const unfilteredAbsences = await api(districtManager.clerkUserId, "GET", "/trainer-absences");
+    assert.equal(unfilteredAbsences.body.length, 50);
+    assert.ok(!unfilteredAbsences.body.some((absence: any) => absence.id === created.body.id),
+      "the older studio's absence falls outside the organization-wide limit");
+    const filteredAbsences = await api(districtManager.clerkUserId, "GET", `/trainer-absences?studioId=${studio.id}`);
+    assert.equal(filteredAbsences.status, 200);
+    assert.ok(filteredAbsences.body.some((absence: any) => absence.id === created.body.id));
+    assert.ok(filteredAbsences.body.every((absence: any) => absence.studioId === studio.id));
+    const otherStudioAbsences = await api(districtManager.clerkUserId, "GET",
+      `/trainer-absences?studioId=${otherStudio.id}`);
+    assert.equal(otherStudioAbsences.body.length, 50);
+    assert.ok(otherStudioAbsences.body.every((absence: any) => absence.studioId === otherStudio.id));
+    assert.equal((await api(districtManager.clerkUserId, "GET",
+      `/trainer-absences?studioId=${foreignStudio.id}`)).status, 403);
+    assert.equal((await api(districtManager.clerkUserId, "GET",
+      "/trainer-absences?studioId=not-a-number")).status, 400);
     const [alert] = await db.select().from(pulseMessagesTable)
       .where(eq(pulseMessagesTable.id, (await db.select({ id: trainerAbsencesTable.pulseMessageId })
         .from(trainerAbsencesTable).where(eq(trainerAbsencesTable.id, created.body.id)))[0].id!));
@@ -308,6 +335,9 @@ test("manager records an absence, resolves all affected courses and notifies mem
         }
         await tx.delete(organizationsTable).where(eq(organizationsTable.id, organizationId!));
       });
+    }
+    if (foreignOrganizationId !== undefined) {
+      await db.delete(organizationsTable).where(eq(organizationsTable.id, foreignOrganizationId));
     }
   }
 });

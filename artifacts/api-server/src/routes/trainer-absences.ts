@@ -1,7 +1,8 @@
 import { and, asc, count, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
-  CreateTrainerAbsenceBody, CreateTrainerAbsenceResponse, ListTrainerAbsencesResponse,
+  CreateTrainerAbsenceBody, CreateTrainerAbsenceResponse, ListTrainerAbsencesQueryParams,
+  ListTrainerAbsencesResponse,
   ListTrainerReplacementCandidatesResponse, RequestTrainerReplacementBody,
   RequestTrainerReplacementResponse, ResolveTrainerAbsenceCourseBody,
   ResolveTrainerAbsenceCourseResponse, RetryTrainerAbsencePushResponse,
@@ -170,10 +171,26 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
   router.get("/trainer-absences", async (req, res): Promise<void> => {
     const staff = await manager(req, res);
     if (!staff) return;
-    const studioIds = await getAccessibleStudioIds(staff, database);
+    const query = ListTrainerAbsencesQueryParams.safeParse(req.query);
+    if (!query.success) {
+      res.status(400).json({ error: query.error.message });
+      return;
+    }
+    if (query.data.studioId !== undefined &&
+      !(await canAccessStudio(staff, query.data.studioId, database))) {
+      res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+      return;
+    }
+    const accessibleStudioIds = await getAccessibleStudioIds(staff, database);
+    const studioIds = query.data.studioId === undefined
+      ? accessibleStudioIds
+      : accessibleStudioIds.filter((id) => id === query.data.studioId);
     const rows = studioIds.length ? await database.select({ id: trainerAbsencesTable.id })
       .from(trainerAbsencesTable)
-      .where(inArray(trainerAbsencesTable.studioId, studioIds))
+      .where(and(
+        inArray(trainerAbsencesTable.studioId, studioIds),
+        ...(query.data.studioId === undefined ? [] : [eq(trainerAbsencesTable.studioId, query.data.studioId)]),
+      ))
       .orderBy(desc(trainerAbsencesTable.id)).limit(50) : [];
     res.json(ListTrainerAbsencesResponse.parse(
       (await Promise.all(rows.map((row) => absenceView(row.id)))).filter((item) => item !== null),

@@ -12,3 +12,4 @@
 - [Backlog verification](backlog-verification.md) — pending task titles may lag completed code; inspect full implementations and tests before picking a “next” task.
 - [Trainer absence policy](trainer-absence-policy.md) — managers report illness and record off-app trainer acceptance; members only receive neutral course-change notices.
 - [District course destination](district-course-destination.md) — course creation requires an explicit studio choice for district managers, not a silent first-studio default.
+- [District studio context](studio-switch-context.md) — studio switching narrows operational views; Pulse and team administration remain organization-wide.

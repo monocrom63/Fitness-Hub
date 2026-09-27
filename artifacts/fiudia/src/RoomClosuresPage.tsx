@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSearch } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { AlertTriangle, ArrowRight, DoorOpen, Plus, Trash2, X } from 'lucide-react';
 import {
   getGetClosureEmailDeliveriesQueryKey, getGetClosurePushDeliveriesQueryKey, getGetClosurePushReadinessQueryKey, getListClosureAffectedCoursesQueryKey, getListClosureResolutionsQueryKey, getListCoursesQueryKey, getListMemberNotificationsQueryKey,
-  getListStudioRoomClosuresQueryKey, getListStudioRoomsQueryKey, getListStudiosQueryKey, useCreateStudioRoom,
+  getListStudioRoomClosuresQueryKey, getListStudioRoomsQueryKey, useCreateStudioRoom,
   useCreateStudioRoomClosure, useDeleteStudioRoomClosure, useGetClosureEmailDeliveries, useGetClosurePushDeliveries, useGetClosurePushReadiness, useListClosureAffectedCourses,
-  useListClosureResolutions, useListStudioRoomClosures, useListStudioRooms, useListStudios, useResolveCourseRoomClosure, useRetryClosureEmailDeliveries, useRetryClosurePushDeliveries,
+  useListClosureResolutions, useListStudioRoomClosures, useListStudioRooms, useResolveCourseRoomClosure, useRetryClosureEmailDeliveries, useRetryClosurePushDeliveries,
 } from '@workspace/api-client-react';
 import type { ClosureAffectedCourse, ClosureCourseResolution, CourseClosureResolutionInput, Me, RoomClosure } from '@workspace/api-client-react';
+import { useStudioScope } from './StudioScope';
 import './RoomClosuresPage.css';
 
 function errorText(error: unknown): string {
@@ -256,6 +257,7 @@ function ClosureCard({ closure, studioId, onDelete, deleting, initiallyOpen, pus
 
 export default function RoomClosuresPage({ me }: { me: Me }) {
   const client = useQueryClient();
+  const [, setLocation] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const requestedClosure = Number(params.get('closure'));
@@ -263,11 +265,18 @@ export default function RoomClosuresPage({ me }: { me: Me }) {
   const requestedStudio = Number(params.get('studio'));
   const targetStudioId = Number.isSafeInteger(requestedStudio) && requestedStudio > 0 ? requestedStudio : null;
   const district = me.role === 'district_manager';
-  const studios = useListStudios({ query: { enabled: district, queryKey: getListStudiosQueryKey() } });
-  const [selectedStudio, setSelectedStudio] = useState<number | null>(null);
-  const linkedStudioId = district && targetStudioId && studios.data?.some(studio => studio.id === targetStudioId) ? targetStudioId : null;
-  useEffect(() => { if (linkedStudioId) setSelectedStudio(linkedStudioId); }, [linkedStudioId]);
-  const studioId = district ? (selectedStudio ?? linkedStudioId ?? studios.data?.[0]?.id ?? 0) : (me.studioId ?? 0);
+  const { selectedStudioId, selectStudio, studios } = useStudioScope();
+  const handledDeepLinkSearch = useRef<string | null>(null);
+  useEffect(() => {
+    if (handledDeepLinkSearch.current === search) return;
+    if (district && targetStudioId && studios.isLoading) return;
+    handledDeepLinkSearch.current = search;
+    if (district && targetStudioId && studios.data?.some(studio => studio.id === targetStudioId)) {
+      selectStudio(targetStudioId);
+    }
+  }, [search, district, targetStudioId, studios.isLoading, studios.data, selectStudio]);
+  const studioIsAvailable = !district || (selectedStudioId !== null && studios.data?.some(studio => studio.id === selectedStudioId));
+  const studioId = district ? (studioIsAvailable ? selectedStudioId ?? 0 : 0) : (me.studioId ?? 0);
   const rooms = useListStudioRooms(studioId, { query: { enabled: studioId > 0, queryKey: getListStudioRoomsQueryKey(studioId), refetchOnMount: 'always', staleTime: 0 } });
   const closures = useListStudioRoomClosures(studioId, { query: { enabled: studioId > 0, queryKey: getListStudioRoomClosuresQueryKey(studioId), refetchOnMount: 'always', staleTime: 0 } });
   const pushReadiness = useGetClosurePushReadiness(studioId, { query: { enabled: studioId > 0, queryKey: getGetClosurePushReadinessQueryKey(studioId), refetchOnMount: 'always', refetchOnWindowFocus: true, staleTime: 0, retry: false } });
@@ -287,6 +296,19 @@ export default function RoomClosuresPage({ me }: { me: Me }) {
   const [newClosureId, setNewClosureId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RoomClosure | null>(null);
   const [deleteError, setDeleteError] = useState('');
+  const studioSelection = district ? selectedStudioId : studioId;
+
+  useEffect(() => {
+    setRoomName('');
+    setFormOpen(false);
+    setForm({ roomName: '', fromDate: '', toDate: '', reason: '', responsible: '' });
+    setFormError('');
+    setRoomError('');
+    setFeedback('');
+    setNewClosureId(null);
+    setDeleteTarget(null);
+    setDeleteError('');
+  }, [studioSelection]);
 
   function addRoom(event: React.FormEvent) {
     event.preventDefault(); setRoomError('');
@@ -317,7 +339,10 @@ export default function RoomClosuresPage({ me }: { me: Me }) {
   }
   return <div className="rooms-page">
     <header className="rooms-head"><div><div className="eyebrow">Workspace / Planung</div><h1>Räume &amp; Sperrungen</h1><p>Räume verwalten, Konflikte prüfen und gebuchte Mitglieder verlässlich informieren.</p></div>
-      {district && <label className="rooms-studio-select">Studio auswählen<select value={studioId || ''} onChange={event => { setSelectedStudio(Number(event.target.value)); setFeedback(''); setNewClosureId(null); setFormOpen(false); }} data-testid="select-room-studio">
+      {district && <label className="rooms-studio-select">Studio auswählen<select value={studioId || ''} onChange={event => {
+        setLocation('/rooms', { replace: true });
+        selectStudio(Number(event.target.value));
+      }} data-testid="select-room-studio">
         {studios.data?.map(studio => <option value={studio.id} key={studio.id}>{studio.name} · {studio.city}</option>)}
       </select></label>}</header>
     {studios.isError && district ? <div className="rooms-alert" role="alert">Studios konnten nicht geladen werden. <button type="button" className="rooms-action" onClick={() => studios.refetch()} data-testid="button-retry-studios">Erneut versuchen</button></div>

@@ -35,12 +35,15 @@ import type {
   CourseInput,
   CourseRosterBooking,
   Dashboard,
+  GetDashboardParams,
   HealthStatus,
   Invitation,
   InvitationInput,
+  ListCoursesParams,
   ListMemberCoursesParams,
   ListMembersParams,
   ListPulseParams,
+  ListTrainerAbsencesParams,
   Me,
   Member,
   MemberCheckIn,
@@ -514,20 +517,116 @@ export const useCreateStudio = <TError = ErrorType<void>,
       return useMutation(getCreateStudioMutationOptions(options));
     }
 
-export const getGetDashboardUrl = () => {
+export const getUpdateStudioUrl = (id: number,) => {
 
 
 
 
-  return `/api/dashboard`
+  return `/api/studios/${id}`
+}
+
+/**
+ * @summary Update a studio's name and city
+ */
+export const updateStudio = async (id: number,
+    studioInput: StudioInput, options?: Parameters<typeof customFetch>[1]): Promise<StudioSummary> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StudioSummary>(getUpdateStudioUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(studioInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateStudioMutationKey = () => ['updateStudio'] as const;
+
+export const getUpdateStudioMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudio>>, TError,UpdateStudioMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStudio>>, TError,UpdateStudioMutationVariables, TContext> => {
+
+const mutationKey = getUpdateStudioMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStudio>>, UpdateStudioMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateStudio(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStudioMutationResult = NonNullable<Awaited<ReturnType<typeof updateStudio>>>
+    export type UpdateStudioMutationBody = BodyType<StudioInput>
+    export type UpdateStudioMutationError = ErrorType<void>
+    export type UpdateStudioMutationVariables = {id: number;data: BodyType<StudioInput>}
+
+    /**
+ * @summary Update a studio's name and city
+ */
+export const useUpdateStudio = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudio>>, TError,UpdateStudioMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStudio>>,
+        TError,
+        UpdateStudioMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateStudioMutationOptions(options));
+    }
+
+export const getGetDashboardUrl = (params?: GetDashboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard?${stringifiedParams}` : `/api/dashboard`
 }
 
 /**
  * @summary Get metrics and activity tailored to the signed-in user's role
  */
-export const getDashboard = async ( options?: Parameters<typeof customFetch>[1]): Promise<Dashboard> => {
+export const getDashboard = async (params?: GetDashboardParams, options?: Parameters<typeof customFetch>[1]): Promise<Dashboard> => {
 
-  return customFetch<Dashboard>(getGetDashboardUrl(),
+  return customFetch<Dashboard>(getGetDashboardUrl(params),
   {
     ...options,
     method: 'GET'
@@ -540,23 +639,23 @@ export const getDashboard = async ( options?: Parameters<typeof customFetch>[1])
 
 
 
-export const getGetDashboardQueryKey = () => {
+export const getGetDashboardQueryKey = (params?: GetDashboardParams,) => {
     return [
-    `/api/dashboard`
+    `/api/dashboard`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getDashboard>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardQueryOptions = <TData = Awaited<ReturnType<typeof getDashboard>>, TError = ErrorType<void>>(params?: GetDashboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboard>>> = ({ signal }) => getDashboard({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboard>>> = ({ signal }) => getDashboard(params, { signal, ...requestOptions });
 
 
 
@@ -574,11 +673,11 @@ export type GetDashboardQueryError = ErrorType<void>
  */
 
 export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetDashboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardQueryOptions(options)
+  const queryOptions = getGetDashboardQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -852,20 +951,27 @@ export const useUpdateMember = <TError = ErrorType<void>,
       return useMutation(getUpdateMemberMutationOptions(options));
     }
 
-export const getListCoursesUrl = () => {
+export const getListCoursesUrl = (params?: ListCoursesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/courses`
+  return stringifiedParams.length > 0 ? `/api/courses?${stringifiedParams}` : `/api/courses`
 }
 
 /**
  * @summary List upcoming courses visible to the signed-in user
  */
-export const listCourses = async ( options?: Parameters<typeof customFetch>[1]): Promise<Course[]> => {
+export const listCourses = async (params?: ListCoursesParams, options?: Parameters<typeof customFetch>[1]): Promise<Course[]> => {
 
-  return customFetch<Course[]>(getListCoursesUrl(),
+  return customFetch<Course[]>(getListCoursesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -878,23 +984,23 @@ export const listCourses = async ( options?: Parameters<typeof customFetch>[1]):
 
 
 
-export const getListCoursesQueryKey = () => {
+export const getListCoursesQueryKey = (params?: ListCoursesParams,) => {
     return [
-    `/api/courses`
+    `/api/courses`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListCoursesQueryOptions = <TData = Awaited<ReturnType<typeof listCourses>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListCoursesQueryOptions = <TData = Awaited<ReturnType<typeof listCourses>>, TError = ErrorType<void>>(params?: ListCoursesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListCoursesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListCoursesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCourses>>> = ({ signal }) => listCourses({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCourses>>> = ({ signal }) => listCourses(params, { signal, ...requestOptions });
 
 
 
@@ -912,11 +1018,11 @@ export type ListCoursesQueryError = ErrorType<void>
  */
 
 export function useListCourses<TData = Awaited<ReturnType<typeof listCourses>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListCoursesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListCoursesQueryOptions(options)
+  const queryOptions = getListCoursesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1017,20 +1123,27 @@ export const useCreateCourse = <TError = ErrorType<void>,
       return useMutation(getCreateCourseMutationOptions(options));
     }
 
-export const getListTrainerAbsencesUrl = () => {
+export const getListTrainerAbsencesUrl = (params?: ListTrainerAbsencesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/trainer-absences`
+  return stringifiedParams.length > 0 ? `/api/trainer-absences?${stringifiedParams}` : `/api/trainer-absences`
 }
 
 /**
  * @summary List trainer absences and affected courses for accessible studios (managers only)
  */
-export const listTrainerAbsences = async ( options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsence[]> => {
+export const listTrainerAbsences = async (params?: ListTrainerAbsencesParams, options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsence[]> => {
 
-  return customFetch<TrainerAbsence[]>(getListTrainerAbsencesUrl(),
+  return customFetch<TrainerAbsence[]>(getListTrainerAbsencesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1043,23 +1156,23 @@ export const listTrainerAbsences = async ( options?: Parameters<typeof customFet
 
 
 
-export const getListTrainerAbsencesQueryKey = () => {
+export const getListTrainerAbsencesQueryKey = (params?: ListTrainerAbsencesParams,) => {
     return [
-    `/api/trainer-absences`
+    `/api/trainer-absences`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListTrainerAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof listTrainerAbsences>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListTrainerAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof listTrainerAbsences>>, TError = ErrorType<void>>(params?: ListTrainerAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListTrainerAbsencesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListTrainerAbsencesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrainerAbsences>>> = ({ signal }) => listTrainerAbsences({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrainerAbsences>>> = ({ signal }) => listTrainerAbsences(params, { signal, ...requestOptions });
 
 
 
@@ -1077,11 +1190,11 @@ export type ListTrainerAbsencesQueryError = ErrorType<void>
  */
 
 export function useListTrainerAbsences<TData = Awaited<ReturnType<typeof listTrainerAbsences>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListTrainerAbsencesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListTrainerAbsencesQueryOptions(options)
+  const queryOptions = getListTrainerAbsencesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -10,6 +10,7 @@ import type { Me, ModuleKey, ModuleSetting, PulseAudience, PulseMessage, PulsePr
 import { pulseArchiveQueryOptions } from './PulseArchiveQuery';
 import { pulseArchiveHref, readPulseArchiveLocation } from './PulseArchiveLocation';
 import { PulseHistory } from './PulseHistory';
+import { useStudioScope } from './StudioScope';
 
 const berlin = 'Europe/Berlin';
 const berlinDate = new Intl.DateTimeFormat('de-DE', { timeZone: berlin, weekday: 'long', day: 'numeric', month: 'long' });
@@ -47,7 +48,9 @@ function enabled(modules: ModuleSetting[], key: ModuleKey) {
 }
 
 export function TodayPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
-  const dashboard = useGetDashboard({ query: { queryKey: getGetDashboardQueryKey(), refetchInterval: 60000 } });
+  const { selectedStudioId } = useStudioScope();
+  const dashboardParams = me.role === 'district_manager' && selectedStudioId ? { studioId: selectedStudioId } : undefined;
+  const dashboard = useGetDashboard(dashboardParams, { query: { queryKey: getGetDashboardQueryKey(dashboardParams), refetchInterval: 60000 } });
   const pulse = useListPulse(undefined, { query: { queryKey: getListPulseQueryKey(), enabled: enabled(modules, 'pulse'), refetchInterval: 60000 } });
   const unreadPulse = useListPulse({ unreadOnly: true }, { query: { queryKey: getListPulseQueryKey({ unreadOnly: true }), enabled: enabled(modules, 'pulse'), refetchInterval: 60000 } });
   const [now, setNow] = useState(() => new Date());
@@ -63,12 +66,12 @@ export function TodayPage({ me, modules }: { me: Me; modules: ModuleSetting[] })
   const upcoming = todaysCourses.find(course => new Date(course.startsAt).getTime() >= now.getTime());
   const unread = unreadPulse.data || [];
   const lead = me.role === 'district_manager'
-    ? (part === 'Abend' ? 'Was hat sich heute in deinen Standorten bewegt?' : 'Deine Standorte. Ein klarer Blick.')
+    ? (part === 'Abend' ? `Was hat sich heute in ${me.studioName || 'deinem Studio'} bewegt?` : `${me.studioName || 'Dein Studio'}. Ein klarer Blick.`)
     : me.role === 'studio_manager'
       ? (part === 'Abend' ? 'Zeit für den Blick auf den Studio-Tag.' : 'Dein Studio ist in Bewegung.')
       : (upcoming ? `Als Nächstes: ${upcoming.title}` : part === 'Abend' ? 'So klingt dein Studio-Tag aus.' : 'Bereit für den Tag im Studio?');
   const detail = me.role === 'district_manager'
-    ? 'Kennzahlen, Aktivitäten und Nachrichten aus deinem Verantwortungsbereich.'
+    ? 'Kennzahlen und Aktivitäten dieses Studios. Pulse-Nachrichten bleiben organisationsweit sichtbar.'
     : me.role === 'studio_manager'
       ? 'Entwicklungen und Informationen an einem Ort.'
       : upcoming ? `${berlinTime.format(new Date(upcoming.startsAt))} Uhr · ${upcoming.room} · ${upcoming.instructor}` : 'Deine nächsten Schritte für die Schicht.';
@@ -84,8 +87,8 @@ export function TodayPage({ me, modules }: { me: Me; modules: ModuleSetting[] })
 
   return <div className="today-page">
     <div className="today-intro"><div><div className="eyebrow">Today / {roleName(me)}{me.studioName ? ` / ${me.studioName}` : ''}</div><h1>Guten {part}, {data.userName || me.userName}.</h1><p>Das ist heute für dich wichtig.</p></div><span className="today-date">{berlinDate.format(now)}</span></div>
-    <section className="today-spotlight" aria-label="Dein Fokus heute"><div><div className="eyebrow">{part === 'Morgen' ? 'Der Tag beginnt' : part === 'Tag' ? 'Mitten im Geschehen' : 'Zum Tagesausklang'}</div><h2>{lead}</h2><p>{detail}</p></div><div className="today-spotlight-side">{me.role === 'studio_employee' && upcoming ? <><span>Nächster Kurs</span><strong>{berlinTime.format(new Date(upcoming.startsAt))} Uhr</strong><Link href="/courses">Kursplan öffnen <ArrowRight size={15} /></Link></> : <><span>Dein Arbeitsbereich</span><strong>{me.role === 'district_manager' ? me.organizationName || 'Organisation' : me.studioName || 'Studio'}</strong><Link href={focusLink}>{focusLink === '/team' ? 'Team' : focusLink === '/courses' ? 'Kurse' : focusLink === '/members' ? 'Mitglieder' : focusLink === '/pulse' ? 'Pulse' : 'Einstellungen'} öffnen <ArrowRight size={15} /></Link></>}</div></section>
-    {visibleMetrics.length > 0 && <section aria-label="Aktuelle Kennzahlen"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Im Studio' : me.role === 'district_manager' ? 'Im Netzwerk' : 'Dein Studio in Zahlen'}</h2><span className="eyebrow">Aktueller Stand</span></div><div className="today-metrics">{visibleMetrics.map((metric, index) => <div className={`today-metric ${metric.tone}`} key={`${metric.label}-${index}`}><span>{metric.label}</span><strong>{metric.value}</strong>{metric.delta && <small>{metric.delta}</small>}</div>)}</div></section>}
+    <section className="today-spotlight" aria-label="Dein Fokus heute"><div><div className="eyebrow">{part === 'Morgen' ? 'Der Tag beginnt' : part === 'Tag' ? 'Mitten im Geschehen' : 'Zum Tagesausklang'}</div><h2>{lead}</h2><p>{detail}</p></div><div className="today-spotlight-side">{me.role === 'studio_employee' && upcoming ? <><span>Nächster Kurs</span><strong>{berlinTime.format(new Date(upcoming.startsAt))} Uhr</strong><Link href="/courses">Kursplan öffnen <ArrowRight size={15} /></Link></> : <><span>Dein Arbeitsbereich</span><strong>{me.studioName || 'Studio'}</strong><Link href={focusLink}>{focusLink === '/team' ? 'Team' : focusLink === '/courses' ? 'Kurse' : focusLink === '/members' ? 'Mitglieder' : focusLink === '/pulse' ? 'Pulse' : 'Einstellungen'} öffnen <ArrowRight size={15} /></Link></>}</div></section>
+    {visibleMetrics.length > 0 && <section aria-label="Aktuelle Kennzahlen"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Im Studio' : 'Dein Studio in Zahlen'}</h2><span className="eyebrow">Aktueller Stand</span></div><div className="today-metrics">{visibleMetrics.map((metric, index) => <div className={`today-metric ${metric.tone}`} key={`${metric.label}-${index}`}><span>{metric.label}</span><strong>{metric.value}</strong>{metric.delta && <small>{metric.delta}</small>}</div>)}</div></section>}
     <div className="today-columns">{enabled(modules, 'courses') && <section className="today-column"><div className="today-section-head"><h2>{me.role === 'district_manager' ? 'Kurse im Blick' : 'Heute im Kursplan'}</h2><Link href="/courses">Alle Kurse <ArrowRight size={14} /></Link></div>{todaysCourses.length ? <div className="today-list">{todaysCourses.slice(0, 5).map(course => <div className="today-list-row" key={course.id}><time>{berlinTime.format(new Date(course.startsAt))}</time><div><strong>{course.title}</strong><small>{course.studioName && me.role === 'district_manager' ? `${course.studioName} · ` : ''}{course.instructor} · {course.room}</small></div><span className="pill pill-scheduled">{course.enrolled}/{course.capacity}</span></div>)}</div> : <p className="today-quiet">Für heute sind keine Kurse eingetragen.</p>}</section>}
       <section className="today-column"><div className="today-section-head"><h2>{me.role === 'studio_employee' ? 'Was zuletzt passiert ist' : 'Aktuelles im Arbeitsbereich'}</h2></div>{visibleActivities.length ? <div className="today-list">{visibleActivities.slice(0, 4).map(item => <div className="today-list-row" key={item.id}><span className="today-activity-mark"><Activity size={15} /></span><div><strong>{item.title}</strong><small>{item.description} · {dateTime(item.happenedAt)}</small></div></div>)}</div> : <p className="today-quiet">Noch keine Aktivitäten in deinem Arbeitsbereich.</p>}</section></div>
     {enabled(modules, 'pulse') && <section className="today-pulse"><div className="today-section-head"><h2>Pulse {unread.length > 0 && <span className="pulse-unread" aria-label="Ungelesene Nachrichten vorhanden" />}</h2><Link href="/pulse">Alle Nachrichten <ArrowRight size={14} /></Link></div>{pulse.isLoading || unreadPulse.isLoading ? <Skeleton count={1} /> : pulse.isError || unreadPulse.isError ? <StatusError label="Pulse konnte nicht geladen werden." retry={() => { pulse.refetch(); unreadPulse.refetch(); }} /> : pulse.data?.length ? <div className="today-pulse-items">{[...unread, ...pulse.data.filter(message => !unread.some(item => item.id === message.id))].slice(0, 3).map(message => <Link href={message.isRead ? '/pulse' : '/pulse?filter=unread'} className="today-pulse-item" key={message.id}><small>{!message.isRead && <span className="pulse-unread" />} {priorityName(message.priority)} · {message.studioName || 'Organisation'}</small><strong>{message.title}</strong><small>{message.authorName} · {dateTime(message.createdAt)}</small></Link>)}</div> : <p className="today-quiet">Noch keine Nachrichten für deinen Arbeitsbereich.</p>}</section>}
