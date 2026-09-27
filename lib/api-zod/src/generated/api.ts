@@ -276,6 +276,191 @@ export const CreateCourseResponse = zod.object({
 
 
 /**
+ * @summary List trainer absences and affected courses for accessible studios (managers only)
+ */
+export const ListTrainerAbsencesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "instructor": zod.string(),
+  "fromDate": zod.coerce.date(),
+  "toDate": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "courses": zod.array(zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "originalInstructor": zod.string(),
+  "instructor": zod.string(),
+  "status": zod.enum(['open', 'requested', 'replaced', 'cancelled', 'external']),
+  "candidateName": zod.string().nullable(),
+  "bookingCount": zod.number().int(),
+  "pushSent": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "pushPending": zod.number().int()
+}))
+})
+export const ListTrainerAbsencesResponse = zod.array(ListTrainerAbsencesResponseItem)
+
+
+/**
+ * @summary Record a trainer's absence and alert managers in Pulse
+ */
+export const createTrainerAbsenceBodyInstructorMin = 2;
+export const createTrainerAbsenceBodyInstructorMax = 120;
+
+
+
+export const CreateTrainerAbsenceBody = zod.object({
+  "studioId": zod.number().int(),
+  "instructor": zod.string().min(createTrainerAbsenceBodyInstructorMin).max(createTrainerAbsenceBodyInstructorMax),
+  "fromDate": zod.coerce.date(),
+  "toDate": zod.coerce.date()
+})
+
+export const CreateTrainerAbsenceResponse = zod.object({
+  "id": zod.number().int(),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "instructor": zod.string(),
+  "fromDate": zod.coerce.date(),
+  "toDate": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "courses": zod.array(zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "originalInstructor": zod.string(),
+  "instructor": zod.string(),
+  "status": zod.enum(['open', 'requested', 'replaced', 'cancelled', 'external']),
+  "candidateName": zod.string().nullable(),
+  "bookingCount": zod.number().int(),
+  "pushSent": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "pushPending": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Show same-studio trainers with scheduling and absence conflicts
+ */
+export const ListTrainerReplacementCandidatesParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "courseId": zod.coerce.number().int()
+})
+
+export const ListTrainerReplacementCandidatesResponseItem = zod.object({
+  "name": zod.string(),
+  "available": zod.boolean(),
+  "reason": zod.string().nullable()
+})
+export const ListTrainerReplacementCandidatesResponse = zod.array(ListTrainerReplacementCandidatesResponseItem)
+
+
+/**
+ * @summary Record a manager's off-app request to an available trainer
+ */
+export const RequestTrainerReplacementParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "courseId": zod.coerce.number().int()
+})
+
+export const requestTrainerReplacementBodyCandidateNameMin = 2;
+export const requestTrainerReplacementBodyCandidateNameMax = 120;
+
+
+
+export const RequestTrainerReplacementBody = zod.object({
+  "candidateName": zod.string().min(requestTrainerReplacementBodyCandidateNameMin).max(requestTrainerReplacementBodyCandidateNameMax)
+})
+
+export const RequestTrainerReplacementResponse = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "originalInstructor": zod.string(),
+  "instructor": zod.string(),
+  "status": zod.enum(['open', 'requested', 'replaced', 'cancelled', 'external']),
+  "candidateName": zod.string().nullable(),
+  "bookingCount": zod.number().int(),
+  "pushSent": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "pushPending": zod.number().int()
+})
+
+
+/**
+ * @summary Confirm a replacement, cancel the class, or record an external trainer
+ */
+export const ResolveTrainerAbsenceCourseParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "courseId": zod.coerce.number().int()
+})
+
+export const resolveTrainerAbsenceCourseBodyCandidateNameMin = 2;
+export const resolveTrainerAbsenceCourseBodyCandidateNameMax = 120;
+
+export const resolveTrainerAbsenceCourseBodyExternalNameMin = 2;
+export const resolveTrainerAbsenceCourseBodyExternalNameMax = 120;
+
+
+
+export const ResolveTrainerAbsenceCourseBody = zod.object({
+  "action": zod.enum(['replace', 'cancel', 'external']),
+  "candidateName": zod.string().min(resolveTrainerAbsenceCourseBodyCandidateNameMin).max(resolveTrainerAbsenceCourseBodyCandidateNameMax).optional().describe('Required for replacement; must match the currently requested trainer'),
+  "externalName": zod.string().min(resolveTrainerAbsenceCourseBodyExternalNameMin).max(resolveTrainerAbsenceCourseBodyExternalNameMax).optional()
+})
+
+export const ResolveTrainerAbsenceCourseResponse = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "originalInstructor": zod.string(),
+  "instructor": zod.string(),
+  "status": zod.enum(['open', 'requested', 'replaced', 'cancelled', 'external']),
+  "candidateName": zod.string().nullable(),
+  "bookingCount": zod.number().int(),
+  "pushSent": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "pushPending": zod.number().int()
+})
+
+
+/**
+ * @summary Retry pending and failed push deliveries for a resolved course
+ */
+export const RetryTrainerAbsencePushParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "courseId": zod.coerce.number().int()
+})
+
+export const RetryTrainerAbsencePushResponse = zod.object({
+  "id": zod.number().int(),
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "originalInstructor": zod.string(),
+  "instructor": zod.string(),
+  "status": zod.enum(['open', 'requested', 'replaced', 'cancelled', 'external']),
+  "candidateName": zod.string().nullable(),
+  "bookingCount": zod.number().int(),
+  "pushSent": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "pushPending": zod.number().int()
+})
+
+
+/**
  * @summary List manager-visible rooms in a studio
  */
 export const ListStudioRoomsParams = zod.object({

@@ -22,6 +22,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ActionStrip, PulsePage, TodayPage } from './TodayPulse';
 import RoomClosuresPage from './RoomClosuresPage';
+import TrainerAbsencesPage from './TrainerAbsencesPage';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -192,6 +193,7 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
     ...(moduleEnabled(modules, 'members') ? [{ href: '/members', label: 'Mitglieder', icon: Users }] : []),
     ...(moduleEnabled(modules, 'courses') ? [{ href: '/courses', label: 'Kurse', icon: CalendarDays }] : []),
     ...((me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? [{ href: '/rooms', label: 'Räume', icon: DoorOpen }] : []),
+    ...((me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? [{ href: '/team/absences', label: 'Trainer-Ausfälle', icon: UserRound }] : []),
     ...(me.role !== 'studio_employee' && moduleEnabled(modules, 'team') ? [{ href: '/team', label: 'Team', icon: UserRound }] : []),
   ];
   return <div className="app-shell">
@@ -448,11 +450,12 @@ function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; mod
   return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Dein Profil und die Module deiner Organisation." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div><section className="module-settings"><div className="eyebrow">Organisation / Zugang</div><h2>Module</h2><p>{me.role === 'district_manager' ? 'Bestimme, welche Bereiche deiner Organisation zur Verfügung stehen.' : 'Für deinen Workspace verfügbare Bereiche.'}</p>{modulesError ? <ErrorBlock retry={retryModules} /> : <div className="module-list">{modules.filter(module => me.role === 'district_manager' || module.enabled).map(module => <div className="module-row" key={module.key} data-testid={`module-${module.key}`}><div><strong>{module.title}</strong><span>{module.enabled ? 'Aktiv' : 'Deaktiviert'}</span></div>{me.role === 'district_manager' && <button type="button" role="switch" aria-checked={module.enabled} aria-label={`${module.title} ${module.enabled ? 'deaktivieren' : 'aktivieren'}`} className={`module-switch ${module.enabled ? 'on' : ''}`} disabled={update.isPending} onClick={() => update.mutate({ key: module.key, data: { enabled: !module.enabled } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListModulesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} data-testid={`switch-module-${module.key}`}><i /></button>}</div>)}{!modules.some(module => module.enabled) && me.role !== 'district_manager' && <p>Keine weiteren Bereiche sind derzeit aktiviert.</p>}</div>}{update.isError && <p className="form-error" role="alert">Modul konnte nicht aktualisiert werden. Bitte erneut versuchen.</p>}</section></>;
 }
 
-function ProtectedRoute({ page }: { page: 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'team' | 'settings' }) {
+function ProtectedRoute({ page }: { page: 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' }) {
   return <AuthenticatedData>{(me, modules, retryModules, modulesError) => {
     if (page === 'settings') return <SettingsPage me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />;
     if (page === 'dashboard') return <DashboardPage me={me} modules={modules} />;
     if (page === 'rooms') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <RoomClosuresPage me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Räume sind nur für Studio- und District-Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
+    if (page === 'trainer-absences') return (me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? <TrainerAbsencesPage me={me} /> : <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Trainer-Ausfälle sind nur für Manager mit aktivem Kursmodul verfügbar.</p><Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
     if (!moduleEnabled(modules, page) || (page === 'team' && me.role === 'studio_employee')) return <div className="empty-state"><div className="empty-icon"><ShieldCheck size={22} /></div><h3>Bereich nicht verfügbar</h3><p>Dieses Modul ist für deinen Workspace nicht aktiviert.</p>{modulesError && <button className="button button-outline" onClick={retryModules}>Module erneut laden</button>}<Link href="/dashboard" className="button button-dark">Zur Übersicht</Link></div>;
     return page === 'pulse' ? <PulsePage me={me} /> : page === 'members' ? <MembersPage me={me} /> : page === 'courses' ? <CoursesPage me={me} modules={modules} /> : <TeamPage me={me} />;
   }}</AuthenticatedData>;
@@ -463,7 +466,7 @@ function NotFoundPage() {
 }
 
 function Router() {
-  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route component={NotFoundPage} /></Switch>;
+  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team/absences"><ProtectedRoute page="trainer-absences" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route component={NotFoundPage} /></Switch>;
 }
 
 function IdentityQueryProvider() {

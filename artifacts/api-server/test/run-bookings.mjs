@@ -7,7 +7,7 @@ const cache = join(process.cwd(), "node_modules", ".cache");
 await mkdir(cache, { recursive: true });
 const directory = await mkdtemp(join(cache, "bookings-test-"));
 try {
-  for (const entryPoint of ["course-bookings", "member-link", "member-notifications"]) {
+  for (const entryPoint of ["course-bookings", "member-link", "member-notifications", "trainer-absences"]) {
     const output = join(directory, `${entryPoint}.test.cjs`);
     await build({
       entryPoints: [`test/${entryPoint}.test.ts`],

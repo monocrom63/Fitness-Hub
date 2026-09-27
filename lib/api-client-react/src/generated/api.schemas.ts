@@ -189,6 +189,95 @@ export interface MemberUpdate {
   status?: MemberStatus;
 }
 
+export interface TrainerAbsenceInput {
+  studioId: number;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  instructor: string;
+  fromDate: string;
+  toDate: string;
+}
+
+export interface TrainerRequestInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  candidateName: string;
+}
+
+export type TrainerDecisionInputAction = typeof TrainerDecisionInputAction[keyof typeof TrainerDecisionInputAction];
+
+
+export const TrainerDecisionInputAction = {
+  replace: 'replace',
+  cancel: 'cancel',
+  external: 'external',
+} as const;
+
+export interface TrainerDecisionInput {
+  action: TrainerDecisionInputAction;
+  /**
+     * Required for replacement; must match the currently requested trainer
+     * @minLength 2
+     * @maxLength 120
+     */
+  candidateName?: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  externalName?: string;
+}
+
+export interface TrainerCandidate {
+  name: string;
+  available: boolean;
+  /** @nullable */
+  reason: string | null;
+}
+
+export type TrainerAbsenceCourseStatus = typeof TrainerAbsenceCourseStatus[keyof typeof TrainerAbsenceCourseStatus];
+
+
+export const TrainerAbsenceCourseStatus = {
+  open: 'open',
+  requested: 'requested',
+  replaced: 'replaced',
+  cancelled: 'cancelled',
+  external: 'external',
+} as const;
+
+export interface TrainerAbsenceCourse {
+  id: number;
+  courseId: number;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  originalInstructor: string;
+  instructor: string;
+  status: TrainerAbsenceCourseStatus;
+  /** @nullable */
+  candidateName: string | null;
+  bookingCount: number;
+  pushSent: number;
+  pushFailed: number;
+  pushPending: number;
+}
+
+export interface TrainerAbsence {
+  id: number;
+  studioId: number;
+  studioName: string;
+  instructor: string;
+  fromDate: string;
+  toDate: string;
+  createdAt: string;
+  courses: TrainerAbsenceCourse[];
+}
+
 export interface CourseInput {
   /**
      * @minLength 2

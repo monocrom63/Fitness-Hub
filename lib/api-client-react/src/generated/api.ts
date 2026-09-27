@@ -69,7 +69,13 @@ import type {
   RoomClosureInput,
   RoomInput,
   StaffBookingInput,
-  StudioSummary
+  StudioSummary,
+  TrainerAbsence,
+  TrainerAbsenceCourse,
+  TrainerAbsenceInput,
+  TrainerCandidate,
+  TrainerDecisionInput,
+  TrainerRequestInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -920,6 +926,511 @@ export const useCreateCourse = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateCourseMutationOptions(options));
+    }
+
+export const getListTrainerAbsencesUrl = () => {
+
+
+
+
+  return `/api/trainer-absences`
+}
+
+/**
+ * @summary List trainer absences and affected courses for accessible studios (managers only)
+ */
+export const listTrainerAbsences = async ( options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsence[]> => {
+
+  return customFetch<TrainerAbsence[]>(getListTrainerAbsencesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTrainerAbsencesQueryKey = () => {
+    return [
+    `/api/trainer-absences`
+    ] as const;
+    }
+
+
+export const getListTrainerAbsencesQueryOptions = <TData = Awaited<ReturnType<typeof listTrainerAbsences>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTrainerAbsencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrainerAbsences>>> = ({ signal }) => listTrainerAbsences({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTrainerAbsencesQueryResult = NonNullable<Awaited<ReturnType<typeof listTrainerAbsences>>>
+export type ListTrainerAbsencesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List trainer absences and affected courses for accessible studios (managers only)
+ */
+
+export function useListTrainerAbsences<TData = Awaited<ReturnType<typeof listTrainerAbsences>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerAbsences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTrainerAbsencesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTrainerAbsenceUrl = () => {
+
+
+
+
+  return `/api/trainer-absences`
+}
+
+/**
+ * @summary Record a trainer's absence and alert managers in Pulse
+ */
+export const createTrainerAbsence = async (trainerAbsenceInput: TrainerAbsenceInput, options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsence> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TrainerAbsence>(getCreateTrainerAbsenceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trainerAbsenceInput)
+  }
+);}
+
+
+
+
+
+export const getCreateTrainerAbsenceMutationKey = () => ['createTrainerAbsence'] as const;
+
+export const getCreateTrainerAbsenceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTrainerAbsence>>, TError,CreateTrainerAbsenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTrainerAbsence>>, TError,CreateTrainerAbsenceMutationVariables, TContext> => {
+
+const mutationKey = getCreateTrainerAbsenceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTrainerAbsence>>, CreateTrainerAbsenceMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTrainerAbsence(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTrainerAbsenceMutationResult = NonNullable<Awaited<ReturnType<typeof createTrainerAbsence>>>
+    export type CreateTrainerAbsenceMutationBody = BodyType<TrainerAbsenceInput>
+    export type CreateTrainerAbsenceMutationError = ErrorType<void>
+    export type CreateTrainerAbsenceMutationVariables = {data: BodyType<TrainerAbsenceInput>}
+
+    /**
+ * @summary Record a trainer's absence and alert managers in Pulse
+ */
+export const useCreateTrainerAbsence = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTrainerAbsence>>, TError,CreateTrainerAbsenceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTrainerAbsence>>,
+        TError,
+        CreateTrainerAbsenceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateTrainerAbsenceMutationOptions(options));
+    }
+
+export const getListTrainerReplacementCandidatesUrl = (id: number,
+    courseId: number,) => {
+
+
+
+
+  return `/api/trainer-absences/${id}/courses/${courseId}/candidates`
+}
+
+/**
+ * @summary Show same-studio trainers with scheduling and absence conflicts
+ */
+export const listTrainerReplacementCandidates = async (id: number,
+    courseId: number, options?: Parameters<typeof customFetch>[1]): Promise<TrainerCandidate[]> => {
+
+  return customFetch<TrainerCandidate[]>(getListTrainerReplacementCandidatesUrl(id,courseId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTrainerReplacementCandidatesQueryKey = (id: number,
+    courseId: number,) => {
+    return [
+    `/api/trainer-absences/${id}/courses/${courseId}/candidates`
+    ] as const;
+    }
+
+
+export const getListTrainerReplacementCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof listTrainerReplacementCandidates>>, TError = ErrorType<void>>(id: number,
+    courseId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerReplacementCandidates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTrainerReplacementCandidatesQueryKey(id,courseId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrainerReplacementCandidates>>> = ({ signal }) => listTrainerReplacementCandidates(id,courseId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined && courseId !== null && courseId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTrainerReplacementCandidates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTrainerReplacementCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof listTrainerReplacementCandidates>>>
+export type ListTrainerReplacementCandidatesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Show same-studio trainers with scheduling and absence conflicts
+ */
+
+export function useListTrainerReplacementCandidates<TData = Awaited<ReturnType<typeof listTrainerReplacementCandidates>>, TError = ErrorType<void>>(
+ id: number,
+    courseId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainerReplacementCandidates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTrainerReplacementCandidatesQueryOptions(id,courseId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRequestTrainerReplacementUrl = (id: number,
+    courseId: number,) => {
+
+
+
+
+  return `/api/trainer-absences/${id}/courses/${courseId}/request`
+}
+
+/**
+ * @summary Record a manager's off-app request to an available trainer
+ */
+export const requestTrainerReplacement = async (id: number,
+    courseId: number,
+    trainerRequestInput: TrainerRequestInput, options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsenceCourse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TrainerAbsenceCourse>(getRequestTrainerReplacementUrl(id,courseId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trainerRequestInput)
+  }
+);}
+
+
+
+
+
+export const getRequestTrainerReplacementMutationKey = () => ['requestTrainerReplacement'] as const;
+
+export const getRequestTrainerReplacementMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTrainerReplacement>>, TError,RequestTrainerReplacementMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestTrainerReplacement>>, TError,RequestTrainerReplacementMutationVariables, TContext> => {
+
+const mutationKey = getRequestTrainerReplacementMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestTrainerReplacement>>, RequestTrainerReplacementMutationVariables> = (props) => {
+          const {id,courseId,data} = props ?? {};
+
+          return  requestTrainerReplacement(id,courseId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestTrainerReplacementMutationResult = NonNullable<Awaited<ReturnType<typeof requestTrainerReplacement>>>
+    export type RequestTrainerReplacementMutationBody = BodyType<TrainerRequestInput>
+    export type RequestTrainerReplacementMutationError = ErrorType<void>
+    export type RequestTrainerReplacementMutationVariables = {id: number;courseId: number;data: BodyType<TrainerRequestInput>}
+
+    /**
+ * @summary Record a manager's off-app request to an available trainer
+ */
+export const useRequestTrainerReplacement = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestTrainerReplacement>>, TError,RequestTrainerReplacementMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestTrainerReplacement>>,
+        TError,
+        RequestTrainerReplacementMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestTrainerReplacementMutationOptions(options));
+    }
+
+export const getResolveTrainerAbsenceCourseUrl = (id: number,
+    courseId: number,) => {
+
+
+
+
+  return `/api/trainer-absences/${id}/courses/${courseId}/resolve`
+}
+
+/**
+ * @summary Confirm a replacement, cancel the class, or record an external trainer
+ */
+export const resolveTrainerAbsenceCourse = async (id: number,
+    courseId: number,
+    trainerDecisionInput: TrainerDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsenceCourse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TrainerAbsenceCourse>(getResolveTrainerAbsenceCourseUrl(id,courseId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trainerDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getResolveTrainerAbsenceCourseMutationKey = () => ['resolveTrainerAbsenceCourse'] as const;
+
+export const getResolveTrainerAbsenceCourseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveTrainerAbsenceCourse>>, TError,ResolveTrainerAbsenceCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveTrainerAbsenceCourse>>, TError,ResolveTrainerAbsenceCourseMutationVariables, TContext> => {
+
+const mutationKey = getResolveTrainerAbsenceCourseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveTrainerAbsenceCourse>>, ResolveTrainerAbsenceCourseMutationVariables> = (props) => {
+          const {id,courseId,data} = props ?? {};
+
+          return  resolveTrainerAbsenceCourse(id,courseId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveTrainerAbsenceCourseMutationResult = NonNullable<Awaited<ReturnType<typeof resolveTrainerAbsenceCourse>>>
+    export type ResolveTrainerAbsenceCourseMutationBody = BodyType<TrainerDecisionInput>
+    export type ResolveTrainerAbsenceCourseMutationError = ErrorType<void>
+    export type ResolveTrainerAbsenceCourseMutationVariables = {id: number;courseId: number;data: BodyType<TrainerDecisionInput>}
+
+    /**
+ * @summary Confirm a replacement, cancel the class, or record an external trainer
+ */
+export const useResolveTrainerAbsenceCourse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveTrainerAbsenceCourse>>, TError,ResolveTrainerAbsenceCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveTrainerAbsenceCourse>>,
+        TError,
+        ResolveTrainerAbsenceCourseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolveTrainerAbsenceCourseMutationOptions(options));
+    }
+
+export const getRetryTrainerAbsencePushUrl = (id: number,
+    courseId: number,) => {
+
+
+
+
+  return `/api/trainer-absences/${id}/courses/${courseId}/push/retry`
+}
+
+/**
+ * @summary Retry pending and failed push deliveries for a resolved course
+ */
+export const retryTrainerAbsencePush = async (id: number,
+    courseId: number, options?: Parameters<typeof customFetch>[1]): Promise<TrainerAbsenceCourse> => {
+
+  return customFetch<TrainerAbsenceCourse>(getRetryTrainerAbsencePushUrl(id,courseId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRetryTrainerAbsencePushMutationKey = () => ['retryTrainerAbsencePush'] as const;
+
+export const getRetryTrainerAbsencePushMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryTrainerAbsencePush>>, TError,RetryTrainerAbsencePushMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryTrainerAbsencePush>>, TError,RetryTrainerAbsencePushMutationVariables, TContext> => {
+
+const mutationKey = getRetryTrainerAbsencePushMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryTrainerAbsencePush>>, RetryTrainerAbsencePushMutationVariables> = (props) => {
+          const {id,courseId} = props ?? {};
+
+          return  retryTrainerAbsencePush(id,courseId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryTrainerAbsencePushMutationResult = NonNullable<Awaited<ReturnType<typeof retryTrainerAbsencePush>>>
+
+    export type RetryTrainerAbsencePushMutationError = ErrorType<void>
+    export type RetryTrainerAbsencePushMutationVariables = {id: number;courseId: number}
+
+    /**
+ * @summary Retry pending and failed push deliveries for a resolved course
+ */
+export const useRetryTrainerAbsencePush = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryTrainerAbsencePush>>, TError,RetryTrainerAbsencePushMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryTrainerAbsencePush>>,
+        TError,
+        RetryTrainerAbsencePushMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRetryTrainerAbsencePushMutationOptions(options));
     }
 
 export const getListStudioRoomsUrl = (studioId: number,) => {

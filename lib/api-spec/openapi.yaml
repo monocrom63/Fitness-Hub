@@ -233,6 +233,114 @@ paths:
           description: Insufficient role or studio access
         "409":
           description: The room is closed or already occupied during the requested course interval
+  /trainer-absences:
+    get:
+      operationId: listTrainerAbsences
+      tags: [portal]
+      summary: List trainer absences and affected courses for accessible studios (managers only)
+      responses:
+        "200":
+          description: Absences with course and push delivery status
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TrainerAbsence" }
+        "403": { description: Manager access required }
+    post:
+      operationId: createTrainerAbsence
+      tags: [portal]
+      summary: Record a trainer's absence and alert managers in Pulse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrainerAbsenceInput" }
+      responses:
+        "201":
+          description: Absence recorded with affected courses
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainerAbsence" }
+        "400": { description: Invalid date or trainer }
+        "403": { description: Manager access required }
+        "409": { description: Trainer already absent or course already under review }
+  /trainer-absences/{id}/courses/{courseId}/candidates:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: courseId, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: listTrainerReplacementCandidates
+      tags: [portal]
+      summary: Show same-studio trainers with scheduling and absence conflicts
+      responses:
+        "200":
+          description: Candidates with reasons for conflicts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TrainerCandidate" }
+        "403": { description: Manager access required }
+        "404": { description: Affected course not found }
+  /trainer-absences/{id}/courses/{courseId}/request:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: courseId, in: path, required: true, schema: { type: integer } }
+    post:
+      operationId: requestTrainerReplacement
+      tags: [portal]
+      summary: Record a manager's off-app request to an available trainer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrainerRequestInput" }
+      responses:
+        "200":
+          description: Request recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainerAbsenceCourse" }
+        "403": { description: Manager access required }
+        "409": { description: Candidate unavailable or course already resolved }
+  /trainer-absences/{id}/courses/{courseId}/resolve:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: courseId, in: path, required: true, schema: { type: integer } }
+    post:
+      operationId: resolveTrainerAbsenceCourse
+      tags: [portal]
+      summary: Confirm a replacement, cancel the class, or record an external trainer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrainerDecisionInput" }
+      responses:
+        "200":
+          description: Course resolved and members notified in-app; push queued and attempted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainerAbsenceCourse" }
+        "403": { description: Manager access required }
+        "409": { description: Course or candidate changed or already resolved }
+  /trainer-absences/{id}/courses/{courseId}/push/retry:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+      - { name: courseId, in: path, required: true, schema: { type: integer } }
+    post:
+      operationId: retryTrainerAbsencePush
+      tags: [portal]
+      summary: Retry pending and failed push deliveries for a resolved course
+      responses:
+        "200":
+          description: Updated course and delivery status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrainerAbsenceCourse" }
+        "403": { description: Manager access required }
+        "409": { description: Course not yet resolved }
   /studios/{studioId}/rooms:
     parameters:
       - name: studioId
@@ -1162,6 +1270,67 @@ components:
         enrolled: { type: integer }
         room: { type: string }
         status: { type: string, enum: [scheduled, full, cancelled] }
+    TrainerAbsenceInput:
+      type: object
+      additionalProperties: false
+      required: [studioId, instructor, fromDate, toDate]
+      properties:
+        studioId: { type: integer }
+        instructor: { type: string, minLength: 2, maxLength: 120 }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+    TrainerRequestInput:
+      type: object
+      additionalProperties: false
+      required: [candidateName]
+      properties:
+        candidateName: { type: string, minLength: 2, maxLength: 120 }
+    TrainerDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: { type: string, enum: [replace, cancel, external] }
+        candidateName: { type: string, minLength: 2, maxLength: 120, description: Required for replacement; must match the currently requested trainer }
+        externalName: { type: string, minLength: 2, maxLength: 120 }
+    TrainerCandidate:
+      type: object
+      required: [name, available, reason]
+      properties:
+        name: { type: string }
+        available: { type: boolean }
+        reason: { type: ["string", "null"] }
+    TrainerAbsenceCourse:
+      type: object
+      required: [id, courseId, title, startsAt, endsAt, originalInstructor, instructor, status, candidateName, bookingCount, pushSent, pushFailed, pushPending]
+      properties:
+        id: { type: integer }
+        courseId: { type: integer }
+        title: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        originalInstructor: { type: string }
+        instructor: { type: string }
+        status: { type: string, enum: [open, requested, replaced, cancelled, external] }
+        candidateName: { type: ["string", "null"] }
+        bookingCount: { type: integer }
+        pushSent: { type: integer }
+        pushFailed: { type: integer }
+        pushPending: { type: integer }
+    TrainerAbsence:
+      type: object
+      required: [id, studioId, studioName, instructor, fromDate, toDate, createdAt, courses]
+      properties:
+        id: { type: integer }
+        studioId: { type: integer }
+        studioName: { type: string }
+        instructor: { type: string }
+        fromDate: { type: string, format: date }
+        toDate: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+        courses:
+          type: array
+          items: { $ref: "#/components/schemas/TrainerAbsenceCourse" }
     CourseInput:
       type: object
       required: [title, instructor, studioId, startsAt, endsAt, capacity, room]

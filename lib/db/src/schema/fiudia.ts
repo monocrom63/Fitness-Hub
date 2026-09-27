@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   unique,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 export const organizationsTable = pgTable("fiudia_organizations", {
@@ -135,6 +136,47 @@ export const coursesTable = pgTable("fiudia_courses", {
     .notNull()
     .defaultNow(),
 });
+
+// Trainers are identified by the existing studio-scoped course instructor name.
+// Managers record absences and decisions; trainers do not have app accounts.
+export const trainerAbsencesTable = pgTable("fiudia_trainer_absences", {
+  id: serial("id").primaryKey(),
+  studioId: integer("studio_id").notNull().references(() => studiosTable.id, { onDelete: "cascade" }),
+  instructor: text("instructor").notNull(),
+  fromDate: date("from_date", { mode: "string" }).notNull(),
+  toDate: date("to_date", { mode: "string" }).notNull(),
+  createdByStaffId: integer("created_by_staff_id").notNull().references(() => staffTable.id, { onDelete: "restrict" }),
+  pulseMessageId: integer("pulse_message_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const trainerAbsenceCoursesTable = pgTable("fiudia_trainer_absence_courses", {
+  id: serial("id").primaryKey(),
+  absenceId: integer("absence_id").notNull().references(() => trainerAbsencesTable.id, { onDelete: "restrict" }),
+  courseId: integer("course_id").notNull().references(() => coursesTable.id, { onDelete: "restrict" }),
+  originalInstructor: text("original_instructor").notNull(),
+  status: text("status").notNull().default("open"),
+  candidateName: text("candidate_name"),
+  resolvedByStaffId: integer("resolved_by_staff_id").references(() => staffTable.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+}, (table) => [unique("fiudia_trainer_absence_course").on(table.absenceId, table.courseId)]);
+
+export const trainerAbsencePushDeliveriesTable = pgTable("fiudia_trainer_absence_push_deliveries", {
+  id: serial("id").primaryKey(),
+  absenceCourseId: integer("absence_course_id").notNull().references(() => trainerAbsenceCoursesTable.id, { onDelete: "restrict" }),
+  bookingId: integer("booking_id").notNull().references(() => courseBookingsTable.id, { onDelete: "restrict" }),
+  memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "restrict" }),
+  subscriptionId: text("subscription_id").notNull(),
+  idempotencyKey: uuid("idempotency_key").notNull().defaultRandom().unique(),
+  status: text("status").notNull().default("pending"),
+  error: text("error"),
+  providerId: text("provider_id"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  claimToken: text("claim_token"),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [unique("fiudia_trainer_push_booking_subscription").on(table.absenceCourseId, table.bookingId, table.subscriptionId)]);
 
 export const roomsTable = pgTable(
   "fiudia_rooms",
