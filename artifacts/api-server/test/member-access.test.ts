@@ -419,7 +419,9 @@ test("member records remain inside the caller's studio and organization", async 
       });
       assert.equal(checkInResponse.status, 201);
 
-      const startsAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
+      // Keep this class separate from the earlier Pulse-enabled class in the
+      // same studio and room; this case tests module behavior, not a collision.
+      const startsAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
       const courseResponse = await api(managerA1.clerkUserId, "POST", "/courses", {
         title: `Pulse disabled course ${run}`,
         instructor: "Instructor",

@@ -247,6 +247,7 @@ test("manager records an absence, resolves all affected courses and notifies mem
     assert.equal(replaced.body.instructor, "Sarah");
     assert.equal(replaced.body.pushFailed, 1);
     assert.equal(sends.length, 1);
+    assert.deepEqual(sends[0].body.data, { courseId: morning.id, memberId: members[0].id });
     assert.doesNotMatch(JSON.stringify(sends[0]), /krank|Mike|Abwesenheit/i);
     const [noticeAfterFailure] = await db.select().from(memberNotificationsTable)
       .where(eq(memberNotificationsTable.courseId, morning.id));
@@ -255,6 +256,7 @@ test("manager records an absence, resolves all affected courses and notifies mem
     assert.equal(retried.status, 200, JSON.stringify(retried.body));
     assert.equal(retried.body.pushSent, 1);
     assert.equal(sends.length, 2);
+    assert.deepEqual(sends[1].body.data, { courseId: morning.id, memberId: members[0].id });
     assert.match(sends[0].body.idempotency_key, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     assert.equal(sends[0].body.idempotency_key, sends[1].body.idempotency_key);
     assert.equal((await api(manager.clerkUserId, "POST", `${prefix(morning.id)}/resolve`,

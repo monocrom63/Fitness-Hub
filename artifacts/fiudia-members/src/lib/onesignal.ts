@@ -1,4 +1,5 @@
 import { registerMemberPushSubscription, unregisterMemberPushSubscription } from '@workspace/api-client-react';
+import { CoursePushClickRouter } from '../course-target';
 
 const APP_ID = 'c1a30beb-bc79-45f6-9cdd-275e663dbcd6';
 const basePath = import.meta.env.BASE_URL.replace(/\/?$/, '/');
@@ -27,8 +28,14 @@ type OneSignalSdk = {
   Notifications: {
     permission: boolean;
     isPushSupported: () => boolean;
-    addEventListener: (name: 'permissionChange', listener: () => void) => void;
-    removeEventListener: (name: 'permissionChange', listener: () => void) => void;
+    addEventListener(name: 'permissionChange', listener: () => void): void;
+    addEventListener(name: 'click', listener: (event: {
+      notification: { additionalData?: unknown };
+    }) => void): void;
+    removeEventListener(name: 'permissionChange', listener: () => void): void;
+    removeEventListener(name: 'click', listener: (event: {
+      notification: { additionalData?: unknown };
+    }) => void): void;
   };
   User: { PushSubscription: PushSubscription };
 };
@@ -42,6 +49,8 @@ declare global {
 let sdkPromise: Promise<OneSignalSdk> | null = null;
 let scriptPromise: Promise<void> | null = null;
 const pendingRegistrations = new Set<Promise<unknown>>();
+const coursePushClickRouter = new CoursePushClickRouter();
+let clickListenerSdk: OneSignalSdk | null = null;
 
 export function supportsPushEnvironment() {
   return window.isSecureContext && 'serviceWorker' in navigator && 'Notification' in window;
@@ -76,6 +85,12 @@ export function getOneSignal(): Promise<OneSignalSdk> {
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       const initialize = async (sdk: OneSignalSdk) => {
         try {
+          if (clickListenerSdk !== sdk) {
+            sdk.Notifications.addEventListener('click', event => {
+              coursePushClickRouter.receive(event.notification.additionalData);
+            });
+            clickListenerSdk = sdk;
+          }
           await sdk.init({
             appId: APP_ID,
             serviceWorkerPath: workerPath,
@@ -99,6 +114,14 @@ export function getOneSignal(): Promise<OneSignalSdk> {
     });
   }
   return sdkPromise;
+}
+
+export function listenForCoursePushClicks(memberId: number, navigate: (target: string) => void) {
+  return coursePushClickRouter.subscribe(memberId, navigate);
+}
+
+export function clearCoursePushClickState() {
+  coursePushClickRouter.clear();
 }
 
 export function rememberPushChoice(optedIn: boolean) {

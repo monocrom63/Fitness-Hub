@@ -67,6 +67,7 @@ export async function processTrainerAbsencePush(
 
   const [decision] = await db.select({
     status: trainerAbsenceCoursesTable.status,
+    courseId: trainerAbsenceCoursesTable.courseId,
     instructor: coursesTable.instructor,
     title: coursesTable.title,
   }).from(trainerAbsenceCoursesTable)
@@ -98,6 +99,7 @@ export async function processTrainerAbsencePush(
             target_channel: "push",
             headings: { en: notice.title },
             contents: { en: notice.body },
+            data: { courseId: decision.courseId, memberId: claim.memberId },
             idempotency_key: claim.idempotencyKey,
           },
         });

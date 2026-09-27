@@ -191,6 +191,7 @@ async function sendOne(
         target_channel: "push",
         headings: { en: title },
         contents: { en: body },
+        data: { courseId: resolution.courseId, memberId: delivery.memberId },
         idempotency_key: delivery.idempotencyKey,
       },
     });

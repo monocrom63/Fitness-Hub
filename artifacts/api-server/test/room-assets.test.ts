@@ -286,6 +286,10 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
     assert.deepEqual((requestBodies[0] as any).include_subscription_ids, [subscriptionId]);
     assert.equal((requestBodies[0] as any).target_channel, "push");
     assert.equal((requestBodies[0] as any).app_id, "c1a30beb-bc79-45f6-9cdd-275e663dbcd6");
+    assert.deepEqual((requestBodies[0] as any).data, {
+      courseId: pushResolution.courseId,
+      memberId: member.id,
+    });
     assert.deepEqual(requestBodies[1], requestBodies[0], "the stable payload and provider idempotency key are reused");
     const repeatPushAttempt = await processResolutionPushDeliveries(pushResolution.id, mockProxy);
     assert.equal(repeatPushAttempt[0].status, "sent");

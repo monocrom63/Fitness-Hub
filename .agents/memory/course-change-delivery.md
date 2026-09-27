@@ -20,3 +20,9 @@ Do not target member-specific OneSignal messages using a client-declared externa
 **Why:** An unauthenticated browser can otherwise claim another member's external ID and potentially receive private course-change messages intended for that member.
 
 **How to apply:** For targeted push delivery, use OneSignal identity verification or bind subscription IDs to authenticated members on the server, then obtain server-side sending authorization. Keep manager-side push unavailable until the full path is proven.
+
+Treat push click navigation as recipient-specific and asynchronous: retain a validated click until the member app knows who signed in, then route only if that member is the intended recipient.
+
+**Why:** The browser may open the app from a push before authentication or member-home loading finishes, and browser subscriptions can outlive a tab. A course ID alone can be applied to the wrong signed-in member on a shared device. A fixed production launch URL can also send development pushes into a different environment and database.
+
+**How to apply:** Send recipient context with each course-change push, validate it against the authenticated member before consuming a queued click, clear pending clicks on identity changes, and keep course authorization on the server. Do not solve click routing by guessing a deployment domain or hardcoding a cross-environment launch URL.

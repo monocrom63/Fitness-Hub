@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
@@ -16,7 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
-import { getOneSignal, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
+import { clearCoursePushClickState, getOneSignal, listenForCoursePushClicks, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -87,7 +87,7 @@ function PageHeader({ eyebrow, title, description }: { eyebrow: string; title: s
   return <><div className="topline"><span className="eyebrow">Fiudia / {eyebrow}</span><span className="topline-right"><i /> Dein Raum für Bewegung</span></div><div className="page-head"><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div></>;
 }
 function MemberShell({ member, home, children }: { member: Member | null; home?: MemberHome; children: ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
   const [signingOut, setSigningOut] = useState(false);
@@ -106,6 +106,10 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
       });
   };
   const notifications = useMemberNotifications(Boolean(member && home?.coursesEnabled));
+  useEffect(() => {
+    if (!member || !home?.coursesEnabled) return;
+    return listenForCoursePushClicks(member.id, target => navigate(target));
+  }, [member, home?.coursesEnabled, navigate]);
   const unread = notifications.data?.filter(item => !item.readAt).length ?? 0;
   const nav = [
     { href: '/', label: 'Heute', icon: Activity },
@@ -489,8 +493,25 @@ function Routes() {
 function IdentityQueryBoundary() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const previousUserId = useRef<string | null>(null);
+  const previousPushIdentity = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!isLoaded) return;
+    if (previousPushIdentity.current && (!isSignedIn || previousPushIdentity.current !== userId)) {
+      clearCoursePushClickState();
+    }
+    previousPushIdentity.current = userId ?? null;
+  }, [isLoaded, isSignedIn, userId]);
+  useEffect(() => {
+    if (!storedPushSubscriptionId()) return;
+    // The click handler is installed before OneSignal init; init has no prompt
+    // enabled and this path never creates or registers a subscription.
+    void getOneSignal().catch(() => {});
+  }, []);
   useEffect(() => {
     if (!isLoaded) return;
+    if (previousUserId.current && (!isSignedIn || previousUserId.current !== userId)) {
+      clearCoursePushClickState();
+    }
     if (!isSignedIn || (previousUserId.current && previousUserId.current !== userId)) {
       void optOutOnSignOut().catch(() => {});
     }
