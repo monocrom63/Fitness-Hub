@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { afterAuthPath, clearInvite, invitePath, pendingInvite, rememberInvite } from '../src/invitation-return.ts';
+import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, invitePath, pendingInvitationPath, pendingInvite, rememberInvite } from '../src/invitation-return.ts';
 
 function tabStorage() {
   const items = new Map();
@@ -31,4 +31,27 @@ test('a newer invitation replaces the older destination, and completion clears i
   assert.equal(pendingInvite(tab), null);
   assert.equal(afterAuthPath(tab, '/fiudia-members', '/connect'), '/fiudia-members/connect');
   assert.equal(invitePath('a/b'), '/invite/a%2Fb');
+});
+
+test('invite entry, both auth routes, protected redirect and acceptance share the same encoded destination', async () => {
+  const tab = tabStorage();
+  const token = 'studio/Neu?X=ä';
+  const route = '/invite/studio%2FNeu%3FX%3D%C3%A4';
+  assert.equal(enterInvitation(tab, token, false), '/sign-in');
+  assert.equal(afterAuthPath(tab, '/fiudia-members', '/'), `/fiudia-members${route}`);
+  assert.equal(afterAuthPath(tab, '/fiudia-members', '/connect'), `/fiudia-members${route}`);
+  assert.equal(pendingInvitationPath(tab), route);
+  assert.equal(enterInvitation(tab, token, true), null);
+
+  const received = [];
+  await assert.rejects(acceptInvitation(tab, token, async data => {
+    received.push(data);
+    throw new Error('request failed');
+  }), /request failed/);
+  assert.equal(pendingInvite(tab), token, 'failed acceptance must keep the invitation');
+
+  await acceptInvitation(tab, token, async data => { received.push(data); });
+  assert.deepEqual(received, [{ token }, { token }]);
+  assert.equal(pendingInvitationPath(tab), null);
+  assert.equal(afterAuthPath(tab, '/fiudia-members', '/connect'), '/fiudia-members/connect');
 });

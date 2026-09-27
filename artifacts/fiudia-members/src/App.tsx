@@ -15,7 +15,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
-import { afterAuthPath, clearInvite, invitePath, pendingInvite as getPendingInvite, rememberInvite } from './invitation-return';
+import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
 import { getOneSignal, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -396,8 +396,7 @@ function InvitePage({ token, member }: { token: string; member: Member | null })
   const submit = async () => {
     setError('');
     try {
-      await accept.mutateAsync({ data: { token } });
-      clearInvite(sessionStorage);
+      await acceptInvitation(sessionStorage, token, data => accept.mutateAsync({ data }));
       navigate('/', { replace: true });
     } catch (failure) { setError(invitationError(failure)); }
   };
@@ -418,12 +417,12 @@ function InviteEntry() {
   const { isLoaded, isSignedIn } = useAuth();
   const savedToken = useRef<string | null>(null);
   // Preserve the one-use secret only in this tab across Clerk's authentication flow.
-  if (token && savedToken.current !== token) {
-    rememberInvite(sessionStorage, token);
-    savedToken.current = token;
-  }
+  const redirect = token && savedToken.current !== token
+    ? enterInvitation(sessionStorage, token, isSignedIn)
+    : isSignedIn ? null : '/sign-in';
+  if (token) savedToken.current = token;
   if (!isLoaded) return <LoadingPage />;
-  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  if (redirect) return <Redirect to={redirect} />;
   return <AuthenticatedPage page="invite" token={token} />;
 }
 function ConnectPage({ member }: { member: Member | null }) {
@@ -453,8 +452,8 @@ function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'co
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <LoadingPage />;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
-  const pending = pendingInvite();
-  if (pending) return <Redirect to={invitePath(pending)} />;
+  const pending = pendingInvitationPath(sessionStorage);
+  if (pending) return <Redirect to={pending} />;
   return <AuthenticatedPage page={page} />;
 }
 function AuthenticatedPage({ page, token = '' }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'invite'; token?: string }) {
