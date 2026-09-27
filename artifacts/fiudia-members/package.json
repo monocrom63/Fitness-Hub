@@ -8,6 +8,7 @@
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "test:course-target": "node --experimental-strip-types --test test/course-target.test.mjs",
+    "test:invitation-return": "node --experimental-strip-types --test test/invitation-return.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

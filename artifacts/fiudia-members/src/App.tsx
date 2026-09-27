@@ -14,14 +14,13 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
+import { afterAuthPath, clearInvite, invitePath, pendingInvite as getPendingInvite, rememberInvite } from './invitation-return';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxy = import.meta.env.VITE_CLERK_PROXY_URL;
 const stripBase = (path: string) => basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
-const pendingInviteKey = 'fiudia-member-pending-invite';
-const pendingInvite = () => sessionStorage.getItem(pendingInviteKey);
-const invitePath = (token: string) => `/invite/${encodeURIComponent(token)}`;
+const pendingInvite = () => getPendingInvite(sessionStorage);
 
 // The managed Clerk tenant name is set outside this app. Keep every embedded
 // authentication step branded while preserving the rest of the German locale.
@@ -252,12 +251,12 @@ function InvitePage({ token, member }: { token: string; member: Member | null })
     setError('');
     try {
       await accept.mutateAsync({ data: { token } });
-      sessionStorage.removeItem(pendingInviteKey);
+      clearInvite(sessionStorage);
       navigate('/', { replace: true });
     } catch (failure) { setError(invitationError(failure)); }
   };
   const leave = () => {
-    sessionStorage.removeItem(pendingInviteKey);
+    clearInvite(sessionStorage);
     navigate('/connect', { replace: true });
   };
   return <div className="page"><PageHeader eyebrow="Einladung" title="Dein Platz wartet." description="Du entscheidest, ob du diese persönliche Einladung annehmen möchtest." />
@@ -274,7 +273,7 @@ function InviteEntry() {
   const savedToken = useRef<string | null>(null);
   // Preserve the one-use secret only in this tab across Clerk's authentication flow.
   if (token && savedToken.current !== token) {
-    sessionStorage.setItem(pendingInviteKey, token);
+    rememberInvite(sessionStorage, token);
     savedToken.current = token;
   }
   if (!isLoaded) return <LoadingPage />;
@@ -300,7 +299,7 @@ function ConnectPage({ member }: { member: Member | null }) {
 }
 function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const signIn = mode === 'sign-in';
-  const redirect = pendingInvite() ? `${basePath}${invitePath(pendingInvite()!)}` : `${basePath}${signIn ? '/' : '/connect'}`;
+  const redirect = afterAuthPath(sessionStorage, basePath, signIn ? '/' : '/connect');
   useEffect(() => pageTitle(signIn ? 'Anmelden' : 'Registrieren'), [signIn]);
   return <div className="auth-page"><div className="auth-aside"><Brand /><h1>Dein Studio.<br /><em>Dein Rhythmus.</em></h1><p>Alle Kurse, deine Buchungen und jeder Besuch. Ein ruhiger Ort für alles, was dich in Bewegung hält.</p><small>Fiudia / Dein Raum für Bewegung</small></div><main className="auth-main"><div className="auth-content"><div className="eyebrow">Fiudia Mitglieder</div><h2>{signIn ? 'Willkommen zurück.' : 'Schön, dass du da bist.'}</h2><p>{pendingInvite() ? 'Deine Einladung wartet nach der Anmeldung auf dich. Nutze die E-Mail-Adresse, an die dein Studio sie geschickt hat, und bestätige sie.' : signIn ? 'Melde dich an und mach dort weiter, wo du aufgehört hast.' : 'Erstelle ein Konto und verbinde danach deine Mitgliedschaft.'}</p><div className="auth-clerk">{signIn ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={redirect} /> : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} />}</div><div className="auth-switch">{signIn ? <>Noch kein Konto? <Link href="/sign-up" data-testid="link-sign-up">Registrieren</Link></> : <>Schon dabei? <Link href="/sign-in" data-testid="link-sign-in">Anmelden</Link></>}</div></div></main></div>;
 }
