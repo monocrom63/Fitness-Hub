@@ -346,3 +346,81 @@ test("expired team invitations are listed but cannot grant access or block a rep
     if (error !== rollback) throw error;
   }
 });
+
+test("parallel acceptance of one invitation grants only one team access", async () => {
+  const run = randomUUID();
+  const email = `team-parallel-${run}@example.com`;
+  const token = randomUUID();
+  const userA = `team-parallel-a-${run}`;
+  const userB = `team-parallel-b-${run}`;
+  let organizationId: number | undefined;
+  let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+
+  try {
+    const [organization] = await db.insert(organizationsTable)
+      .values({ name: `Parallel invitation ${run}` }).returning();
+    organizationId = organization.id;
+    const [studio] = await db.insert(studiosTable)
+      .values({ organizationId, name: "Parallel studio", city: "Berlin" }).returning();
+    const [manager] = await db.insert(staffTable).values({
+      clerkUserId: `team-parallel-manager-${run}`,
+      organizationId, studioId: studio.id, fullName: "Manager",
+      email: `team-parallel-manager-${run}@example.com`, role: "studio_manager",
+    }).returning();
+    const [invitation] = await db.insert(invitationsTable).values({
+      organizationId, studioId: studio.id, invitedByStaffId: manager.id,
+      email, role: "studio_employee",
+      tokenHash: createHash("sha256").update(token).digest("hex"),
+      expiresAt: new Date(Date.now() + 60_000),
+    }).returning();
+
+    // Hold both HTTP requests at identity lookup so neither can complete before
+    // the other starts; unlike the rolled-back fixture tests, these use separate
+    // database connections and can race on the invitation row.
+    let arrivals = 0;
+    let release!: () => void;
+    const bothArrived = new Promise<void>(resolve => { release = resolve; });
+    const app = express();
+    app.use(express.json());
+    app.use("/api", createTeamRouter({
+      database: db,
+      userIdFromRequest: req => req.get("x-test-user") ?? null,
+      identityForUser: async userId => {
+        if (userId !== userA && userId !== userB) throw new Error("Unexpected test identity");
+        if (++arrivals === 2) release();
+        await bothArrived;
+        return { userId, fullName: userId, email, emailVerified: true };
+      },
+    }));
+    server = app.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => server!.once("listening", resolve));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/team/invitations/${token}/accept`;
+    const responses = await Promise.all([userA, userB].map(async userId => {
+      const response = await fetch(url, { method: "POST", headers: { "x-test-user": userId } });
+      return { status: response.status, body: await response.json() as { userId?: string } };
+    }));
+
+    assert.equal(responses.filter(response => response.status === 200).length, 1);
+    assert.ok([404, 409].includes(responses.find(response => response.status !== 200)!.status));
+    const winner = responses.find(response => response.status === 200)!.body.userId;
+    assert.ok(winner === userA || winner === userB);
+    const staff = await db.select({
+      clerkUserId: staffTable.clerkUserId,
+      studioId: staffTable.studioId,
+      role: staffTable.role,
+    }).from(staffTable).where(eq(staffTable.email, email));
+    assert.deepEqual(staff, [{ clerkUserId: winner, studioId: studio.id, role: "studio_employee" }]);
+    const [used] = await db.select({ status: invitationsTable.status })
+      .from(invitationsTable).where(eq(invitationsTable.id, invitation.id));
+    assert.equal(used.status, "accepted");
+    const loser = winner === userA ? userB : userA;
+    const replay = await fetch(url, { method: "POST", headers: { "x-test-user": loser } });
+    assert.equal(replay.status, 404);
+  } finally {
+    if (server?.listening) await new Promise<void>((resolve, reject) =>
+      server!.close(error => error ? reject(error) : resolve()));
+    if (organizationId !== undefined) {
+      await db.delete(organizationsTable).where(eq(organizationsTable.id, organizationId));
+    }
+  }
+});
