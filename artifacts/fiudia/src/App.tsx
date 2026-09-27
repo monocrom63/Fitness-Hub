@@ -383,9 +383,11 @@ function CourseRoster({ course, onClose }: { course: Course; onClose: () => void
 
 function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const client = useQueryClient();
+  const district = me.role === 'district_manager';
   const manager = me.role === 'studio_manager' || me.role === 'district_manager';
   const canBookMembers = manager && moduleEnabled(modules, 'members');
   const query = useListCourses({ query: { queryKey: getListCoursesQueryKey() } });
+  const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: district, refetchOnMount: 'always' } });
   const create = useCreateCourse();
   const booking = useCreateStaffCourseBooking();
   const [bookingCourse, setBookingCourse] = useState<Course | null>(null);
@@ -395,16 +397,40 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const membersQuery = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey(), enabled: !!bookingCourse && canBookMembers } });
   useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
   const [open, setOpen] = useState(false);
+  const [selectedStudio, setSelectedStudio] = useState('');
+  const [studioError, setStudioError] = useState('');
   const [form, setForm] = useState({ title: '', instructor: '', startsAt: '', endsAt: '', capacity: '20', room: '' });
   const update = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = (e: React.FormEvent) => { e.preventDefault(); create.mutate({ data: { ...form, capacity: Number(form.capacity), studioId: me.studioId || 0, startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString() } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setOpen(false); } }); };
+  const studioId = district ? Number(selectedStudio) : me.studioId;
+  const allowedStudio = !!studioId && (!district || studios.data?.some(studio => studio.id === studioId) === true);
+  const openCreate = () => { create.reset(); setStudioError(''); setOpen(true); };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!allowedStudio || !studioId) {
+      setStudioError(district ? 'Bitte wähle ein verfügbares Zielstudio aus.' : 'Deinem Zugang ist kein Studio zugeordnet.');
+      return;
+    }
+    setStudioError('');
+    create.mutate({
+      data: {
+        ...form, capacity: Number(form.capacity), studioId,
+        startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString(),
+      },
+    }, {
+      onSuccess: () => {
+        void client.invalidateQueries({ queryKey: getListCoursesQueryKey() });
+        void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        setOpen(false);
+      },
+    });
+  };
   const book = (e: React.FormEvent) => { e.preventDefault(); if (!bookingCourse || !bookingMemberId || !canBookMembers) return; setBookingResult(null); booking.mutate({ id: bookingCourse.id, data: { memberId: Number(bookingMemberId) } }, { onSuccess: result => { setBookingResult(result.status === 'confirmed' ? 'Platz bestätigt.' : result.status === 'waitlisted' ? `Auf der Warteliste${result.waitlistPosition ? ` · Position ${result.waitlistPosition}` : ''}.` : 'Buchungsstatus: ' + result.status); void client.invalidateQueries({ queryKey: getListCourseBookingsQueryKey(bookingCourse.id) }); void client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } }); };
   const courses = query.data || [];
   return <>
-    <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button>} />
-    {query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => setOpen(true)} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
+    <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button>} />
+    {query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
       <div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span></div>
-      <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{course.instructor} · {course.room}</p>
+      <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{district && <><strong data-testid={`text-course-studio-${course.id}`}>{course.studioName}</strong> · </>}{course.instructor} · {course.room}</p>
       <div className="course-card-bottom"><span><Users size={15} /> {course.enrolled} / {course.capacity}</span><span className={course.enrolled / course.capacity > .8 ? 'warning-text' : 'positive-text'}>{Math.round((course.enrolled / course.capacity) * 100)}% belegt</span></div>
       <div className="capacity-bar"><i style={{ width: `${Math.min(100, (course.enrolled / course.capacity) * 100)}%` }} /></div>
       {manager && <button className="button button-outline course-book-button" onClick={() => setRosterCourse(course)} data-testid={`button-course-roster-${course.id}`}><Users size={15} /> Teilnehmerliste ansehen</button>}
@@ -414,6 +440,18 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
     {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}
     {me.role !== 'studio_employee' && open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}>
       <form onSubmit={submit} className="modal-form">
+        {district ? <>
+          <label className="field">
+            <span>Zielstudio</span>
+            <select required value={selectedStudio} onChange={event => { setSelectedStudio(event.target.value); setStudioError(''); create.reset(); }} disabled={studios.isLoading || studios.isError || create.isPending} data-testid="select-course-studio">
+              <option value="">Studio auswählen</option>
+              {studios.data?.map(studio => <option key={studio.id} value={studio.id}>{studio.name} · {studio.city}</option>)}
+            </select>
+          </label>
+          {studios.isLoading && <p className="booking-hint" role="status">Studios werden geladen …</p>}
+          {studios.isError && <p className="form-error" role="alert">Studios konnten nicht geladen werden. <button type="button" className="button button-outline" onClick={() => void studios.refetch()} data-testid="button-retry-course-studios">Erneut versuchen</button></p>}
+          {!studios.isLoading && !studios.isError && studios.data?.length === 0 && <p className="form-error" role="alert">Für deinen Zugang ist kein Studio verfügbar.</p>}
+        </> : <p className="booking-hint">Zielstudio: <strong>{me.studioName || 'Kein Studio zugeordnet'}</strong></p>}
         <TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" />
         <TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} />
         <div className="field-grid">
@@ -424,10 +462,11 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
           <TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" />
           <TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} />
         </div>
+        {studioError && <p className="form-error" role="alert" data-testid="error-course-studio">{studioError}</p>}
         {create.isError && <p className="form-error" role="alert" data-testid="error-create-course">
           {(create.error as { data?: { error?: string } } | null)?.data?.error || 'Kurs konnte nicht gespeichert werden.'}
         </p>}
-        <button className="button button-dark button-wide" disabled={create.isPending} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button>
+        <button className="button button-dark button-wide" disabled={create.isPending || !allowedStudio || (district && (studios.isLoading || studios.isError))} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button>
       </form>
     </Modal>}
   </>;

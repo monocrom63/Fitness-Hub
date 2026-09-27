@@ -46,11 +46,12 @@ test("manager records an absence, resolves all affected courses and notifies mem
       { organizationId, name: `Studio ${suffix}`, city: "Berlin" },
       { organizationId, name: `Other ${suffix}`, city: "Berlin" },
     ]).returning();
-    const [manager, employee, otherManager, secondManager] = await db.insert(staffTable).values([
+    const [manager, employee, otherManager, secondManager, districtManager] = await db.insert(staffTable).values([
       { clerkUserId: `absence-manager-${suffix}`, organizationId, studioId: studio.id, fullName: "Manager", email: `manager-${suffix}@example.invalid`, role: "studio_manager" },
       { clerkUserId: `absence-employee-${suffix}`, organizationId, studioId: studio.id, fullName: "Employee", email: `employee-${suffix}@example.invalid`, role: "studio_employee" },
       { clerkUserId: `absence-other-${suffix}`, organizationId, studioId: otherStudio.id, fullName: "Other manager", email: `other-${suffix}@example.invalid`, role: "studio_manager" },
       { clerkUserId: `absence-second-${suffix}`, organizationId, studioId: studio.id, fullName: "Second manager", email: `second-${suffix}@example.invalid`, role: "studio_manager" },
+      { clerkUserId: `absence-district-${suffix}`, organizationId, studioId: null, fullName: "District manager", email: `district-${suffix}@example.invalid`, role: "district_manager" },
     ]).returning();
     const day = futureBerlinDay();
     const slot = (hour: number, minute = 0) => new Date(`${day}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00.000Z`);
@@ -132,6 +133,20 @@ test("manager records an absence, resolves all affected courses and notifies mem
       ...newCourse("Mike", slot(14), slot(15), "Other Studio Room"), studioId: otherStudio.id,
     });
     assert.equal(unaffectedStudio.status, 201, JSON.stringify(unaffectedStudio.body));
+    const availableStudios = await api(districtManager.clerkUserId, "GET", "/studios");
+    assert.equal(availableStudios.status, 200);
+    assert.deepEqual(availableStudios.body.map((item: any) => item.id).sort((a: number, b: number) => a - b),
+      [studio.id, otherStudio.id].sort((a, b) => a - b));
+    const districtCourse = await api(districtManager.clerkUserId, "POST", "/courses", {
+      ...newCourse("Lina", slot(14), slot(15), "District Room"), studioId: otherStudio.id,
+    });
+    assert.equal(districtCourse.status, 201, JSON.stringify(districtCourse.body));
+    assert.equal(districtCourse.body.studioId, otherStudio.id);
+    assert.equal(districtCourse.body.studioName, otherStudio.name);
+    const districtList = await api(districtManager.clerkUserId, "GET", "/courses");
+    assert.equal(districtList.body.find((course: any) => course.id === districtCourse.body.id)?.studioName, otherStudio.name);
+    const managerList = await api(manager.clerkUserId, "GET", "/courses");
+    assert.ok(!managerList.body.some((course: any) => course.id === districtCourse.body.id));
     const nextDay = (value: Date) => new Date(value.getTime() + 86400000);
     const outsideAbsence = await api(manager.clerkUserId, "POST", "/courses",
       newCourse("  Mike  ", nextDay(slot(14)), nextDay(slot(15))));
