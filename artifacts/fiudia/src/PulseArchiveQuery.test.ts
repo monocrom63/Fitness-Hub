@@ -65,3 +65,55 @@ test('Pulse archive keeps pages, search and read filters separate when switching
     client.clear();
   }
 });
+
+test('a late response from the previous Pulse filter never appears in the active view', async () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(finish => { resolve = finish; });
+    return { promise, resolve };
+  }
+  const oldResponse = deferred<PulseMessage[]>();
+  const unreadResponse = deferred<PulseMessage[]>();
+  const calls: Array<{ unreadOnly?: boolean; search?: string }> = [];
+  const loadMessages: typeof listPulse = async params => {
+    calls.push({ unreadOnly: params?.unreadOnly, search: params?.search });
+    return params?.unreadOnly ? unreadResponse.promise : oldResponse.promise;
+  };
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const all = pulseArchiveQueryOptions('all', '', loadMessages);
+  const unread = pulseArchiveQueryOptions('unread', '', loadMessages);
+  const observer = new InfiniteQueryObserver(client, all);
+  const visible: Array<number[]> = [];
+  const unsubscribe = observer.subscribe(result => {
+    visible.push(result.data?.pages.flat().map(row => row.id) ?? []);
+  });
+  const flush = () => new Promise<void>(resolve => setImmediate(resolve));
+
+  try {
+    await flush();
+    assert.deepEqual(calls, [{ unreadOnly: undefined, search: undefined }]);
+    observer.setOptions(unread);
+    await flush();
+    assert.deepEqual(calls.at(-1), { unreadOnly: true, search: undefined });
+    assert.equal(observer.getCurrentResult().data, undefined);
+
+    oldResponse.resolve([{ id: 100, isRead: true }] as PulseMessage[]);
+    await flush();
+    assert.equal(observer.getCurrentResult().data, undefined,
+      'the obsolete all-messages response cannot replace the unread view');
+
+    unreadResponse.resolve([{ id: 99, isRead: false }] as PulseMessage[]);
+    await flush();
+    assert.deepEqual(observer.getCurrentResult().data?.pages.flat().map(row => row.id), [99]);
+    assert.ok(!visible.some(ids => ids.includes(100)), 'a stale message must never flash in the active view');
+
+    observer.setOptions(all);
+    await flush();
+    assert.deepEqual(observer.getCurrentResult().data?.pages.flat().map(row => row.id), [100]);
+    observer.setOptions(unread);
+    assert.deepEqual(observer.getCurrentResult().data?.pages.flat().map(row => row.id), [99]);
+  } finally {
+    unsubscribe();
+    client.clear();
+  }
+});

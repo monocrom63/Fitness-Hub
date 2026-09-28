@@ -1250,8 +1250,16 @@ export const AcceptMemberInvitationResponse = zod.object({
 
 
 /**
+ * Returns the latest 50 notifications by default. Pass the id of the last notification from the previous response as beforeId to fetch the next page. The cursor must belong to the signed-in member.
  * @summary Recent waitlist promotion notifications for the signed-in member
  */
+
+
+
+export const ListMemberNotificationsQueryParams = zod.object({
+  "beforeId": zod.coerce.number().int().min(1).optional().describe('Positive id of an earlier notification owned by the signed-in member; results continue before that notification.')
+})
+
 export const ListMemberNotificationsResponseItem = zod.object({
   "id": zod.number().int(),
   "courseId": zod.number().int(),

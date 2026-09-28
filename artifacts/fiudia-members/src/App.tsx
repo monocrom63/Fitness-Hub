@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
@@ -15,6 +15,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
+import { memberNotificationArchiveQueryOptions } from './notification-history';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
 import { clearCoursePushClickState, getOneSignal, listenForCoursePushClicks, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 
@@ -358,7 +359,7 @@ function emailDeliveryMessage(status: MemberNotification['emailDeliveryStatus'])
 }
 
 function NotificationsPage({ home }: { home: MemberHome }) {
-  const notifications = useMemberNotifications(true);
+  const notifications = useInfiniteQuery(memberNotificationArchiveQueryOptions());
   const markRead = useNotificationRead();
   const emailPreference = useEmailPreference();
   const [preferenceError, setPreferenceError] = useState('');
@@ -368,7 +369,7 @@ function NotificationsPage({ home }: { home: MemberHome }) {
     try { await markRead.mutateAsync({ id }); }
     catch { setActionError({ id, message: 'Der Hinweis konnte nicht als gelesen markiert werden. Bitte versuche es erneut.' }); }
   };
-  const items = [...(notifications.data || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const items = notifications.data?.pages.flat() ?? [];
   return <div className="page"><PageHeader eyebrow="Hinweise" title="Deine Hinweise." description="Hier erfährst du, wenn sich etwas an deinen Kursbuchungen oder Wartelistenplätzen ändert." />
     <PushPreference />
     <section className="soft-card email-preference" aria-labelledby="email-preference-title">
@@ -388,12 +389,15 @@ function NotificationsPage({ home }: { home: MemberHome }) {
       {preferenceError && <p className="form-error" role="alert">{preferenceError}</p>}
     </section>
     {notifications.isLoading ? <div className="skeleton-page" data-testid="status-notifications-loading"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> :
-      notifications.isError ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
-      items.length ? <div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
+      notifications.isError && !notifications.data ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
+      items.length ? <><div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
         <div className="notification-icon"><Bell size={20} /></div><div className="notification-content"><div className="eyebrow">{item.readAt ? 'Gelesen' : 'Neu'}</div><h3>{item.title}</h3><p>{item.body}</p>{item.emailDeliveryStatus && <div className={`notification-email-status email-${item.emailDeliveryStatus}`} role="status" data-testid={`status-notification-email-${item.id}`}>{emailDeliveryMessage(item.emailDeliveryStatus)}</div>}<time dateTime={item.createdAt}>{dateLabel(item.createdAt)} · {timeLabel(item.createdAt)} Uhr</time>
           <div className="notification-actions"><Link href={`/courses?courseId=${item.courseId}`} className="text-link" data-testid={`link-notification-courses-${item.id}`}>Kurs ansehen <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
           {actionError?.id === item.id && <div className="form-error" role="alert" data-testid={`status-notification-error-${item.id}`}>{actionError.message}</div>}
-        </div></article>)}</div> :
+        </div></article>)}</div>
+        {notifications.hasNextPage && <button type="button" className="button button-secondary" disabled={notifications.isFetchingNextPage} onClick={() => { void notifications.fetchNextPage(); }} data-testid="button-older-notifications">{notifications.isFetchingNextPage ? 'Ältere Hinweise werden geladen …' : 'Ältere Hinweise laden'}</button>}
+        {notifications.isFetchNextPageError && <p className="form-error" role="alert">Ältere Hinweise konnten nicht geladen werden. <button type="button" className="text-link" onClick={() => { void notifications.fetchNextPage(); }}>Erneut versuchen</button></p>}
+      </> :
       <EmptyView icon={<Bell size={22} />} title="Alles auf dem Laufenden." description="Noch keine Hinweise. Änderungen an deinen Kursbuchungen und Wartelistenplätzen erscheinen hier." action={<Link href="/courses" className="button button-secondary" data-testid="link-notification-empty-courses">Kurse ansehen <ArrowRight size={15} /></Link>} />}
     <div className="footer-line">Deine Hinweise sind nur für dich sichtbar.</div>
   </div>;

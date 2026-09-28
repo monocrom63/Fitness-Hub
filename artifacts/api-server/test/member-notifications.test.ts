@@ -180,6 +180,78 @@ test("members can read and acknowledge only their own course notifications", asy
     assert.deepEqual(await courseIds(own.clerkUserId, `/member/courses?courseId=${foreignCourse.id}`), []);
     assert.deepEqual(await courseIds(waiting.clerkUserId, `/member/courses?courseId=${course.id}`), [course.id]);
     assert.equal((await request(own.clerkUserId, "GET", "/member/courses?courseId=invalid")).status, 400);
+
+    const sharedTimestamp = new Date("2099-01-01T00:00:00.000Z");
+    const [historicalCourse] = await db.insert(coursesTable).values({
+      studioId: studio.id, title: "Nur auf Seite zwei", instructor: "Trainer",
+      startsAt: new Date(Date.now() - 10 * 86400000),
+      endsAt: new Date(Date.now() - 10 * 86400000 + 3600000),
+      capacity: 2, room: "D",
+    }).returning();
+    const [historicalBooking] = await db.insert(courseBookingsTable).values({
+      courseId: historicalCourse.id, memberId: own.id, status: "confirmed",
+    }).returning();
+    const pagedNotices = await db.insert(memberNotificationsTable).values(
+      Array.from({ length: 55 }, (_, index) => ({
+        bookingId: index === 0 ? historicalBooking.id : ownBooking.id,
+        memberId: own.id,
+        courseId: index === 0 ? historicalCourse.id : course.id,
+        title: `History ${index + 1}`,
+        body: "Pagination test",
+        createdAt: sharedTimestamp,
+      })),
+    ).returning({ id: memberNotificationsTable.id });
+    const firstPage = await request(own.clerkUserId, "GET", "/member/notifications");
+    assert.equal(firstPage.status, 200);
+    const firstPageItems = firstPage.body as Array<{ id: number; courseId: number }>;
+    assert.equal(firstPageItems.length, 50, "the default page remains limited to the latest 50");
+    assert.deepEqual(
+      firstPageItems.map(({ id }) => id),
+      pagedNotices.map(({ id }) => id).slice(-50).reverse(),
+      "equal timestamps are ordered by descending id",
+    );
+    assert.ok(
+      firstPageItems.every(({ courseId }) => courseId !== historicalCourse.id),
+      "the distinct historical course is not linked from the first page",
+    );
+    assert.deepEqual(await courseIds(
+      own.clerkUserId,
+      `/member/courses?courseId=${firstPageItems[0].courseId}`,
+    ), [course.id], "a paged historical notification still resolves to its course");
+
+    const cursorId = firstPageItems[firstPageItems.length - 1].id;
+    const nextPage = await request(own.clerkUserId, "GET", `/member/notifications?beforeId=${cursorId}`);
+    assert.equal(nextPage.status, 200);
+    const nextPageItems = nextPage.body as Array<{ id: number; courseId: number }>;
+    const nextPageIds = nextPageItems.map(({ id }) => id);
+    assert.deepEqual(nextPageIds.slice(0, 5), pagedNotices.map(({ id }) => id).slice(0, 5).reverse());
+    assert.ok(nextPageIds.every(id => id < cursorId));
+    assert.ok(
+      nextPageItems.some(({ id, courseId }) => id === pagedNotices[0].id && courseId === historicalCourse.id),
+      "the second page contains the sole notice for the distinct historical course",
+    );
+    assert.deepEqual(
+      await courseIds(own.clerkUserId, `/member/courses?courseId=${historicalCourse.id}`),
+      [historicalCourse.id],
+      "the owner can resolve the old course linked only from page two",
+    );
+    assert.deepEqual(
+      await courseIds(other.clerkUserId, `/member/courses?courseId=${historicalCourse.id}`),
+      [],
+      "another member cannot access the historical course through this notice",
+    );
+    for (const invalidCursor of ["0", "-1", "1.5", "invalid", String(Number.MAX_SAFE_INTEGER)]) {
+      assert.equal(
+        (await request(own.clerkUserId, "GET", `/member/notifications?beforeId=${invalidCursor}`)).status,
+        400,
+        `invalid cursor ${invalidCursor} is rejected`,
+      );
+    }
+    assert.equal(
+      (await request(own.clerkUserId, "GET", `/member/notifications?beforeId=${otherNotice.id}`)).status,
+      400,
+      "a cursor belonging to another member is rejected",
+    );
   } finally {
     if (server?.listening) {
       await new Promise<void>((resolve, reject) =>

@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { MemberNotification } from '@workspace/api-client-react';
 import {
   getGetMemberHomeQueryKey,
@@ -16,11 +16,12 @@ import {
   useMarkMemberNotificationRead,
   useUpdateMemberNotificationSettings,
 } from '@workspace/api-client-react';
+import { memberNotificationArchiveQueryKey } from '../notification-history';
 
 export { useGetMemberHome, useListMemberCourses, useListMemberCheckIns };
 
 export function useMemberNotifications(enabled: boolean) {
-  return useListMemberNotifications({
+  return useListMemberNotifications(undefined, {
     query: {
       queryKey: getListMemberNotificationsQueryKey(),
       enabled,
@@ -37,6 +38,11 @@ export function useNotificationRead() {
       onSuccess: (notification) => {
         client.setQueryData<MemberNotification[]>(getListMemberNotificationsQueryKey(), (old) =>
           old?.map(item => item.id === notification.id ? notification : item),
+        );
+        client.setQueryData<InfiniteData<MemberNotification[], number>>(memberNotificationArchiveQueryKey, old =>
+          old && { ...old, pages: old.pages.map(page =>
+            page.map(item => item.id === notification.id ? notification : item),
+          ) },
         );
         void client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() });
       },

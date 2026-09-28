@@ -986,6 +986,14 @@ export type ListTrainerAbsencesParams = {
 studioId?: number;
 };
 
+export type ListMemberNotificationsParams = {
+/**
+ * Positive id of an earlier notification owned by the signed-in member; results continue before that notification.
+ * @minimum 1
+ */
+beforeId?: number;
+};
+
 export type ListMemberCoursesParams = {
 /**
  * Include a past course only when the signed-in member has a notification for it

@@ -45,6 +45,7 @@ import type {
   ListCourseEditPushHistoryParams,
   ListCoursesParams,
   ListMemberCoursesParams,
+  ListMemberNotificationsParams,
   ListMembersParams,
   ListPulseParams,
   ListTrainerAbsencesParams,
@@ -4006,20 +4007,28 @@ export const useAcceptMemberInvitation = <TError = ErrorType<void>,
       return useMutation(getAcceptMemberInvitationMutationOptions(options));
     }
 
-export const getListMemberNotificationsUrl = () => {
+export const getListMemberNotificationsUrl = (params?: ListMemberNotificationsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/member/notifications`
+  return stringifiedParams.length > 0 ? `/api/member/notifications?${stringifiedParams}` : `/api/member/notifications`
 }
 
 /**
+ * Returns the latest 50 notifications by default. Pass the id of the last notification from the previous response as beforeId to fetch the next page. The cursor must belong to the signed-in member.
  * @summary Recent waitlist promotion notifications for the signed-in member
  */
-export const listMemberNotifications = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberNotification[]> => {
+export const listMemberNotifications = async (params?: ListMemberNotificationsParams, options?: Parameters<typeof customFetch>[1]): Promise<MemberNotification[]> => {
 
-  return customFetch<MemberNotification[]>(getListMemberNotificationsUrl(),
+  return customFetch<MemberNotification[]>(getListMemberNotificationsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4032,23 +4041,23 @@ export const listMemberNotifications = async ( options?: Parameters<typeof custo
 
 
 
-export const getListMemberNotificationsQueryKey = () => {
+export const getListMemberNotificationsQueryKey = (params?: ListMemberNotificationsParams,) => {
     return [
-    `/api/member/notifications`
+    `/api/member/notifications`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListMemberNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listMemberNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListMemberNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof listMemberNotifications>>, TError = ErrorType<unknown>>(params?: ListMemberNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListMemberNotificationsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListMemberNotificationsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberNotifications>>> = ({ signal }) => listMemberNotifications({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMemberNotifications>>> = ({ signal }) => listMemberNotifications(params, { signal, ...requestOptions });
 
 
 
@@ -4066,11 +4075,11 @@ export type ListMemberNotificationsQueryError = ErrorType<unknown>
  */
 
 export function useListMemberNotifications<TData = Awaited<ReturnType<typeof listMemberNotifications>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListMemberNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMemberNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListMemberNotificationsQueryOptions(options)
+  const queryOptions = getListMemberNotificationsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

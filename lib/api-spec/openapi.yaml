@@ -997,6 +997,13 @@ paths:
       operationId: listMemberNotifications
       tags: [member-app]
       summary: Recent waitlist promotion notifications for the signed-in member
+      description: Returns the latest 50 notifications by default. Pass the id of the last notification from the previous response as beforeId to fetch the next page. The cursor must belong to the signed-in member.
+      parameters:
+        - name: beforeId
+          in: query
+          required: false
+          description: Positive id of an earlier notification owned by the signed-in member; results continue before that notification.
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
           description: Own notifications

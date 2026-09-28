@@ -1,11 +1,11 @@
-import { and, asc, count, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   BookMemberCourseParams, BookMemberCourseResponse,
   CancelMemberCourseParams, CancelMemberCourseResponse,
   ClaimMembershipBody, ClaimMembershipResponse,
   GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
-  ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
+  ListMemberNotificationsQueryParams, ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
   RegisterMemberPushSubscriptionBody, RegisterMemberPushSubscriptionResponse,
   UpdateMemberNotificationSettingsBody, UpdateMemberNotificationSettingsResponse,
@@ -343,6 +343,28 @@ router.get("/member/notifications", async (req, res): Promise<void> => {
   if (!(await isModuleEnabled(member.organizationId, "courses"))) {
     res.status(404).json({ error: "Kurse sind nicht verfügbar." }); return;
   }
+  const query = ListMemberNotificationsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "Ungültiger Mitteilungs-Cursor." }); return;
+  }
+  const beforeId = query.data.beforeId;
+  let cursor: { id: number; createdAt: Date } | undefined;
+  if (beforeId !== undefined) {
+    if (beforeId > 2_147_483_647) {
+      res.status(400).json({ error: "Ungültiger Mitteilungs-Cursor." }); return;
+    }
+    [cursor] = await db.select({
+      id: memberNotificationsTable.id,
+      createdAt: memberNotificationsTable.createdAt,
+    }).from(memberNotificationsTable)
+      .where(and(
+        eq(memberNotificationsTable.id, beforeId),
+        eq(memberNotificationsTable.memberId, member.id),
+      )).limit(1);
+    if (!cursor) {
+      res.status(400).json({ error: "Ungültiger Mitteilungs-Cursor." }); return;
+    }
+  }
   const notifications = await db.select({
     id: memberNotificationsTable.id,
     courseId: memberNotificationsTable.courseId,
@@ -357,7 +379,16 @@ router.get("/member/notifications", async (req, res): Promise<void> => {
       eq(waitlistEmailDeliveriesTable.notificationId, memberNotificationsTable.id),
       eq(waitlistEmailDeliveriesTable.memberId, member.id),
     ))
-    .where(eq(memberNotificationsTable.memberId, member.id))
+    .where(and(
+      eq(memberNotificationsTable.memberId, member.id),
+      ...(cursor ? [or(
+        lt(memberNotificationsTable.createdAt, cursor.createdAt),
+        and(
+          eq(memberNotificationsTable.createdAt, cursor.createdAt),
+          lt(memberNotificationsTable.id, cursor.id),
+        ),
+      )!] : []),
+    ))
     .orderBy(desc(memberNotificationsTable.createdAt), desc(memberNotificationsTable.id))
     .limit(50);
   res.json(ListMemberNotificationsResponse.parse(notifications.map(({ emailRequested, ...notice }) => ({

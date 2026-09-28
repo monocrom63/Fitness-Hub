@@ -57,6 +57,7 @@ export * from './invitationStatus';
 export * from './listCourseEditPushHistoryParams';
 export * from './listCoursesParams';
 export * from './listMemberCoursesParams';
+export * from './listMemberNotificationsParams';
 export * from './listMembersParams';
 export * from './listPulseParams';
 export * from './listTrainerAbsencesParams';
