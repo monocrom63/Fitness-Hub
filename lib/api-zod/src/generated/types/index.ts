@@ -65,6 +65,7 @@ export * from './memberInvitationAcceptInput';
 export * from './memberInvitationLink';
 export * from './memberLinkInput';
 export * from './memberNotification';
+export * from './memberNotificationEmailDeliveryStatus';
 export * from './memberNotificationSettings';
 export * from './memberStatus';
 export * from './memberUpdate';

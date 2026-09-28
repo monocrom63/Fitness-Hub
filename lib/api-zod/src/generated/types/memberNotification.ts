@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MemberNotificationEmailDeliveryStatus } from './memberNotificationEmailDeliveryStatus';
 
 export interface MemberNotification {
   id: number;
@@ -14,4 +15,6 @@ export interface MemberNotification {
   createdAt: Date;
   /** @nullable */
   readAt: Date | null;
+  /** @nullable */
+  emailDeliveryStatus: MemberNotificationEmailDeliveryStatus;
 }

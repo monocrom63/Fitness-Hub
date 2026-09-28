@@ -7,7 +7,7 @@ import { deDE } from '@clerk/localizations';
 import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
-import type { Member, MemberCourse, MemberHome } from '@workspace/api-client-react';
+import type { Member, MemberCourse, MemberHome, MemberNotification } from '@workspace/api-client-react';
 import { unregisterMemberPushSubscription } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -346,6 +346,17 @@ function PushPreference() {
   </section>;
 }
 
+function emailDeliveryMessage(status: MemberNotification['emailDeliveryStatus']) {
+  switch (status) {
+    case 'pending': return 'E-Mail wartet auf Versand';
+    case 'sending': return 'E-Mail wird versendet';
+    case 'sent': return 'E-Mail an den Anbieter übergeben';
+    case 'failed': return 'E-Mail konnte bisher nicht versendet werden';
+    case 'skipped': return 'E-Mail wurde nicht versendet';
+    default: return null;
+  }
+}
+
 function NotificationsPage({ home }: { home: MemberHome }) {
   const notifications = useMemberNotifications(true);
   const markRead = useNotificationRead();
@@ -379,7 +390,7 @@ function NotificationsPage({ home }: { home: MemberHome }) {
     {notifications.isLoading ? <div className="skeleton-page" data-testid="status-notifications-loading"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> :
       notifications.isError ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
       items.length ? <div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
-        <div className="notification-icon"><Bell size={20} /></div><div className="notification-content"><div className="eyebrow">{item.readAt ? 'Gelesen' : 'Neu'}</div><h3>{item.title}</h3><p>{item.body}</p><time dateTime={item.createdAt}>{dateLabel(item.createdAt)} · {timeLabel(item.createdAt)} Uhr</time>
+        <div className="notification-icon"><Bell size={20} /></div><div className="notification-content"><div className="eyebrow">{item.readAt ? 'Gelesen' : 'Neu'}</div><h3>{item.title}</h3><p>{item.body}</p>{item.emailDeliveryStatus && <div className={`notification-email-status email-${item.emailDeliveryStatus}`} role="status" data-testid={`status-notification-email-${item.id}`}>{emailDeliveryMessage(item.emailDeliveryStatus)}</div>}<time dateTime={item.createdAt}>{dateLabel(item.createdAt)} · {timeLabel(item.createdAt)} Uhr</time>
           <div className="notification-actions"><Link href={`/courses?courseId=${item.courseId}`} className="text-link" data-testid={`link-notification-courses-${item.id}`}>Kurs ansehen <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
           {actionError?.id === item.id && <div className="form-error" role="alert" data-testid={`status-notification-error-${item.id}`}>{actionError.message}</div>}
         </div></article>)}</div> :

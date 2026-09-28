@@ -350,11 +350,20 @@ router.get("/member/notifications", async (req, res): Promise<void> => {
     body: memberNotificationsTable.body,
     createdAt: memberNotificationsTable.createdAt,
     readAt: memberNotificationsTable.readAt,
+    emailRequested: memberNotificationsTable.emailRequested,
+    emailDeliveryStatus: waitlistEmailDeliveriesTable.status,
   }).from(memberNotificationsTable)
+    .leftJoin(waitlistEmailDeliveriesTable, and(
+      eq(waitlistEmailDeliveriesTable.notificationId, memberNotificationsTable.id),
+      eq(waitlistEmailDeliveriesTable.memberId, member.id),
+    ))
     .where(eq(memberNotificationsTable.memberId, member.id))
     .orderBy(desc(memberNotificationsTable.createdAt), desc(memberNotificationsTable.id))
     .limit(50);
-  res.json(ListMemberNotificationsResponse.parse(notifications));
+  res.json(ListMemberNotificationsResponse.parse(notifications.map(({ emailRequested, ...notice }) => ({
+    ...notice,
+    emailDeliveryStatus: emailRequested ? notice.emailDeliveryStatus : null,
+  }))));
 });
 
 router.patch("/member/notifications/:id/read", async (req, res): Promise<void> => {
@@ -377,9 +386,20 @@ router.patch("/member/notifications/:id/read", async (req, res): Promise<void> =
       id: memberNotificationsTable.id, courseId: memberNotificationsTable.courseId,
       title: memberNotificationsTable.title, body: memberNotificationsTable.body,
       createdAt: memberNotificationsTable.createdAt, readAt: memberNotificationsTable.readAt,
+      emailRequested: memberNotificationsTable.emailRequested,
     });
   if (!notification) { res.status(404).json({ error: "Mitteilung nicht gefunden." }); return; }
-  res.json(MarkMemberNotificationReadResponse.parse(notification));
+  const [delivery] = notification.emailRequested ? await db.select({
+    status: waitlistEmailDeliveriesTable.status,
+  }).from(waitlistEmailDeliveriesTable).where(and(
+    eq(waitlistEmailDeliveriesTable.notificationId, notification.id),
+    eq(waitlistEmailDeliveriesTable.memberId, member.id),
+  )).limit(1) : [];
+  const { emailRequested, ...readNotice } = notification;
+  res.json(MarkMemberNotificationReadResponse.parse({
+    ...readNotice,
+    emailDeliveryStatus: emailRequested ? delivery?.status ?? null : null,
+  }));
 });
 
 export default router;

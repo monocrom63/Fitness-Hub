@@ -652,6 +652,20 @@ export interface MemberInvitationAcceptInput {
   token: string;
 }
 
+/**
+ * @nullable
+ */
+export type MemberNotificationEmailDeliveryStatus = typeof MemberNotificationEmailDeliveryStatus[keyof typeof MemberNotificationEmailDeliveryStatus] | null;
+
+
+export const MemberNotificationEmailDeliveryStatus = {
+  pending: 'pending',
+  sending: 'sending',
+  sent: 'sent',
+  failed: 'failed',
+  skipped: 'skipped',
+} as const;
+
 export interface MemberNotification {
   id: number;
   courseId: number;
@@ -660,6 +674,8 @@ export interface MemberNotification {
   createdAt: string;
   /** @nullable */
   readAt: string | null;
+  /** @nullable */
+  emailDeliveryStatus: MemberNotificationEmailDeliveryStatus;
 }
 
 export type ModuleKey = typeof ModuleKey[keyof typeof ModuleKey];

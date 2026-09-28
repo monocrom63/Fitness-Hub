@@ -1630,7 +1630,7 @@ components:
         token: { type: string, minLength: 32, maxLength: 128 }
     MemberNotification:
       type: object
-      required: [id, courseId, title, body, createdAt, readAt]
+      required: [id, courseId, title, body, createdAt, readAt, emailDeliveryStatus]
       properties:
         id: { type: integer }
         courseId: { type: integer }
@@ -1638,6 +1638,7 @@ components:
         body: { type: string }
         createdAt: { type: string, format: date-time }
         readAt: { type: ["string", "null"], format: date-time }
+        emailDeliveryStatus: { type: ["string", "null"], enum: [pending, sending, sent, failed, skipped, null] }
     ModuleKey:
       type: string
       enum: [members, courses, pulse, team]

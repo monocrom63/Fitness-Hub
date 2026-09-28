@@ -1122,7 +1122,8 @@ export const ListMemberNotificationsResponseItem = zod.object({
   "title": zod.string(),
   "body": zod.string(),
   "createdAt": zod.coerce.date(),
-  "readAt": zod.coerce.date().nullable()
+  "readAt": zod.coerce.date().nullable(),
+  "emailDeliveryStatus": zod.union([zod.literal('pending'),zod.literal('sending'),zod.literal('sent'),zod.literal('failed'),zod.literal('skipped'),zod.literal(null)]).nullable()
 })
 export const ListMemberNotificationsResponse = zod.array(ListMemberNotificationsResponseItem)
 
@@ -1140,7 +1141,8 @@ export const MarkMemberNotificationReadResponse = zod.object({
   "title": zod.string(),
   "body": zod.string(),
   "createdAt": zod.coerce.date(),
-  "readAt": zod.coerce.date().nullable()
+  "readAt": zod.coerce.date().nullable(),
+  "emailDeliveryStatus": zod.union([zod.literal('pending'),zod.literal('sending'),zod.literal('sent'),zod.literal('failed'),zod.literal('skipped'),zod.literal(null)]).nullable()
 })
 
 

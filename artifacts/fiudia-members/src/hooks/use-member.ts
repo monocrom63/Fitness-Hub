@@ -50,6 +50,7 @@ export function useEmailPreference() {
     mutation: {
       onSuccess: (home) => {
         client.setQueryData(getGetMemberHomeQueryKey(), home);
+        void client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() });
       },
     },
   });
@@ -74,6 +75,7 @@ export function useMemberActions() {
       client.invalidateQueries({ queryKey: getGetMemberHomeQueryKey() }),
       client.invalidateQueries({ queryKey: getListMemberCoursesQueryKey() }),
       client.invalidateQueries({ queryKey: getListMemberCheckInsQueryKey() }),
+      client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() }),
     ]);
   };
   const claim = useClaimMembership({ mutation: { onSuccess: refresh } });

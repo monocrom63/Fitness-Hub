@@ -101,21 +101,27 @@ test("members can read and acknowledge only their own course notifications", asy
     const marked = await request(own.clerkUserId, "PATCH", `/member/notifications/${ownNotice.id}/read`);
     assert.equal(marked.status, 200);
     assert.ok((marked.body as { readAt: string }).readAt);
+    assert.equal((marked.body as { emailDeliveryStatus: string | null }).emailDeliveryStatus, null);
     assert.equal((await request(other.clerkUserId, "GET", "/member/notifications")).status, 200);
 
     await cancelCourseBooking(course.id, own.id);
     const promotion = await request(waiting.clerkUserId, "GET", "/member/notifications");
     assert.equal(promotion.status, 200);
-    const messages = promotion.body as Array<{ id: number; courseId: number; title: string; body: string; readAt: string | null }>;
+    const messages = promotion.body as Array<{ id: number; courseId: number; title: string; body: string; readAt: string | null; emailDeliveryStatus: string | null }>;
     assert.equal(messages.length, 1);
     assert.equal(messages[0].courseId, course.id);
     assert.match(messages[0].body, /Testkurs.*\d{4}.*Uhr/);
     assert.equal(messages[0].readAt, null);
+    assert.equal(messages[0].emailDeliveryStatus, "pending");
     assert.equal((await db.select({ emailRequested: memberNotificationsTable.emailRequested })
       .from(memberNotificationsTable).where(eq(memberNotificationsTable.id, messages[0].id)))[0].emailRequested, 1);
     const [queuedEmail] = await db.select().from(waitlistEmailDeliveriesTable)
       .where(eq(waitlistEmailDeliveriesTable.notificationId, messages[0].id));
     assert.equal(queuedEmail.status, "pending");
+    await db.update(waitlistEmailDeliveriesTable).set({ status: "failed", error: "Temporary failure" })
+      .where(eq(waitlistEmailDeliveriesTable.id, queuedEmail.id));
+    const afterFailure = await request(waiting.clerkUserId, "GET", "/member/notifications");
+    assert.equal((afterFailure.body as typeof messages)[0].emailDeliveryStatus, "failed");
     const disabled = await request(waiting.clerkUserId, "PATCH", settings, { waitlistEmailEnabled: false });
     assert.equal((disabled.body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, false);
     assert.equal((await db.select({ emailRequested: memberNotificationsTable.emailRequested })
@@ -128,7 +134,8 @@ test("members can read and acknowledge only their own course notifications", asy
     await assert.rejects(cancelCourseBooking(course.id, own.id),
       (error) => error instanceof BookingError && error.status === 404);
     const afterReload = await request(waiting.clerkUserId, "GET", "/member/notifications");
-    assert.deepEqual(afterReload.body, promotion.body, "the notice remains in the database after another request");
+    assert.deepEqual(afterReload.body, [{ ...messages[0], emailDeliveryStatus: null }],
+      "the notice remains after opt-out without implying an email is still queued");
     assert.deepEqual(
       ((await request(other.clerkUserId, "GET", "/member/notifications")).body as Array<{ id: number }>).map(item => item.id),
       [otherNotice.id],

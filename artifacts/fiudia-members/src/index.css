@@ -259,6 +259,9 @@ button:disabled { cursor: not-allowed; }
 .notification-content { flex: 1; min-width: 0; }
 .notification-content h3 { margin: 3px 0 6px; font: 600 18px/1.2 'Space Grotesk', sans-serif; letter-spacing: -.04em; }
 .notification-content p { margin: 0 0 11px; color: #626b77; font-size: 12px; line-height: 1.6; }
+.notification-email-status { width: fit-content; margin: 0 0 10px; padding: 5px 9px; border-radius: 6px; background: #ebe6f5; color: #59487d; font-size: 11px; font-weight: 700; }
+.notification-email-status.email-sent { background: #e5f4e9; color: #347456; }
+.notification-email-status.email-failed, .notification-email-status.email-skipped { background: #fff0e8; color: #9c4e2f; }
 .notification-content time { color: #82778e; font: 700 10px 'Space Mono', monospace; }
 .notification-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 17px; }
 .notification-actions .form-error { margin: 0; }
