@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { after, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import express from "express";
 import {
   db,
@@ -355,6 +356,8 @@ test("parallel acceptance of one invitation grants only one team access", async 
   const userB = `team-parallel-b-${run}`;
   let organizationId: number | undefined;
   let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+  let releaseA: (() => void) | undefined;
+  let releaseB: (() => void) | undefined;
 
   try {
     const [organization] = await db.insert(organizationsTable)
@@ -374,24 +377,46 @@ test("parallel acceptance of one invitation grants only one team access", async 
       expiresAt: new Date(Date.now() + 60_000),
     }).returning();
 
+    // Pin each HTTP request to a different PostgreSQL session. Using the global
+    // pool here would usually do the same, but explicit clients make this test
+    // independent of pool scheduling and prove the race is not serialized by a
+    // shared transaction/connection.
+    const connectionA = await pool.connect();
+    releaseA = () => connectionA.release();
+    const connectionB = await pool.connect();
+    releaseB = () => connectionB.release();
+    const databaseA = drizzle(connectionA) as unknown as typeof db;
+    const databaseB = drizzle(connectionB) as unknown as typeof db;
+
     // Hold both HTTP requests at identity lookup so neither can complete before
-    // the other starts; unlike the rolled-back fixture tests, these use separate
-    // database connections and can race on the invitation row.
+    // the other starts; each router is permanently bound to its own DB session.
     let arrivals = 0;
     let release!: () => void;
     const bothArrived = new Promise<void>(resolve => { release = resolve; });
     const app = express();
     app.use(express.json());
-    app.use("/api", createTeamRouter({
-      database: db,
-      userIdFromRequest: req => req.get("x-test-user") ?? null,
-      identityForUser: async userId => {
+    const dependencies = (database: typeof db) => ({
+      database,
+      userIdFromRequest: (req: express.Request) => req.get("x-test-user") ?? null,
+      identityForUser: async (userId: string) => {
         if (userId !== userA && userId !== userB) throw new Error("Unexpected test identity");
         if (++arrivals === 2) release();
         await bothArrived;
         return { userId, fullName: userId, email, emailVerified: true };
       },
-    }));
+    });
+    const routerA = createTeamRouter(dependencies(databaseA));
+    const routerB = createTeamRouter(dependencies(databaseB));
+    app.use("/api", (req, res, next) => {
+      const router = req.get("x-test-user") === userA ? routerA
+        : req.get("x-test-user") === userB ? routerB
+          : null;
+      if (!router) {
+        next();
+        return;
+      }
+      router(req, res, next);
+    });
     server = app.listen(0, "127.0.0.1");
     await new Promise<void>(resolve => server!.once("listening", resolve));
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/team/invitations/${token}/accept`;
@@ -406,19 +431,34 @@ test("parallel acceptance of one invitation grants only one team access", async 
     assert.ok(winner === userA || winner === userB);
     const staff = await db.select({
       clerkUserId: staffTable.clerkUserId,
+      organizationId: staffTable.organizationId,
       studioId: staffTable.studioId,
       role: staffTable.role,
     }).from(staffTable).where(eq(staffTable.email, email));
-    assert.deepEqual(staff, [{ clerkUserId: winner, studioId: studio.id, role: "studio_employee" }]);
+    assert.deepEqual(staff, [{
+      clerkUserId: winner,
+      organizationId,
+      studioId: studio.id,
+      role: "studio_employee",
+    }]);
     const [used] = await db.select({ status: invitationsTable.status })
       .from(invitationsTable).where(eq(invitationsTable.id, invitation.id));
     assert.equal(used.status, "accepted");
     const loser = winner === userA ? userB : userA;
     const replay = await fetch(url, { method: "POST", headers: { "x-test-user": loser } });
     assert.equal(replay.status, 404);
+    const winnerReplay = await fetch(url, { method: "POST", headers: { "x-test-user": winner } });
+    assert.equal(winnerReplay.status, 409);
+    assert.equal((await db.select({ id: staffTable.id }).from(staffTable)
+      .where(eq(staffTable.email, email))).length, 1);
+    const [stillAccepted] = await db.select({ status: invitationsTable.status })
+      .from(invitationsTable).where(eq(invitationsTable.id, invitation.id));
+    assert.equal(stillAccepted.status, "accepted");
   } finally {
     if (server?.listening) await new Promise<void>((resolve, reject) =>
       server!.close(error => error ? reject(error) : resolve()));
+    releaseA?.();
+    releaseB?.();
     if (organizationId !== undefined) {
       await db.delete(organizationsTable).where(eq(organizationsTable.id, organizationId));
     }

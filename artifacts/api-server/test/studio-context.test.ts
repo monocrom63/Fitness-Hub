@@ -71,6 +71,16 @@ test("district managers can edit studios and choose an authorized studio context
     }
     const updatePath = `/studios/${studioA.id}`;
     const draft = { name: `Renamed ${run}`, city: "  Potsdam  " };
+    const targetCourseTitle = `Target course ${run}`;
+    const targetCourseStart = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const targetCourse = {
+      title: targetCourseTitle,
+      instructor: `Target instructor ${run}`,
+      startsAt: targetCourseStart.toISOString(),
+      endsAt: new Date(targetCourseStart.getTime() + 60 * 60 * 1000).toISOString(),
+      capacity: 12,
+      room: `Target room ${run}`,
+    };
 
     assert.equal((await api(manager.clerkUserId, "PATCH", updatePath, draft)).status, 403);
     assert.equal((await api(district.clerkUserId, "PATCH", `/studios/${foreignStudio.id}`, draft)).status, 404);
@@ -98,6 +108,54 @@ test("district managers can edit studios and choose an authorized studio context
     assert.equal(filteredDashboard.body.studioName, studioB.name);
     assert.ok(filteredDashboard.body.courses.length > 0);
     assert.ok(filteredDashboard.body.courses.every((course: any) => course.studioId === studioB.id));
+
+    const availableStudios = await api(district.clerkUserId, "GET", "/studios");
+    assert.equal(availableStudios.status, 200);
+    assert.deepEqual(
+      availableStudios.body.map((studio: any) => studio.id).sort((a: number, b: number) => a - b),
+      [studioA.id, studioB.id].sort((a, b) => a - b),
+      "district managers can select organization studios but not foreign studios",
+    );
+    const viewingStudioA = await api(district.clerkUserId, "GET", `/courses?studioId=${studioA.id}`);
+    assert.equal(viewingStudioA.status, 200);
+    assert.ok(viewingStudioA.body.every((course: any) => course.studioId === studioA.id));
+
+    const createdInStudioB = await api(district.clerkUserId, "POST", "/courses", {
+      ...targetCourse,
+      studioId: studioB.id,
+    });
+    assert.equal(createdInStudioB.status, 201, JSON.stringify(createdInStudioB.body));
+    assert.equal(createdInStudioB.body.studioId, studioB.id);
+    assert.equal(createdInStudioB.body.title, targetCourseTitle);
+    const [persistedTargetCourse] = await db.select().from(coursesTable)
+      .where(eq(coursesTable.title, targetCourseTitle));
+    assert.ok(persistedTargetCourse, "the explicitly targeted course is persisted");
+    assert.equal(persistedTargetCourse.studioId, studioB.id);
+    const studioACoursesAfterCreate = await api(district.clerkUserId, "GET", `/courses?studioId=${studioA.id}`);
+    const studioBCoursesAfterCreate = await api(district.clerkUserId, "GET", `/courses?studioId=${studioB.id}`);
+    assert.ok(studioACoursesAfterCreate.body.every((course: any) => course.title !== targetCourseTitle));
+    assert.ok(studioBCoursesAfterCreate.body.some((course: any) =>
+      course.id === createdInStudioB.body.id && course.studioId === studioB.id));
+
+    assert.equal((await api(district.clerkUserId, "POST", "/courses", targetCourse)).status, 400,
+      "studioId is required");
+    assert.equal((await api(district.clerkUserId, "POST", "/courses", {
+      ...targetCourse,
+      studioId: "not-a-studio",
+    })).status, 400, "studioId must be a valid integer");
+    assert.equal((await api(manager.clerkUserId, "POST", "/courses", {
+      ...targetCourse,
+      studioId: studioB.id,
+    })).status, 403, "studio managers cannot create courses in another studio");
+    assert.equal((await api(manager.clerkUserId, "POST", "/courses", {
+      ...targetCourse,
+      studioId: foreignStudio.id,
+    })).status, 403, "studio managers cannot create courses in a foreign studio");
+    assert.equal((await api(district.clerkUserId, "POST", "/courses", {
+      ...targetCourse,
+      studioId: foreignStudio.id,
+    })).status, 403, "district managers cannot create courses outside their organization");
+
     assert.equal((await api(manager.clerkUserId, "GET", `/courses?studioId=${studioB.id}`)).status, 403);
     assert.equal((await api(district.clerkUserId, "GET", `/dashboard?studioId=${foreignStudio.id}`)).status, 403);
 
