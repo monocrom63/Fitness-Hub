@@ -23,7 +23,7 @@ export function promotionNotice(title: string, startsAt: Date) {
   };
 }
 
-// Constructs a plain-text draft only. No provider is called and no message is sent.
+// Builds the plain-text content snapshotted in the outbox; this function does not send.
 export function waitlistEmailDraft(recipient: string, notice: ReturnType<typeof promotionNotice>): WaitlistEmailDraft {
   return {
     from: WAITLIST_EMAIL_SENDER,

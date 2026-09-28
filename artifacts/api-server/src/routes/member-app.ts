@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-zod";
 import {
   checkInsTable, courseBookingsTable, coursesTable, db, memberNotificationsTable,
-  memberPushSubscriptionsTable, membersTable, studiosTable,
+  memberPushSubscriptionsTable, membersTable, studiosTable, waitlistEmailDeliveriesTable,
 } from "@workspace/db";
 import { BookingError, bookCourse, cancelCourseBooking } from "../lib/course-bookings";
 import { getClerkIdentity, getRequestUserId } from "../lib/fiudia-access";
@@ -211,14 +211,29 @@ router.patch("/member/notification-settings", async (req, res): Promise<void> =>
   }
   const body = UpdateMemberNotificationSettingsBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Ungültige E-Mail-Einstellung." }); return; }
-  await db.update(membersTable)
-    .set({ waitlistEmailEnabled: body.data.waitlistEmailEnabled ? 1 : 0 })
-    .where(and(eq(membersTable.id, member.id), eq(membersTable.clerkUserId, userId)));
-  if (!body.data.waitlistEmailEnabled) {
-    await db.update(memberNotificationsTable)
-      .set({ emailRequested: 0 })
-      .where(eq(memberNotificationsTable.memberId, member.id));
-  }
+  await db.transaction(async (tx) => {
+    await tx.update(membersTable)
+      .set({ waitlistEmailEnabled: body.data.waitlistEmailEnabled ? 1 : 0 })
+      .where(and(eq(membersTable.id, member.id), eq(membersTable.clerkUserId, userId)));
+    if (!body.data.waitlistEmailEnabled) {
+      await tx.update(memberNotificationsTable)
+        .set({ emailRequested: 0 })
+        .where(eq(memberNotificationsTable.memberId, member.id));
+      // Pending/retryable messages are canceled here. A provider request already
+      // in flight may complete; its actual provider outcome is retained.
+      await tx.update(waitlistEmailDeliveriesTable)
+        .set({
+          status: "skipped",
+          error: "Member opted out before delivery.",
+          claimToken: null,
+          claimedAt: null,
+        })
+        .where(and(
+          eq(waitlistEmailDeliveriesTable.memberId, member.id),
+          inArray(waitlistEmailDeliveriesTable.status, ["pending", "failed"]),
+        ));
+    }
+  });
   res.json(UpdateMemberNotificationSettingsResponse.parse(await memberHome(await linkedMember(userId))));
 });
 

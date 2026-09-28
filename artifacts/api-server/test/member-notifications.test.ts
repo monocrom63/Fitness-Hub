@@ -5,7 +5,7 @@ import { test } from "node:test";
 import express from "express";
 import { eq } from "drizzle-orm";
 import {
-  courseBookingsTable, coursesTable, db, memberNotificationsTable,
+  courseBookingsTable, coursesTable, db, memberNotificationsTable, waitlistEmailDeliveriesTable,
   membersTable, organizationsTable, pool, studiosTable,
 } from "@workspace/db";
 import memberAppRouter from "../src/routes/member-app";
@@ -113,10 +113,16 @@ test("members can read and acknowledge only their own course notifications", asy
     assert.equal(messages[0].readAt, null);
     assert.equal((await db.select({ emailRequested: memberNotificationsTable.emailRequested })
       .from(memberNotificationsTable).where(eq(memberNotificationsTable.id, messages[0].id)))[0].emailRequested, 1);
+    const [queuedEmail] = await db.select().from(waitlistEmailDeliveriesTable)
+      .where(eq(waitlistEmailDeliveriesTable.notificationId, messages[0].id));
+    assert.equal(queuedEmail.status, "pending");
     const disabled = await request(waiting.clerkUserId, "PATCH", settings, { waitlistEmailEnabled: false });
     assert.equal((disabled.body as { waitlistEmailEnabled: boolean }).waitlistEmailEnabled, false);
     assert.equal((await db.select({ emailRequested: memberNotificationsTable.emailRequested })
       .from(memberNotificationsTable).where(eq(memberNotificationsTable.id, messages[0].id)))[0].emailRequested, 0);
+    const [cancelledEmail] = await db.select().from(waitlistEmailDeliveriesTable)
+      .where(eq(waitlistEmailDeliveriesTable.id, queuedEmail.id));
+    assert.equal(cancelledEmail.status, "skipped");
     assert.equal((await db.select().from(courseBookingsTable)
       .where(eq(courseBookingsTable.id, waitingBooking.id)))[0].status, "confirmed");
     await assert.rejects(cancelCourseBooking(course.id, own.id),

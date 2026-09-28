@@ -362,7 +362,7 @@ function NotificationsPage({ home }: { home: MemberHome }) {
     <PushPreference />
     <section className="soft-card email-preference" aria-labelledby="email-preference-title">
       <div><h2 id="email-preference-title">E-Mail für freie Kursplätze</h2>
-        <p>Wenn du von der Warteliste nachrückst, kannst du zusätzlich einen E-Mail-Hinweis wünschen. Der Versand ist derzeit noch nicht aktiv; Hinweise erscheinen weiterhin hier.</p>
+        <p>Wenn du von der Warteliste nachrückst, kannst du zusätzlich eine E-Mail an die Adresse deiner Mitgliedschaft erhalten. Ist der E-Mail-Versand vorübergehend nicht verfügbar, bleibt dein Hinweis hier sichtbar.</p>
       </div>
       <label className="email-preference-toggle">
         <input type="checkbox" checked={home.waitlistEmailEnabled} disabled={emailPreference.isPending}
@@ -372,7 +372,7 @@ function NotificationsPage({ home }: { home: MemberHome }) {
             catch { setPreferenceError('Deine Einstellung konnte nicht gespeichert werden. Bitte versuche es erneut.'); }
           }}
           data-testid="checkbox-waitlist-email" />
-        <span>E-Mail-Wunsch {home.waitlistEmailEnabled ? 'vorgemerkt' : 'vormerken'}</span>
+        <span>E-Mail-Hinweise {home.waitlistEmailEnabled ? 'aktiviert' : 'aktivieren'}</span>
       </label>
       {preferenceError && <p className="form-error" role="alert">{preferenceError}</p>}
     </section>

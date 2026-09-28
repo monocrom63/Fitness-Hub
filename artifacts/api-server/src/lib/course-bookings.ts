@@ -1,5 +1,8 @@
-import { and, asc, count, eq } from "drizzle-orm";
-import { courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable } from "@workspace/db";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
+import {
+  courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable,
+  waitlistEmailDeliveriesTable,
+} from "@workspace/db";
 import { promotionNotice, waitlistEmailDraft } from "./waitlist-email";
 
 export class BookingError extends Error {
@@ -104,6 +107,17 @@ export async function cancelCourseBooking(
         eq(memberNotificationsTable.bookingId, booking.id),
         eq(memberNotificationsTable.title, "Dein Kursplatz ist bestätigt"),
       ));
+    await tx.update(waitlistEmailDeliveriesTable)
+      .set({
+        status: "skipped",
+        error: "The booking confirmation was invalidated before delivery.",
+        claimToken: null,
+        claimedAt: null,
+      })
+      .where(and(
+        eq(waitlistEmailDeliveriesTable.bookingId, booking.id),
+        inArray(waitlistEmailDeliveriesTable.status, ["pending", "failed"]),
+      ));
     if (options.cancelledByStaff) {
       await tx.insert(memberNotificationsTable).values({
         bookingId: booking.id,
@@ -141,14 +155,23 @@ export async function cancelCourseBooking(
         const notice = promotionNotice(course.title, course.startsAt);
         const draft = candidate.memberEmailEnabled && candidate.memberEmail.trim()
           ? waitlistEmailDraft(candidate.memberEmail, notice) : null;
-        await tx.insert(memberNotificationsTable).values({
+        const [notification] = await tx.insert(memberNotificationsTable).values({
           bookingId: candidate.id,
           memberId: candidate.memberId,
           courseId,
           title: notice.title,
           body: notice.body,
-          // A draft is only prepared for opted-in members; nothing is dispatched.
+          // The opted-in delivery snapshot is queued in this transaction and
+          // dispatched asynchronously only after the promotion commits.
           emailRequested: draft ? 1 : 0,
+        }).returning({ id: memberNotificationsTable.id });
+        if (draft) await tx.insert(waitlistEmailDeliveriesTable).values({
+          notificationId: notification.id,
+          bookingId: candidate.id,
+          memberId: candidate.memberId,
+          email: draft.to,
+          subject: draft.subject,
+          text: draft.text,
         });
         promoted = true;
         break;

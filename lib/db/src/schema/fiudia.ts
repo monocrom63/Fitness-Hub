@@ -241,6 +241,37 @@ export const memberNotificationsTable = pgTable("fiudia_member_notifications", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const waitlistEmailDeliveriesTable = pgTable(
+  "fiudia_waitlist_email_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    notificationId: integer("notification_id")
+      .notNull()
+      .references(() => memberNotificationsTable.id, { onDelete: "cascade" }),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => courseBookingsTable.id, { onDelete: "cascade" }),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => membersTable.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    subject: text("subject").notNull(),
+    text: text("text").notNull(),
+    status: text("status").notNull().default("pending"),
+    error: text("error"),
+    providerId: text("provider_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    claimToken: text("claim_token"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("fiudia_waitlist_email_notification").on(table.notificationId),
+  ],
+);
+
 export const memberPushSubscriptionsTable = pgTable("fiudia_member_push_subscriptions", {
   subscriptionId: text("subscription_id").primaryKey(),
   memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),

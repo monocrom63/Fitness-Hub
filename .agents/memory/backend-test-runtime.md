@@ -8,3 +8,9 @@ Do not assume Node's native TypeScript loader or an ESM bundle can execute the b
 **Why:** Native loading rejected directory imports in workspace TypeScript modules, while an ESM bundle failed on a dependency's dynamic CommonJS require. These were test-loader failures, not failures in the API behavior.
 
 **How to apply:** When adding backend integration tests, use a runtime that handles the complete dependency graph, such as a bundled CommonJS test. Keep test fixtures isolated in a rollback transaction so failed tests cannot leave business data behind.
+
+Avoid eagerly loading the server logger in modules imported by temporary bundled tests.
+
+**Why:** Pino's thread-based transport can resolve its worker path inside the temporary test bundle after cleanup has removed that directory. Tests may pass their assertions yet fail on an asynchronous worker error.
+
+**How to apply:** Load the logger only from server-startup or exercised logging paths; keep the provider/DB logic importable without starting a logging transport.
