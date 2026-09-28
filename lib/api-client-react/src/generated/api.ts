@@ -32,6 +32,8 @@ import type {
   CourseBooking,
   CourseClosureResolution,
   CourseClosureResolutionInput,
+  CourseEditPushHistoryEntry,
+  CourseEditPushReport,
   CourseInput,
   CourseRosterBooking,
   CourseUpdate,
@@ -40,6 +42,7 @@ import type {
   HealthStatus,
   Invitation,
   InvitationInput,
+  ListCourseEditPushHistoryParams,
   ListCoursesParams,
   ListMemberCoursesParams,
   ListMembersParams,
@@ -1211,6 +1214,243 @@ export const useUpdateCourse = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateCourseMutationOptions(options));
+    }
+
+export const getListCourseEditPushHistoryUrl = (params?: ListCourseEditPushHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/courses/push-history?${stringifiedParams}` : `/api/courses/push-history`
+}
+
+/**
+ * @summary List recent manual-edit push history for accessible courses
+ */
+export const listCourseEditPushHistory = async (params?: ListCourseEditPushHistoryParams, options?: Parameters<typeof customFetch>[1]): Promise<CourseEditPushHistoryEntry[]> => {
+
+  return customFetch<CourseEditPushHistoryEntry[]>(getListCourseEditPushHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCourseEditPushHistoryQueryKey = (params?: ListCourseEditPushHistoryParams,) => {
+    return [
+    `/api/courses/push-history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCourseEditPushHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listCourseEditPushHistory>>, TError = ErrorType<void>>(params?: ListCourseEditPushHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourseEditPushHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCourseEditPushHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCourseEditPushHistory>>> = ({ signal }) => listCourseEditPushHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCourseEditPushHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCourseEditPushHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listCourseEditPushHistory>>>
+export type ListCourseEditPushHistoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary List recent manual-edit push history for accessible courses
+ */
+
+export function useListCourseEditPushHistory<TData = Awaited<ReturnType<typeof listCourseEditPushHistory>>, TError = ErrorType<void>>(
+ params?: ListCourseEditPushHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCourseEditPushHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCourseEditPushHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCourseEditPushDeliveriesUrl = (id: number,) => {
+
+
+
+
+  return `/api/courses/${id}/push-deliveries`
+}
+
+/**
+ * @summary Get the manual-edit push delivery history for an accessible course
+ */
+export const getCourseEditPushDeliveries = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<CourseEditPushReport> => {
+
+  return customFetch<CourseEditPushReport>(getGetCourseEditPushDeliveriesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCourseEditPushDeliveriesQueryKey = (id: number,) => {
+    return [
+    `/api/courses/${id}/push-deliveries`
+    ] as const;
+    }
+
+
+export const getGetCourseEditPushDeliveriesQueryOptions = <TData = Awaited<ReturnType<typeof getCourseEditPushDeliveries>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCourseEditPushDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCourseEditPushDeliveriesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCourseEditPushDeliveries>>> = ({ signal }) => getCourseEditPushDeliveries(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCourseEditPushDeliveries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCourseEditPushDeliveriesQueryResult = NonNullable<Awaited<ReturnType<typeof getCourseEditPushDeliveries>>>
+export type GetCourseEditPushDeliveriesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the manual-edit push delivery history for an accessible course
+ */
+
+export function useGetCourseEditPushDeliveries<TData = Awaited<ReturnType<typeof getCourseEditPushDeliveries>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCourseEditPushDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCourseEditPushDeliveriesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRetryCourseEditPushDeliveryUrl = (id: number,
+    deliveryId: number,) => {
+
+
+
+
+  return `/api/courses/${id}/push-deliveries/${deliveryId}/retry`
+}
+
+/**
+ * @summary Queue a safe retry for one terminal failed current-revision push
+ */
+export const retryCourseEditPushDelivery = async (id: number,
+    deliveryId: number, options?: Parameters<typeof customFetch>[1]): Promise<CourseEditPushReport> => {
+
+  return customFetch<CourseEditPushReport>(getRetryCourseEditPushDeliveryUrl(id,deliveryId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRetryCourseEditPushDeliveryMutationKey = () => ['retryCourseEditPushDelivery'] as const;
+
+export const getRetryCourseEditPushDeliveryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryCourseEditPushDelivery>>, TError,RetryCourseEditPushDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryCourseEditPushDelivery>>, TError,RetryCourseEditPushDeliveryMutationVariables, TContext> => {
+
+const mutationKey = getRetryCourseEditPushDeliveryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryCourseEditPushDelivery>>, RetryCourseEditPushDeliveryMutationVariables> = (props) => {
+          const {id,deliveryId} = props ?? {};
+
+          return  retryCourseEditPushDelivery(id,deliveryId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryCourseEditPushDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof retryCourseEditPushDelivery>>>
+
+    export type RetryCourseEditPushDeliveryMutationError = ErrorType<void>
+    export type RetryCourseEditPushDeliveryMutationVariables = {id: number;deliveryId: number}
+
+    /**
+ * @summary Queue a safe retry for one terminal failed current-revision push
+ */
+export const useRetryCourseEditPushDelivery = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryCourseEditPushDelivery>>, TError,RetryCourseEditPushDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryCourseEditPushDelivery>>,
+        TError,
+        RetryCourseEditPushDeliveryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRetryCourseEditPushDeliveryMutationOptions(options));
     }
 
 export const getListTrainerAbsencesUrl = (params?: ListTrainerAbsencesParams,) => {

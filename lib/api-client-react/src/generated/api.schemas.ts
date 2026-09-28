@@ -226,6 +226,47 @@ export interface CourseUpdate {
   revision: number;
 }
 
+export type CourseEditPushDeliveryStatus = typeof CourseEditPushDeliveryStatus[keyof typeof CourseEditPushDeliveryStatus];
+
+
+export const CourseEditPushDeliveryStatus = {
+  pending: 'pending',
+  sending: 'sending',
+  sent: 'sent',
+  failed: 'failed',
+  skipped: 'skipped',
+} as const;
+
+export interface CourseEditPushDelivery {
+  id: number;
+  revision: number;
+  memberName: string;
+  status: CourseEditPushDeliveryStatus;
+  attemptCount: number;
+  /** @nullable */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  attemptedAt: string | null;
+  /** @nullable */
+  nextAttemptAt: string | null;
+  canRetry: boolean;
+}
+
+export interface CourseEditPushReport {
+  courseId: number;
+  currentRevision: number;
+  deliveries: CourseEditPushDelivery[];
+}
+
+export interface CourseEditPushHistoryEntry {
+  courseId: number;
+  title: string;
+  studioName: string;
+  startsAt: string;
+  lastChangeAt: string;
+}
+
 export interface TrainerAbsenceInput {
   studioId: number;
   /**
@@ -926,6 +967,19 @@ studioId?: number;
 
 export type ListCoursesParams = {
 studioId?: number;
+};
+
+export type ListCourseEditPushHistoryParams = {
+studioId?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };
 
 export type ListTrainerAbsencesParams = {

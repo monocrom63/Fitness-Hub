@@ -332,6 +332,75 @@ paths:
         "403": { description: Manager access required }
         "404": { description: Course not found in accessible studio }
         "409": { description: "Stale revision, past or cancelled course, trainer absence, room closure, or overlap" }
+  /courses/push-history:
+    get:
+      operationId: listCourseEditPushHistory
+      tags: [portal]
+      summary: List recent manual-edit push history for accessible courses
+      parameters:
+        - name: studioId
+          in: query
+          schema: { type: integer }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        "200":
+          description: Paginated accessible courses with their most recent manual-edit push delivery
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CourseEditPushHistoryEntry" }
+        "400": { description: Invalid studio filter or pagination }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required or requested studio is inaccessible }
+  /courses/{id}/push-deliveries:
+    get:
+      operationId: getCourseEditPushDeliveries
+      tags: [portal]
+      summary: Get the manual-edit push delivery history for an accessible course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Delivery history, newest first
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseEditPushReport" }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required }
+        "404": { description: Course not found in accessible studio }
+  /courses/{id}/push-deliveries/{deliveryId}/retry:
+    post:
+      operationId: retryCourseEditPushDelivery
+      tags: [portal]
+      summary: Queue a safe retry for one terminal failed current-revision push
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated delivery history after queueing the retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CourseEditPushReport" }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required }
+        "404": { description: Course or delivery not found in accessible studio }
+        "409": { description: Delivery is no longer eligible for retry }
   /trainer-absences:
     get:
       operationId: listTrainerAbsences
@@ -1393,6 +1462,38 @@ components:
         endsAt: { type: string, format: date-time }
         room: { type: string, minLength: 1, maxLength: 80 }
         revision: { type: integer, minimum: 1 }
+    CourseEditPushDelivery:
+      type: object
+      required: [id, revision, memberName, status, attemptCount, error, createdAt, attemptedAt, nextAttemptAt, canRetry]
+      properties:
+        id: { type: integer }
+        revision: { type: integer }
+        memberName: { type: string }
+        status: { type: string, enum: [pending, sending, sent, failed, skipped] }
+        attemptCount: { type: integer }
+        error: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        attemptedAt: { type: ["string", "null"], format: date-time }
+        nextAttemptAt: { type: ["string", "null"], format: date-time }
+        canRetry: { type: boolean }
+    CourseEditPushReport:
+      type: object
+      required: [courseId, currentRevision, deliveries]
+      properties:
+        courseId: { type: integer }
+        currentRevision: { type: integer }
+        deliveries:
+          type: array
+          items: { $ref: "#/components/schemas/CourseEditPushDelivery" }
+    CourseEditPushHistoryEntry:
+      type: object
+      required: [courseId, title, studioName, startsAt, lastChangeAt]
+      properties:
+        courseId: { type: integer }
+        title: { type: string }
+        studioName: { type: string }
+        startsAt: { type: string, format: date-time }
+        lastChangeAt: { type: string, format: date-time }
     TrainerAbsenceInput:
       type: object
       additionalProperties: false

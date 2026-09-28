@@ -392,6 +392,84 @@ export const UpdateCourseResponse = zod.object({
 
 
 /**
+ * @summary List recent manual-edit push history for accessible courses
+ */
+export const listCourseEditPushHistoryQueryOffsetDefault = 0;
+export const listCourseEditPushHistoryQueryOffsetMin = 0;
+
+export const listCourseEditPushHistoryQueryLimitDefault = 30;
+export const listCourseEditPushHistoryQueryLimitMax = 100;
+
+
+
+export const ListCourseEditPushHistoryQueryParams = zod.object({
+  "studioId": zod.coerce.number().int().optional(),
+  "offset": zod.coerce.number().int().min(listCourseEditPushHistoryQueryOffsetMin).default(listCourseEditPushHistoryQueryOffsetDefault),
+  "limit": zod.coerce.number().int().min(1).max(listCourseEditPushHistoryQueryLimitMax).default(listCourseEditPushHistoryQueryLimitDefault)
+})
+
+export const ListCourseEditPushHistoryResponseItem = zod.object({
+  "courseId": zod.number().int(),
+  "title": zod.string(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "lastChangeAt": zod.coerce.date()
+})
+export const ListCourseEditPushHistoryResponse = zod.array(ListCourseEditPushHistoryResponseItem)
+
+
+/**
+ * @summary Get the manual-edit push delivery history for an accessible course
+ */
+export const GetCourseEditPushDeliveriesParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetCourseEditPushDeliveriesResponse = zod.object({
+  "courseId": zod.number().int(),
+  "currentRevision": zod.number().int(),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "revision": zod.number().int(),
+  "memberName": zod.string(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "attemptedAt": zod.coerce.date().nullable(),
+  "nextAttemptAt": zod.coerce.date().nullable(),
+  "canRetry": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Queue a safe retry for one terminal failed current-revision push
+ */
+export const RetryCourseEditPushDeliveryParams = zod.object({
+  "id": zod.coerce.number().int(),
+  "deliveryId": zod.coerce.number().int()
+})
+
+export const RetryCourseEditPushDeliveryResponse = zod.object({
+  "courseId": zod.number().int(),
+  "currentRevision": zod.number().int(),
+  "deliveries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "revision": zod.number().int(),
+  "memberName": zod.string(),
+  "status": zod.enum(['pending', 'sending', 'sent', 'failed', 'skipped']),
+  "attemptCount": zod.number().int(),
+  "error": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "attemptedAt": zod.coerce.date().nullable(),
+  "nextAttemptAt": zod.coerce.date().nullable(),
+  "canRetry": zod.boolean()
+}))
+})
+
+
+/**
  * @summary List trainer absences and affected courses for accessible studios (managers only)
  */
 export const ListTrainerAbsencesQueryParams = zod.object({

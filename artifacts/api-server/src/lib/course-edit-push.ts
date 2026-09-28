@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 
 const APP_ID = "c1a30beb-bc79-45f6-9cdd-275e663dbcd6";
-const MAX_ATTEMPTS = 5;
+export const COURSE_EDIT_PUSH_MAX_ATTEMPTS = 5;
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 const PROVIDER_TIMEOUT_MS = 20_000;
 const connectors = new ReplitConnectors();
@@ -81,7 +81,7 @@ async function claimOne(courseId?: number) {
         ),
       ),
       courseId === undefined ? undefined : eq(courseEditPushDeliveriesTable.courseId, courseId),
-      lt(courseEditPushDeliveriesTable.attemptCount, MAX_ATTEMPTS),
+      lt(courseEditPushDeliveriesTable.attemptCount, COURSE_EDIT_PUSH_MAX_ATTEMPTS),
     )).orderBy(asc(courseEditPushDeliveriesTable.createdAt), asc(courseEditPushDeliveriesTable.id))
       .limit(1).for("update", { skipLocked: true });
 
@@ -96,7 +96,7 @@ async function claimOne(courseId?: number) {
       }).where(and(
         eq(courseEditPushDeliveriesTable.status, "sending"),
         lt(courseEditPushDeliveriesTable.claimedAt, expiredBefore),
-        sql`${courseEditPushDeliveriesTable.attemptCount} >= ${MAX_ATTEMPTS}`,
+        sql`${courseEditPushDeliveriesTable.attemptCount} >= ${COURSE_EDIT_PUSH_MAX_ATTEMPTS}`,
       ));
       return null;
     }
@@ -131,7 +131,7 @@ async function settle(
     status: result.status,
     error: result.error,
     providerId: result.providerId ?? null,
-    nextAttemptAt: result.status === "failed" && attemptCount < MAX_ATTEMPTS ? backoff(attemptCount) : new Date(),
+    nextAttemptAt: result.status === "failed" && attemptCount < COURSE_EDIT_PUSH_MAX_ATTEMPTS ? backoff(attemptCount) : new Date(),
     claimToken: null,
     claimedAt: null,
   }).where(and(

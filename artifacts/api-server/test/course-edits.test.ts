@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { after, test } from "node:test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import express from "express";
 import {
   courseBookingsTable,
@@ -19,7 +19,10 @@ import {
   studiosTable,
   trainerAbsencesTable,
 } from "@workspace/db";
-import { processCourseEditPushDeliveries } from "../src/lib/course-edit-push";
+import {
+  COURSE_EDIT_PUSH_MAX_ATTEMPTS,
+  processCourseEditPushDeliveries,
+} from "../src/lib/course-edit-push";
 import { createCourseEditsRouter } from "../src/routes/course-edits";
 
 after(async () => {
@@ -210,6 +213,338 @@ test("course edits enforce manager/studio/revision boundaries and notify only el
     if (organizationId !== undefined) {
       await db.delete(organizationsTable).where(eq(organizationsTable.id, organizationId));
     }
+  }
+});
+
+test("course edit push history is private and only safely retryable terminal failures can be queued", async () => {
+  const suffix = randomUUID();
+  let organizationId: number | undefined;
+  let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+  try {
+    const [organization] = await db.insert(organizationsTable)
+      .values({ name: `Course push history ${suffix}` }).returning();
+    organizationId = organization.id;
+    const [studio, otherStudio] = await db.insert(studiosTable).values([
+      { organizationId, name: `History studio ${suffix}`, city: "Berlin" },
+      { organizationId, name: `Foreign studio ${suffix}`, city: "Berlin" },
+    ]).returning();
+    const users = {
+      manager: `history-manager-${suffix}`,
+      district: `history-district-${suffix}`,
+      employee: `history-employee-${suffix}`,
+      foreignManager: `history-foreign-manager-${suffix}`,
+    };
+    await db.insert(staffTable).values([
+      { clerkUserId: users.manager, organizationId, studioId: studio.id, fullName: "History Manager", email: `history-manager-${suffix}@example.invalid`, role: "studio_manager" },
+      { clerkUserId: users.district, organizationId, studioId: null, fullName: "District Manager", email: `history-district-${suffix}@example.invalid`, role: "district_manager" },
+      { clerkUserId: users.employee, organizationId, studioId: studio.id, fullName: "History Employee", email: `history-employee-${suffix}@example.invalid`, role: "studio_employee" },
+      { clerkUserId: users.foreignManager, organizationId, studioId: otherStudio.id, fullName: "Foreign Manager", email: `history-foreign-${suffix}@example.invalid`, role: "studio_manager" },
+    ]);
+    const [course, foreignCourse, anotherAccessibleCourse] = await db.insert(coursesTable).values([
+      {
+        studioId: studio.id, title: "Push history class", instructor: "Trainer",
+        startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        endsAt: new Date(Date.now() + 49 * 60 * 60 * 1000),
+        capacity: 8, enrolled: 2, room: "Room A", status: "scheduled", revision: 3,
+      },
+      {
+        studioId: otherStudio.id, title: "Foreign class", instructor: "Trainer",
+        startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        endsAt: new Date(Date.now() + 49 * 60 * 60 * 1000),
+        capacity: 8, room: "Room B",
+      },
+      {
+        studioId: studio.id, title: "Another accessible class", instructor: "Trainer",
+        startsAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+        endsAt: new Date(Date.now() + 73 * 60 * 60 * 1000),
+        capacity: 8, room: "Room C",
+      },
+    ]).returning();
+    const members = await db.insert(membersTable).values(Array.from({ length: 8 }, (_value, index) => ({
+      studioId: studio.id,
+      fullName: `History member ${index}`,
+      email: `history-member-${index}-${suffix}@example.invalid`,
+      membershipType: "Standard",
+    }))).returning();
+    const bookings = await db.insert(courseBookingsTable).values(members.map((member, index) => ({
+      courseId: course.id,
+      memberId: member.id,
+      status: index === 6 ? "cancelled" : index === 1 ? "waitlisted" : "confirmed",
+    }))).returning();
+    const [otherCourseBooking] = await db.insert(courseBookingsTable).values({
+      courseId: anotherAccessibleCourse.id,
+      memberId: members[0]!.id,
+      status: "confirmed",
+    }).returning();
+    const subscriptionIds = members.map((_member, index) => `history-sub-${index}-${suffix}`);
+    await db.insert(memberPushSubscriptionsTable).values([
+      ...members.slice(0, 7).map((member, index) => ({
+        memberId: member.id,
+        subscriptionId: subscriptionIds[index]!,
+      })),
+      // The final member intentionally has no linked subscription.
+    ]);
+    const createdAt = new Date(Date.now() - 60_000);
+    const rows = [
+      { bookingIndex: 0, revision: 3, status: "pending", attemptCount: 0 },
+      { bookingIndex: 1, revision: 3, status: "sent", attemptCount: 1 },
+      { bookingIndex: 2, revision: 3, status: "skipped", attemptCount: 1 },
+      { bookingIndex: 3, revision: 3, status: "failed", attemptCount: COURSE_EDIT_PUSH_MAX_ATTEMPTS },
+      { bookingIndex: 4, revision: 3, status: "failed", attemptCount: COURSE_EDIT_PUSH_MAX_ATTEMPTS },
+      { bookingIndex: 5, revision: 2, status: "failed", attemptCount: COURSE_EDIT_PUSH_MAX_ATTEMPTS },
+      { bookingIndex: 6, revision: 3, status: "failed", attemptCount: COURSE_EDIT_PUSH_MAX_ATTEMPTS },
+      { bookingIndex: 7, revision: 3, status: "failed", attemptCount: COURSE_EDIT_PUSH_MAX_ATTEMPTS },
+    ] as const;
+    const inserted = await db.insert(courseEditPushDeliveriesTable).values(rows.map((row, index) => ({
+      courseId: course.id,
+      courseRevision: row.revision,
+      bookingId: bookings[row.bookingIndex]!.id,
+      memberId: members[row.bookingIndex]!.id,
+      subscriptionId: subscriptionIds[row.bookingIndex]!,
+      title: "Neutral title",
+      body: "Neutral body",
+      idempotencyKey: randomUUID(),
+      status: row.status,
+      error: row.status === "failed" ? "Provider did not confirm." : null,
+      attemptCount: row.attemptCount,
+      createdAt: new Date(createdAt.getTime() + index * 1000),
+      attemptedAt: row.status === "pending" ? null : new Date(createdAt.getTime() + index * 1000),
+      nextAttemptAt: new Date(createdAt.getTime() + index * 1000),
+    }))).returning();
+    const [wrongCourseDelivery] = await db.insert(courseEditPushDeliveriesTable).values({
+      courseId: anotherAccessibleCourse.id,
+      courseRevision: anotherAccessibleCourse.revision,
+      bookingId: otherCourseBooking.id,
+      memberId: members[0]!.id,
+      subscriptionId: subscriptionIds[0]!,
+      title: "Neutral title",
+      body: "Neutral body",
+      idempotencyKey: randomUUID(),
+      status: "failed",
+      attemptCount: COURSE_EDIT_PUSH_MAX_ATTEMPTS,
+      createdAt,
+    }).returning();
+    const eligibleRetryId = inserted[3]!.id;
+    const concurrentRetryId = inserted[4]!.id;
+    const eligibleIdempotencyKey = inserted[3]!.idempotencyKey;
+    const concurrentIdempotencyKey = inserted[4]!.idempotencyKey;
+
+    const app = express();
+    app.use(express.json());
+    app.use(createCourseEditsRouter({
+      userIdFromRequest: (req) => req.header("x-test-user") ?? null,
+    }));
+    server = app.listen(0);
+    await new Promise<void>((resolve) => server!.once("listening", resolve));
+    const address = server.address() as AddressInfo;
+    const base = `http://127.0.0.1:${address.port}`;
+    const get = (user: string | null, path = `/courses/${course.id}/push-deliveries`) =>
+      fetch(`${base}${path}`, { headers: user ? { "x-test-user": user } : {} });
+    const retry = (user: string, deliveryId: number) => fetch(
+      `${base}/courses/${course.id}/push-deliveries/${deliveryId}/retry`,
+      { method: "POST", headers: { "x-test-user": user } },
+    );
+
+    assert.equal((await get(null)).status, 401);
+    assert.equal((await get(users.employee)).status, 403);
+    assert.equal((await get(users.foreignManager)).status, 404);
+    assert.equal((await get(users.manager, "/courses/999999/push-deliveries")).status, 404);
+    assert.equal((await get(users.manager, `/courses/${foreignCourse.id}/push-deliveries`)).status, 404);
+    assert.equal((await get(users.district)).status, 200);
+
+    const reportResponse = await get(users.manager);
+    assert.equal(reportResponse.status, 200);
+    const report = await reportResponse.json() as {
+      courseId: number;
+      currentRevision: number;
+      deliveries: Array<{ id: number; revision: number; memberName: string; status: string; attemptCount: number; error: string | null; canRetry: boolean }>;
+    };
+    assert.equal(report.courseId, course.id);
+    assert.equal(report.currentRevision, 3);
+    assert.deepEqual(report.deliveries.map((delivery) => delivery.status), [
+      "failed", "failed", "failed", "failed", "failed", "skipped", "sent", "pending",
+    ]);
+    assert.equal(report.deliveries.find((delivery) => delivery.id === eligibleRetryId)?.canRetry, true);
+    assert.equal(report.deliveries.find((delivery) => delivery.id === concurrentRetryId)?.canRetry, true);
+    assert.equal(report.deliveries.find((delivery) => delivery.id === inserted[5]!.id)?.canRetry, false);
+    assert.equal(report.deliveries.find((delivery) => delivery.id === inserted[6]!.id)?.canRetry, false);
+    assert.equal(report.deliveries.find((delivery) => delivery.id === inserted[7]!.id)?.canRetry, false);
+    const serializedReport = JSON.stringify(report);
+    assert.ok(!serializedReport.includes("subscriptionId"));
+    assert.ok(!subscriptionIds.some((subscriptionId) => serializedReport.includes(subscriptionId)));
+
+    assert.equal((await retry(users.foreignManager, eligibleRetryId)).status, 404);
+    assert.equal((await retry(users.manager, 999999)).status, 404);
+    assert.equal((await retry(users.manager, wrongCourseDelivery.id)).status, 404, "delivery from another accessible course is not addressable here");
+    assert.equal((await retry(users.manager, inserted[5]!.id)).status, 409, "old course revision is stale");
+    assert.equal((await retry(users.manager, inserted[6]!.id)).status, 409, "cancelled booking is no longer eligible");
+    assert.equal((await retry(users.manager, inserted[7]!.id)).status, 409, "unlinked subscription is no longer eligible");
+
+    const concurrentResults = await Promise.all([
+      retry(users.manager, concurrentRetryId),
+      retry(users.manager, concurrentRetryId),
+    ]);
+    assert.deepEqual(concurrentResults.map((response) => response.status).sort(), [200, 409]);
+    const queued = await retry(users.manager, eligibleRetryId);
+    assert.equal(queued.status, 200);
+    const queuedReport = await queued.json() as typeof report;
+    const queuedRow = queuedReport.deliveries.find((delivery) => delivery.id === eligibleRetryId)!;
+    assert.equal(queuedRow.status, "pending");
+    assert.equal(queuedRow.attemptCount, 0);
+    assert.equal(queuedRow.error, null);
+    assert.equal(queuedRow.canRetry, false);
+    assert.equal((await retry(users.manager, eligibleRetryId)).status, 409, "duplicate retry must not enqueue twice");
+
+    const stored = await db.select().from(courseEditPushDeliveriesTable).where(inArray(
+      courseEditPushDeliveriesTable.id,
+      [eligibleRetryId, concurrentRetryId],
+    ));
+    assert.ok(stored.every((delivery) => delivery.status === "pending" && delivery.attemptCount === 0));
+    assert.equal(stored.find((delivery) => delivery.id === eligibleRetryId)?.idempotencyKey, eligibleIdempotencyKey);
+    assert.equal(stored.find((delivery) => delivery.id === concurrentRetryId)?.idempotencyKey, concurrentIdempotencyKey);
+
+    await db.update(coursesTable).set({
+      startsAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      endsAt: new Date(Date.now() - 60 * 60 * 1000),
+    }).where(eq(coursesTable.id, course.id));
+    const pastCourseHistory = await get(users.manager);
+    assert.equal(pastCourseHistory.status, 200, "accessible past courses retain push history");
+    assert.equal((await pastCourseHistory.json() as typeof report).deliveries.length, rows.length);
+  } finally {
+    if (server) await new Promise<void>((resolve, reject) => server!.close((error) => error ? reject(error) : resolve()));
+    if (organizationId !== undefined) {
+      await db.delete(organizationsTable).where(eq(organizationsTable.id, organizationId));
+    }
+  }
+});
+
+test("course edit push history index is manager-scoped, includes past courses, and paginates by latest delivery", async () => {
+  const suffix = randomUUID();
+  let organizationId: number | undefined;
+  let foreignOrganizationId: number | undefined;
+  let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+  try {
+    const [organization, foreignOrganization] = await db.insert(organizationsTable).values([
+      { name: `Push index ${suffix}` },
+      { name: `Foreign push index ${suffix}` },
+    ]).returning();
+    organizationId = organization.id;
+    foreignOrganizationId = foreignOrganization.id;
+    const [studioA, studioB, foreignStudio] = await db.insert(studiosTable).values([
+      { organizationId, name: `Push index A ${suffix}`, city: "Berlin" },
+      { organizationId, name: `Push index B ${suffix}`, city: "Hamburg" },
+      { organizationId: foreignOrganizationId, name: `Foreign push index ${suffix}`, city: "Köln" },
+    ]).returning();
+    const users = {
+      district: `push-index-district-${suffix}`,
+      managerA: `push-index-manager-a-${suffix}`,
+      managerB: `push-index-manager-b-${suffix}`,
+      employee: `push-index-employee-${suffix}`,
+    };
+    await db.insert(staffTable).values([
+      { clerkUserId: users.district, organizationId, studioId: null, fullName: "District Manager", email: `push-index-district-${suffix}@example.invalid`, role: "district_manager" },
+      { clerkUserId: users.managerA, organizationId, studioId: studioA.id, fullName: "Studio Manager A", email: `push-index-manager-a-${suffix}@example.invalid`, role: "studio_manager" },
+      { clerkUserId: users.managerB, organizationId, studioId: studioB.id, fullName: "Studio Manager B", email: `push-index-manager-b-${suffix}@example.invalid`, role: "studio_manager" },
+      { clerkUserId: users.employee, organizationId, studioId: studioA.id, fullName: "Studio Employee", email: `push-index-employee-${suffix}@example.invalid`, role: "studio_employee" },
+    ]);
+    const now = Date.now();
+    const [oldCourse, recentCourse, crossStudioCourse, foreignCourse] = await db.insert(coursesTable).values([
+      { studioId: studioA.id, title: "Old past course", instructor: "Trainer", startsAt: new Date(now - 7 * 86400000), endsAt: new Date(now - 7 * 86400000 + 3600000), capacity: 10, room: "Room A", status: "cancelled" },
+      { studioId: studioA.id, title: "Recent past course", instructor: "Trainer", startsAt: new Date(now - 5 * 86400000), endsAt: new Date(now - 5 * 86400000 + 3600000), capacity: 10, room: "Room A", status: "cancelled" },
+      { studioId: studioB.id, title: "Cross-studio past course", instructor: "Trainer", startsAt: new Date(now - 4 * 86400000), endsAt: new Date(now - 4 * 86400000 + 3600000), capacity: 10, room: "Room B", status: "cancelled" },
+      { studioId: foreignStudio.id, title: "Foreign past course", instructor: "Trainer", startsAt: new Date(now - 3 * 86400000), endsAt: new Date(now - 3 * 86400000 + 3600000), capacity: 10, room: "Room C", status: "cancelled" },
+    ]).returning();
+    const [oldMember, recentMemberA, recentMemberB, crossStudioMember, foreignMember] =
+      await db.insert(membersTable).values([
+        { studioId: studioA.id, fullName: "Old", email: `push-index-old-${suffix}@example.invalid`, membershipType: "Standard" },
+        { studioId: studioA.id, fullName: "Recent A", email: `push-index-recent-a-${suffix}@example.invalid`, membershipType: "Standard" },
+        { studioId: studioA.id, fullName: "Recent B", email: `push-index-recent-b-${suffix}@example.invalid`, membershipType: "Standard" },
+        { studioId: studioB.id, fullName: "Cross studio", email: `push-index-cross-${suffix}@example.invalid`, membershipType: "Standard" },
+        { studioId: foreignStudio.id, fullName: "Foreign", email: `push-index-foreign-${suffix}@example.invalid`, membershipType: "Standard" },
+      ]).returning();
+    const bookings = await db.insert(courseBookingsTable).values([
+      { courseId: oldCourse.id, memberId: oldMember.id, status: "confirmed" },
+      { courseId: recentCourse.id, memberId: recentMemberA.id, status: "confirmed" },
+      { courseId: recentCourse.id, memberId: recentMemberB.id, status: "waitlisted" },
+      { courseId: crossStudioCourse.id, memberId: crossStudioMember.id, status: "confirmed" },
+      { courseId: foreignCourse.id, memberId: foreignMember.id, status: "confirmed" },
+    ]).returning();
+    const lastChanges = [
+      new Date(now - 45_000),
+      new Date(now - 30_000),
+      new Date(now - 20_000),
+      new Date(now - 35_000),
+      new Date(now - 10_000),
+    ];
+    const deliverySeeds = [
+      { courseId: oldCourse.id, memberId: oldMember.id, bookingId: bookings[0]!.id, createdAt: lastChanges[0]! },
+      { courseId: recentCourse.id, memberId: recentMemberA.id, bookingId: bookings[1]!.id, createdAt: lastChanges[1]! },
+      { courseId: recentCourse.id, memberId: recentMemberB.id, bookingId: bookings[2]!.id, createdAt: lastChanges[2]! },
+      { courseId: crossStudioCourse.id, memberId: crossStudioMember.id, bookingId: bookings[3]!.id, createdAt: lastChanges[3]! },
+      { courseId: foreignCourse.id, memberId: foreignMember.id, bookingId: bookings[4]!.id, createdAt: lastChanges[4]! },
+    ];
+    await db.insert(courseEditPushDeliveriesTable).values(deliverySeeds.map((seed) => ({
+      ...seed,
+      courseRevision: 1,
+      subscriptionId: `push-index-sub-${randomUUID()}`,
+      title: "Neutral title",
+      body: "Neutral body",
+      idempotencyKey: randomUUID(),
+      status: "sent",
+      attemptCount: 1,
+      attemptedAt: seed.createdAt,
+      nextAttemptAt: seed.createdAt,
+    })));
+
+    const app = express();
+    app.use(express.json());
+    app.use(createCourseEditsRouter({
+      userIdFromRequest: (req) => req.header("x-test-user") ?? null,
+    }));
+    server = app.listen(0);
+    await new Promise<void>((resolve) => server!.once("listening", resolve));
+    const address = server.address() as AddressInfo;
+    const endpoint = `http://127.0.0.1:${address.port}/courses/push-history`;
+    const list = (user: string | null, query = "") =>
+      fetch(`${endpoint}${query}`, { headers: user ? { "x-test-user": user } : {} });
+
+    assert.equal((await list(null)).status, 401);
+    assert.equal((await list(users.employee)).status, 403);
+    assert.equal((await list(users.managerA, `?studioId=${studioB.id}`)).status, 403);
+    assert.equal((await list(users.district, `?studioId=${foreignStudio.id}`)).status, 403);
+    assert.equal((await list(users.district, "?offset=-1")).status, 400);
+    assert.equal((await list(users.district, "?limit=101")).status, 400);
+
+    const firstPageResponse = await list(users.district, "?offset=0&limit=2");
+    assert.equal(firstPageResponse.status, 200);
+    const firstPage = await firstPageResponse.json() as Array<{
+      courseId: number; title: string; studioName: string; startsAt: string; lastChangeAt: string;
+    }>;
+    assert.deepEqual(firstPage.map((entry) => entry.courseId), [recentCourse.id, crossStudioCourse.id]);
+    assert.ok(firstPage.every((entry) => new Date(entry.startsAt).getTime() < now));
+    assert.equal(firstPage[0]?.title, "Recent past course");
+    assert.equal(firstPage[0]?.studioName, studioA.name);
+    assert.equal(new Date(firstPage[0]!.lastChangeAt).getTime(), lastChanges[2]!.getTime());
+
+    const secondPageResponse = await list(users.district, "?offset=2&limit=2");
+    assert.equal(secondPageResponse.status, 200);
+    const secondPage = await secondPageResponse.json() as Array<{ courseId: number }>;
+    assert.deepEqual(secondPage.map((entry) => entry.courseId), [oldCourse.id]);
+
+    const studioAResponse = await list(users.managerA);
+    assert.equal(studioAResponse.status, 200);
+    assert.deepEqual((await studioAResponse.json() as Array<{ courseId: number }>).map((entry) => entry.courseId),
+      [recentCourse.id, oldCourse.id]);
+    const studioBFilter = await list(users.district, `?studioId=${studioB.id}`);
+    assert.deepEqual((await studioBFilter.json() as Array<{ courseId: number }>).map((entry) => entry.courseId),
+      [crossStudioCourse.id]);
+    const noInternalIds = JSON.stringify(firstPage);
+    assert.ok(!noInternalIds.includes("subscriptionId"));
+    assert.ok(!noInternalIds.includes("memberId"));
+  } finally {
+    if (server) await new Promise<void>((resolve, reject) => server!.close((error) => error ? reject(error) : resolve()));
+    if (organizationId !== undefined) await db.delete(organizationsTable).where(eq(organizationsTable.id, organizationId));
+    if (foreignOrganizationId !== undefined) await db.delete(organizationsTable).where(eq(organizationsTable.id, foreignOrganizationId));
   }
 });
 

@@ -32,3 +32,9 @@ For ordinary course edits, keep external push copy neutral and direct the member
 **Why:** A provider call cannot reliably be retracted after it begins. A cancellation, opt-out, or later edit can commit between the final eligibility check and provider acceptance; detailed old push copy would then show wrong times or rooms, while marking it skipped would misstate what actually happened.
 
 **How to apply:** Recheck recipient eligibility before every attempt, use the shared revision for stale-form protection, keep provider results truthful for already-started sends, and avoid course-specific details in any push that could race a later change.
+
+Keep operational course scheduling focused on upcoming classes while giving managers a separate, studio-scoped delivery history that remains readable after a class starts or is cancelled. Historical visibility must not imply historical retry eligibility.
+
+**Why:** A push failure may only be noticed after its course disappears from the upcoming schedule. Expanding the scheduling list just to reach delivery records conflates two different jobs.
+
+**How to apply:** Preserve manager access to past delivery outcomes through an authorized history path; allow re-queueing only terminal failures for the current revision of a future, still-booked course with an active subscription.
