@@ -29,6 +29,7 @@ import CoursePushDeliveries from './CoursePushDeliveries';
 import CoursePushHistory from './CoursePushHistory';
 import { berlinDateTimeInput, berlinDateTimeIso } from './course-time';
 import { courseQueryScope } from './course-studio-scope';
+import { acceptStaffInvitation, afterAuthInviteUrl, clearInvite, enterInvitation, pendingInvitationPath } from './invitation-return';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -335,11 +336,13 @@ function LandingPage() {
 }
 
 function SignInPage() {
-  return <div className="auth-page auth-page--photo"><div className="auth-aside auth-aside--photo"><Brand light /><div className="auth-photo-copy"><div className="eyebrow">Fiudia workspace</div><h1>Mehr Raum für<br /><em>gute Arbeit.</em></h1><p>Dein Studio-Alltag, in der Perspektive, die zu dir gehört.</p></div><span className="auth-aside-foot">Für Teams, die Menschen bewegen.</span></div><div className="auth-main"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div></div>;
+  const redirect = afterAuthInviteUrl(sessionStorage, basePath);
+  return <div className="auth-page auth-page--photo"><div className="auth-aside auth-aside--photo"><Brand light /><div className="auth-photo-copy"><div className="eyebrow">Fiudia workspace</div><h1>Mehr Raum für<br /><em>gute Arbeit.</em></h1><p>Dein Studio-Alltag, in der Perspektive, die zu dir gehört.</p></div><span className="auth-aside-foot">Für Teams, die Menschen bewegen.</span></div><div className="auth-main"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={redirect} /></div></div>;
 }
 
 function SignUpPage() {
-  return <div className="auth-page"><div className="auth-aside"><Brand light /><div><div className="eyebrow">Starte mit Fiudia</div><h1>Ein besserer Tag<br /><em>beginnt hier.</em></h1><p>Richte deinen Workspace ein und bringe deine Organisation in Bewegung.</p></div><span className="auth-aside-foot">Wächst mit dir. Bleibt bei dir.</span></div><div className="auth-main"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div></div>;
+  const redirect = afterAuthInviteUrl(sessionStorage, basePath);
+  return <div className="auth-page"><div className="auth-aside"><Brand light /><div><div className="eyebrow">Starte mit Fiudia</div><h1>Ein besserer Tag<br /><em>beginnt hier.</em></h1><p>Richte deinen Workspace ein und bringe deine Organisation in Bewegung.</p></div><span className="auth-aside-foot">Wächst mit dir. Bleibt bei dir.</span></div><div className="auth-main"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} /></div></div>;
 }
 
 function OnboardingPage() {
@@ -658,11 +661,31 @@ function TeamPage({ me }: { me: Me }) {
 
 function InvitePage() {
   const [, setLocation] = useLocation();
+  const client = useQueryClient();
   const [, params] = useRoute('/invite/:token');
   const mutation = useAcceptInvitation();
   const { isSignedIn } = useAuth();
-  const accept = () => { if (!isSignedIn) { setLocation(`/sign-in?redirect_url=${window.location.pathname}`); return; } if (params?.token) mutation.mutate({ token: params.token }, { onSuccess: () => setLocation('/dashboard') }); };
-  return <div className="invite-page"><Brand /><div className="invite-card"><div className="invite-symbol"><Users size={24} /></div><div className="eyebrow">Deine Einladung</div><h1>Gemeinsam wird<br /><em>mehr daraus.</em></h1><p>Du wurdest eingeladen, einem Fiudia-Workspace beizutreten. Nimm deinen Platz im Studio ein.</p><button className="button button-dark button-wide" onClick={accept} disabled={mutation.isPending} data-testid="button-accept-invitation">{mutation.isPending ? 'Einladung wird angenommen …' : isSignedIn ? 'Einladung annehmen' : 'Anmelden und beitreten'} <ArrowRight size={17} /></button>{mutation.isError && <p className="form-error">Diese Einladung ist nicht mehr gültig. Bitte frage die Studioleitung nach einem neuen Link.</p>}</div></div>;
+  const accept = () => {
+    if (!params?.token) return;
+    if (!isSignedIn) {
+      setLocation(enterInvitation(sessionStorage, params.token));
+      return;
+    }
+    void acceptStaffInvitation(sessionStorage, params.token, token => mutation.mutateAsync({ token }))
+      .then(() => {
+        // A previously opened dashboard may still have the pre-invitation role cached.
+        client.removeQueries({ queryKey: getGetMeQueryKey() });
+        client.removeQueries({ queryKey: getListModulesQueryKey() });
+        client.removeQueries({ queryKey: getGetDashboardQueryKey() });
+        setLocation('/dashboard');
+      })
+      .catch(() => { /* The mutation error remains visible on this page. */ });
+  };
+  const leave = () => {
+    clearInvite(sessionStorage);
+    setLocation(isSignedIn ? '/dashboard' : '/');
+  };
+  return <div className="invite-page"><Brand /><div className="invite-card"><div className="invite-symbol"><Users size={24} /></div><div className="eyebrow">Deine Einladung</div><h1>Gemeinsam wird<br /><em>mehr daraus.</em></h1><p>Du wurdest eingeladen, einem Fiudia-Workspace beizutreten. Nimm deinen Platz im Studio ein.</p><button className="button button-dark button-wide" onClick={accept} disabled={mutation.isPending || !params?.token} data-testid="button-accept-invitation">{mutation.isPending ? 'Einladung wird angenommen …' : isSignedIn ? 'Einladung annehmen' : 'Anmelden und beitreten'} <ArrowRight size={17} /></button>{mutation.isError && <p className="form-error" role="alert">Diese Einladung konnte nicht angenommen werden. Prüfe, ob du mit der eingeladenen, bestätigten E-Mail-Adresse angemeldet bist, oder frage die Studioleitung nach einem neuen Link.</p>}<button type="button" className="button button-outline button-wide" onClick={leave} disabled={mutation.isPending} data-testid="button-leave-invitation">Zur Übersicht</button></div></div>;
 }
 
 function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; modules: ModuleSetting[]; retryModules: () => void; modulesError: boolean }) {
@@ -694,6 +717,9 @@ function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
 }
 
 function ProtectedRoute({ page }: { page: ProtectedPage }) {
+  const { isSignedIn } = useAuth();
+  const pending = isSignedIn ? pendingInvitationPath(sessionStorage) : null;
+  if (pending) return <Redirect to={pending} />;
   return <AuthenticatedData>{(me, modules, retryModules, modulesError) =>
     <ProtectedContent page={page} me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />
   }</AuthenticatedData>;
