@@ -28,6 +28,7 @@ import TrainerAbsencesPage from './TrainerAbsencesPage';
 import CoursePushDeliveries from './CoursePushDeliveries';
 import CoursePushHistory from './CoursePushHistory';
 import { berlinDateTimeInput, berlinDateTimeIso } from './course-time';
+import { courseQueryScope } from './course-studio-scope';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -450,13 +451,12 @@ function CourseRoster({ course, onClose }: { course: Course; onClose: () => void
 
 function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const client = useQueryClient();
-  const { selectedStudioId, selectStudio } = useStudioScope();
+  const { selectedStudioId, selectStudio, studios } = useStudioScope();
   const district = me.role === 'district_manager';
   const manager = me.role === 'studio_manager' || me.role === 'district_manager';
   const canBookMembers = manager && moduleEnabled(modules, 'members');
-  const courseParams = district && selectedStudioId ? { studioId: selectedStudioId } : undefined;
-  const query = useListCourses(courseParams, { query: { queryKey: getListCoursesQueryKey(courseParams) } });
-  const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: district, refetchOnMount: 'always' } });
+  const courseScope = courseQueryScope(district, selectedStudioId);
+  const query = useListCourses(courseScope.params, { query: courseScope.query });
   const create = useCreateCourse();
   const edit = useUpdateCourse();
   const booking = useCreateStaffCourseBooking();
@@ -470,13 +470,21 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const bookingMemberParams = bookingCourse ? { studioId: bookingCourse.studioId } : undefined;
   const membersQuery = useListMembers(bookingMemberParams, { query: { queryKey: getListMembersQueryKey(bookingMemberParams), enabled: !!bookingCourse && canBookMembers } });
   useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
-  useEffect(() => { setPushCourse(null); setPushHistoryOpen(false); setReturnToPushHistory(false); }, [selectedStudioId]);
   const [open, setOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [selectedStudio, setSelectedStudio] = useState('');
   const [studioError, setStudioError] = useState('');
   const [timeError, setTimeError] = useState('');
   const [form, setForm] = useState({ title: '', instructor: '', startsAt: '', endsAt: '', capacity: '20', room: '' });
+  useEffect(() => {
+    setBookingCourse(null);
+    setRosterCourse(null);
+    setPushCourse(null);
+    setPushHistoryOpen(false);
+    setReturnToPushHistory(false);
+    setOpen(false);
+    setEditingCourse(null);
+  }, [selectedStudioId]);
   const update = (key: keyof typeof form) => (value: string) => { setTimeError(''); setForm((current) => ({ ...current, [key]: value })); };
   const studioId = editingCourse?.studioId ?? (district ? Number(selectedStudio) : me.studioId);
   const allowedStudio = !!studioId && (!district || studios.data?.some(studio => studio.id === studioId) === true);
@@ -548,7 +556,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const courses = query.data || [];
   return <>
     <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={manager && <div className="course-header-actions"><button className="button button-outline" onClick={() => setPushHistoryOpen(true)} data-testid="button-course-push-history"><Zap size={17} /> Push-Verlauf</button><button className="button button-dark" onClick={openCreate} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button></div>} />
-    {query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
+    {district && studios.isLoading ? <LoadingBlock label="Studios werden geladen" /> : district && studios.isError ? <ErrorBlock retry={() => studios.refetch()} /> : district && !selectedStudioId ? <div className="empty-state" role="status">Kein Studio für den Kursplan verfügbar.</div> : query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
       <div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span><span className="course-date">{new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(course.startsAt))}</span></div>
       <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{district && <><strong data-testid={`text-course-studio-${course.id}`}>{course.studioName}</strong> · </>}{course.instructor} · {course.room}</p>
       <div className="course-card-bottom"><span><Users size={15} /> {course.enrolled} / {course.capacity}</span><span className={course.enrolled / course.capacity > .8 ? 'warning-text' : 'positive-text'}>{Math.round((course.enrolled / course.capacity) * 100)}% belegt</span></div>
