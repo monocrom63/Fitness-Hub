@@ -135,6 +135,8 @@ export interface Course {
   enrolled: number;
   room: string;
   status: CourseStatus;
+  /** @minimum 1 */
+  revision: number;
 }
 
 export interface Dashboard {
@@ -200,6 +202,28 @@ export interface MemberUpdate {
      */
   membershipType?: string;
   status?: MemberStatus;
+}
+
+export interface CourseUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  title: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  instructor: string;
+  startsAt: string;
+  endsAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  room: string;
+  /** @minimum 1 */
+  revision: number;
 }
 
 export interface TrainerAbsenceInput {

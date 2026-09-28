@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startWaitlistEmailWorker } from "./lib/waitlist-email-worker";
+import { startCourseEditPushWorker } from "./lib/course-edit-push";
 
 const rawPort = process.env["PORT"];
 
@@ -24,4 +25,5 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   startWaitlistEmailWorker();
+  startCourseEditPushWorker();
 });

@@ -34,6 +34,7 @@ import type {
   CourseClosureResolutionInput,
   CourseInput,
   CourseRosterBooking,
+  CourseUpdate,
   Dashboard,
   GetDashboardParams,
   HealthStatus,
@@ -1121,6 +1122,95 @@ export const useCreateCourse = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateCourseMutationOptions(options));
+    }
+
+export const getUpdateCourseUrl = (id: number,) => {
+
+
+
+
+  return `/api/courses/${id}`
+}
+
+/**
+ * @summary Edit a future scheduled or full course and notify its booked members
+ */
+export const updateCourse = async (id: number,
+    courseUpdate: CourseUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Course> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Course>(getUpdateCourseUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(courseUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateCourseMutationKey = () => ['updateCourse'] as const;
+
+export const getUpdateCourseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCourse>>, TError,UpdateCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCourse>>, TError,UpdateCourseMutationVariables, TContext> => {
+
+const mutationKey = getUpdateCourseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCourse>>, UpdateCourseMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCourse(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCourseMutationResult = NonNullable<Awaited<ReturnType<typeof updateCourse>>>
+    export type UpdateCourseMutationBody = BodyType<CourseUpdate>
+    export type UpdateCourseMutationError = ErrorType<void>
+    export type UpdateCourseMutationVariables = {id: number;data: BodyType<CourseUpdate>}
+
+    /**
+ * @summary Edit a future scheduled or full course and notify its booked members
+ */
+export const useUpdateCourse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCourse>>, TError,UpdateCourseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCourse>>,
+        TError,
+        UpdateCourseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateCourseMutationOptions(options));
     }
 
 export const getListTrainerAbsencesUrl = (params?: ListTrainerAbsencesParams,) => {

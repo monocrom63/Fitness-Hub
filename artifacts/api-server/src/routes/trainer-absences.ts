@@ -18,6 +18,7 @@ import {
 } from "../lib/fiudia-access";
 import { processTrainerAbsencePush, trainerDecisionNotice } from "../lib/trainer-absence-push";
 import { isTrainerAbsentForCourse, retireTrainerAlertIfResolved, trainerAbsenceOverlapsCourse, trainerLockKey } from "../lib/trainer-scheduling";
+import { supersedeCourseEditPushDeliveries } from "../lib/course-edit-deliveries";
 
 type Dependencies = {
   database: typeof db;
@@ -317,6 +318,13 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
       res.status(400).json({ error: "Ein externer Name ist nur für externe Vertretungen zulässig." }); return;
     }
     const result = await database.transaction(async (tx) => {
+      // Resolve the requested target before taking the course row lock, which
+      // matches course editing and absence creation lock ordering.
+      const targetInstructor = action === "replace" ? candidateName :
+        action === "external" ? externalName : null;
+      if (targetInstructor) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(row.studioId, targetInstructor)}))`);
+      }
       const [lockedCourse] = await tx.select().from(coursesTable)
         .where(eq(coursesTable.id, Number(req.params.courseId))).for("update").limit(1);
       const [decision] = await tx.select().from(trainerAbsenceCoursesTable)
@@ -335,7 +343,6 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
         }
         // Serialize assignment and overlapping sick reports for this trainer
         // across separate courses before doing the final availability check.
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(row.studioId, decision.candidateName)}))`);
         const pool = await candidates(row.studioId, {
           courseId: lockedCourse.id, startsAt: lockedCourse.startsAt, endsAt: lockedCourse.endsAt,
           originalInstructor: decision.originalInstructor,
@@ -344,7 +351,6 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
           return { error: "Die angefragte Person ist inzwischen nicht mehr verfügbar." };
         }
       } else if (action === "external") {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${trainerLockKey(row.studioId, externalName)}))`);
         if (await isTrainerAbsentForCourse(row.studioId, externalName, lockedCourse.startsAt, lockedCourse.endsAt, tx)) {
           return { error: "Die externe Vertretung ist für diesen Kurstag ebenfalls abwesend." };
         }
@@ -361,8 +367,10 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
       ));
       const notice = trainerDecisionNotice(lockedCourse.title, status, nextInstructor);
       await tx.update(coursesTable).set(action === "cancel"
-        ? { status: "cancelled", enrolled: 0 } : { instructor: nextInstructor })
+        ? { status: "cancelled", enrolled: 0, revision: lockedCourse.revision + 1 }
+        : { instructor: nextInstructor, revision: lockedCourse.revision + 1 })
         .where(eq(coursesTable.id, lockedCourse.id));
+      await supersedeCourseEditPushDeliveries(lockedCourse.id, tx);
       if (action === "cancel") {
         await tx.update(courseBookingsTable).set({ status: "cancelled" }).where(and(
           eq(courseBookingsTable.courseId, lockedCourse.id),

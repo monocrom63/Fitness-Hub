@@ -11,6 +11,7 @@
     "test:members": "tsx --test test/member-access.test.ts test/member-stale-staff-assignment.test.ts",
     "test:team": "tsx --test test/team-invitations.test.ts",
     "test:bookings": "node ./test/run-bookings.mjs",
+    "test:course-edits": "node ./test/run-course-edits.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

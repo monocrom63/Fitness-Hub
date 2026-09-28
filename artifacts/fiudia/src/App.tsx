@@ -12,7 +12,7 @@ import {
 import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCourseBookingsQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
   getListMembersQueryKey, getListModulesQueryKey, useAcceptInvitation, useCompleteOnboarding, useCreateCheckIn,
-  useCancelStaffCourseBooking, useCreateCourse, useCreateInvitation, useCreateMember, useCreateMemberInvitation, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
+  useCancelStaffCourseBooking, useCreateCourse, useUpdateCourse, useCreateInvitation, useCreateMember, useCreateMemberInvitation, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
   getListStudiosQueryKey, useListCourseBookings, useListCourses, useListInvitations, useListMembers, useListModules, useListStudios, useUpdateMember, useUpdateModule,
 } from '@workspace/api-client-react';
 import type { Course, CourseRosterBooking, Dashboard, Invitation, Member, MemberInvitationLink, Me, ModuleKey, ModuleSetting, Role } from '@workspace/api-client-react';
@@ -25,6 +25,7 @@ import RoomClosuresPage from './RoomClosuresPage';
 import StudioManagement from './StudioManagement';
 import { StudioScopeProvider, useStudioScope } from './StudioScope';
 import TrainerAbsencesPage from './TrainerAbsencesPage';
+import { berlinDateTimeInput, berlinDateTimeIso } from './course-time';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -128,7 +129,7 @@ function timeAgo(value: string) {
 }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
 function initials(name = 'Fiudia') {
@@ -455,6 +456,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const query = useListCourses(courseParams, { query: { queryKey: getListCoursesQueryKey(courseParams) } });
   const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), enabled: district, refetchOnMount: 'always' } });
   const create = useCreateCourse();
+  const edit = useUpdateCourse();
   const booking = useCreateStaffCourseBooking();
   const [bookingCourse, setBookingCourse] = useState<Course | null>(null);
   const [bookingMemberId, setBookingMemberId] = useState('');
@@ -464,13 +466,27 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const membersQuery = useListMembers(bookingMemberParams, { query: { queryKey: getListMembersQueryKey(bookingMemberParams), enabled: !!bookingCourse && canBookMembers } });
   useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
   const [open, setOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [selectedStudio, setSelectedStudio] = useState('');
   const [studioError, setStudioError] = useState('');
+  const [timeError, setTimeError] = useState('');
   const [form, setForm] = useState({ title: '', instructor: '', startsAt: '', endsAt: '', capacity: '20', room: '' });
-  const update = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const studioId = district ? Number(selectedStudio) : me.studioId;
+  const update = (key: keyof typeof form) => (value: string) => { setTimeError(''); setForm((current) => ({ ...current, [key]: value })); };
+  const studioId = editingCourse?.studioId ?? (district ? Number(selectedStudio) : me.studioId);
   const allowedStudio = !!studioId && (!district || studios.data?.some(studio => studio.id === studioId) === true);
-  const openCreate = () => { create.reset(); setStudioError(''); setOpen(true); };
+  const openCreate = () => {
+    create.reset(); edit.reset(); setEditingCourse(null); setSelectedStudio('');
+    setForm({ title: '', instructor: '', startsAt: '', endsAt: '', capacity: '20', room: '' });
+    setStudioError(''); setTimeError(''); setOpen(true);
+  };
+  const openEdit = (course: Course) => {
+    create.reset(); edit.reset(); setEditingCourse(course); setSelectedStudio(String(course.studioId));
+    setForm({
+      title: course.title, instructor: course.instructor, startsAt: berlinDateTimeInput(course.startsAt),
+      endsAt: berlinDateTimeInput(course.endsAt), capacity: String(course.capacity), room: course.room,
+    });
+    setStudioError(''); setTimeError(''); setOpen(true);
+  };
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!allowedStudio || !studioId) {
@@ -478,10 +494,40 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
       return;
     }
     setStudioError('');
+    const startsAt = editingCourse && form.startsAt === berlinDateTimeInput(editingCourse.startsAt)
+      ? editingCourse.startsAt : berlinDateTimeIso(form.startsAt);
+    const endsAt = editingCourse && form.endsAt === berlinDateTimeInput(editingCourse.endsAt)
+      ? editingCourse.endsAt : berlinDateTimeIso(form.endsAt);
+    if (!startsAt || !endsAt) {
+      setTimeError('Diese Berliner Uhrzeit ist wegen der Zeitumstellung nicht eindeutig oder existiert nicht. Bitte wähle eine andere Uhrzeit.');
+      return;
+    }
+    if (new Date(endsAt) <= new Date(startsAt)) {
+      setTimeError('Das Kursende muss nach dem Kursstart liegen.');
+      return;
+    }
+    setTimeError('');
+    if (editingCourse) {
+      edit.mutate({
+        id: editingCourse.id,
+        data: {
+          title: form.title, instructor: form.instructor, room: form.room,
+          startsAt, endsAt,
+          revision: editingCourse.revision,
+        },
+      }, {
+        onSuccess: () => {
+          void client.invalidateQueries({ queryKey: getListCoursesQueryKey() });
+          void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+          setOpen(false); setEditingCourse(null);
+        },
+      });
+      return;
+    }
     create.mutate({
       data: {
         ...form, capacity: Number(form.capacity), studioId,
-        startsAt: new Date(form.startsAt).toISOString(), endsAt: new Date(form.endsAt).toISOString(),
+        startsAt, endsAt,
       },
     }, {
       onSuccess: () => {
@@ -497,18 +543,19 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   return <>
     <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button>} />
     {query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
-      <div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span></div>
+      <div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span><span className="course-date">{new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(course.startsAt))}</span></div>
       <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{district && <><strong data-testid={`text-course-studio-${course.id}`}>{course.studioName}</strong> · </>}{course.instructor} · {course.room}</p>
       <div className="course-card-bottom"><span><Users size={15} /> {course.enrolled} / {course.capacity}</span><span className={course.enrolled / course.capacity > .8 ? 'warning-text' : 'positive-text'}>{Math.round((course.enrolled / course.capacity) * 100)}% belegt</span></div>
       <div className="capacity-bar"><i style={{ width: `${Math.min(100, (course.enrolled / course.capacity) * 100)}%` }} /></div>
       {manager && <button className="button button-outline course-book-button" onClick={() => setRosterCourse(course)} data-testid={`button-course-roster-${course.id}`}><Users size={15} /> Teilnehmerliste ansehen</button>}
+      {manager && course.status !== 'cancelled' && new Date(course.startsAt).getTime() > Date.now() && <button className="button button-outline course-book-button" onClick={() => openEdit(course)} data-testid={`button-edit-course-${course.id}`}><Pencil size={15} /> Kurs bearbeiten</button>}
       {canBookMembers && course.status !== 'cancelled' && new Date(course.startsAt).getTime() > Date.now() && <button className="button button-outline course-book-button" onClick={() => { setBookingCourse(course); setBookingMemberId(''); setBookingResult(null); booking.reset(); }} data-testid={`button-book-course-${course.id}`}>Mitglied buchen <ArrowRight size={15} /></button>}
     </div>)}</div>}
     {manager && rosterCourse && <CourseRoster key={rosterCourse.id} course={rosterCourse} onClose={() => setRosterCourse(null)} />}
     {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}
-    {me.role !== 'studio_employee' && open && <Modal title="Neuen Kurs planen" onClose={() => setOpen(false)}>
+    {me.role !== 'studio_employee' && open && <Modal title={editingCourse ? 'Kurs bearbeiten' : 'Neuen Kurs planen'} onClose={() => { setOpen(false); setEditingCourse(null); }}>
       <form onSubmit={submit} className="modal-form">
-        {district ? <>
+        {editingCourse ? <p className="booking-hint">Studio: <strong>{editingCourse.studioName}</strong></p> : district ? <>
           <label className="field">
             <span>Zielstudio</span>
             <select required value={selectedStudio} onChange={event => { setSelectedStudio(event.target.value); setStudioError(''); create.reset(); }} disabled={studios.isLoading || studios.isError || create.isPending} data-testid="select-course-studio">
@@ -522,19 +569,21 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
         </> : <p className="booking-hint">Zielstudio: <strong>{me.studioName || 'Kein Studio zugeordnet'}</strong></p>}
         <TextField label="Kursname" name="course-title" value={form.title} onChange={update('title')} placeholder="z. B. Yoga Flow" />
         <TextField label="Trainer:in" name="course-instructor" value={form.instructor} onChange={update('instructor')} />
-        <div className="field-grid">
-          <TextField label="Beginn" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" />
-          <TextField label="Ende" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" />
+          <div className="field-grid">
+          <TextField label="Beginn (Berlin)" name="course-start" value={form.startsAt} onChange={update('startsAt')} type="datetime-local" />
+          <TextField label="Ende (Berlin)" name="course-end" value={form.endsAt} onChange={update('endsAt')} type="datetime-local" />
         </div>
         <div className="field-grid">
-          <TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" />
+          {!editingCourse && <TextField label="Kapazität" name="course-capacity" value={form.capacity} onChange={update('capacity')} type="number" />}
           <TextField label="Raum" name="course-room" value={form.room} onChange={update('room')} />
         </div>
+        {editingCourse && <p className="booking-hint">Änderungen werden gebuchten Mitgliedern als Hinweis angezeigt und bei aktivierten Browser-Benachrichtigungen zusätzlich per Push gesendet.</p>}
         {studioError && <p className="form-error" role="alert" data-testid="error-course-studio">{studioError}</p>}
-        {create.isError && <p className="form-error" role="alert" data-testid="error-create-course">
-          {(create.error as { data?: { error?: string } } | null)?.data?.error || 'Kurs konnte nicht gespeichert werden.'}
+        {timeError && <p className="form-error" role="alert" data-testid="error-course-time">{timeError}</p>}
+        {(editingCourse ? edit.isError : create.isError) && <p className="form-error" role="alert" data-testid={editingCourse ? 'error-edit-course' : 'error-create-course'}>
+          {((editingCourse ? edit.error : create.error) as { data?: { error?: string } } | null)?.data?.error || 'Kurs konnte nicht gespeichert werden.'}
         </p>}
-        <button className="button button-dark button-wide" disabled={create.isPending || !allowedStudio || (district && (studios.isLoading || studios.isError))} data-testid="button-save-course"><Check size={16} /> Kurs speichern</button>
+        <button className="button button-dark button-wide" disabled={create.isPending || edit.isPending || !allowedStudio || (district && (studios.isLoading || studios.isError))} data-testid={editingCourse ? 'button-save-course-edit' : 'button-save-course'}><Check size={16} /> {editingCourse ? 'Änderungen speichern' : 'Kurs speichern'}</button>
       </form>
     </Modal>}
   </>;

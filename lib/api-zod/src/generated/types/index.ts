@@ -39,6 +39,7 @@ export * from './courseInput';
 export * from './courseRosterBooking';
 export * from './courseRosterBookingStatus';
 export * from './courseStatus';
+export * from './courseUpdate';
 export * from './dashboard';
 export * from './dashboardActivity';
 export * from './dashboardActivityCategory';

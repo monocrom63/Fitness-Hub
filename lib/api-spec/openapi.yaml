@@ -306,6 +306,32 @@ paths:
           description: Insufficient role or studio access
         "409":
           description: The room is closed or occupied, or the trainer is absent on the course date
+  /courses/{id}:
+    patch:
+      operationId: updateCourse
+      tags: [portal]
+      summary: Edit a future scheduled or full course and notify its booked members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CourseUpdate" }
+      responses:
+        "200":
+          description: Updated course; in-app notices committed and push deliveries queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+        "400": { description: Invalid course fields or interval }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required }
+        "404": { description: Course not found in accessible studio }
+        "409": { description: "Stale revision, past or cancelled course, trainer absence, room closure, or overlap" }
   /trainer-absences:
     get:
       operationId: listTrainerAbsences
@@ -1342,7 +1368,7 @@ components:
         status: { $ref: "#/components/schemas/MemberStatus" }
     Course:
       type: object
-      required: [id, title, instructor, studioId, studioName, startsAt, endsAt, capacity, enrolled, room, status]
+      required: [id, title, instructor, studioId, studioName, startsAt, endsAt, capacity, enrolled, room, status, revision]
       properties:
         id: { type: integer }
         title: { type: string }
@@ -1355,6 +1381,18 @@ components:
         enrolled: { type: integer }
         room: { type: string }
         status: { type: string, enum: [scheduled, full, cancelled] }
+        revision: { type: integer, minimum: 1 }
+    CourseUpdate:
+      type: object
+      additionalProperties: false
+      required: [title, instructor, startsAt, endsAt, room, revision]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 120 }
+        instructor: { type: string, minLength: 2, maxLength: 120 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        room: { type: string, minLength: 1, maxLength: 80 }
+        revision: { type: integer, minimum: 1 }
     TrainerAbsenceInput:
       type: object
       additionalProperties: false

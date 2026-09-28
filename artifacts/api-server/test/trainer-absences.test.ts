@@ -6,7 +6,7 @@ import { test } from "node:test";
 import express from "express";
 import { and, eq, inArray } from "drizzle-orm";
 import {
-  courseBookingsTable, courseClosureResolutionsTable, coursesTable, db, memberNotificationsTable,
+  courseBookingsTable, courseClosureResolutionsTable, courseEditPushDeliveriesTable, coursesTable, db, memberNotificationsTable,
   memberPushSubscriptionsTable, membersTable, organizationsTable,
   pulseMessagesTable, roomClosuresTable, staffTable, studiosTable, trainerAbsenceCoursesTable,
   trainerAbsencePushDeliveriesTable, trainerAbsencesTable,
@@ -75,9 +75,23 @@ test("manager records an absence, resolves all affected courses and notifies mem
       studioId: studio.id, fullName: `Member ${index}`,
       email: `member-${index}-${suffix}@example.invalid`, membershipType: "Basic", status: "active",
     }))).returning();
-    await db.insert(courseBookingsTable).values([morning, midday, evening].map((course, index) => ({
+    const bookings = await db.insert(courseBookingsTable).values([morning, midday, evening].map((course, index) => ({
       courseId: course.id, memberId: members[index].id, status: "confirmed",
-    })));
+    }))).returning();
+    for (const [courseIndex, course] of [[0, morning], [1, midday]] as const) {
+      await db.insert(courseEditPushDeliveriesTable).values(["pending", "failed", "sending"].map((status, index) => ({
+        courseId: course.id,
+        courseRevision: 1,
+        bookingId: bookings[courseIndex].id,
+        memberId: members[courseIndex].id,
+        subscriptionId: `absence-edit-${suffix}-${courseIndex}-${index}`,
+        title: "Course update",
+        body: "Course details changed.",
+        idempotencyKey: `absence-edit-${suffix}-${courseIndex}-${index}`,
+        status,
+        ...(status === "sending" ? { claimToken: `absence-claim-${suffix}-${courseIndex}` } : {}),
+      })));
+    }
     await db.insert(memberPushSubscriptionsTable).values({
       memberId: members[0].id, subscriptionId: `test-${suffix}`,
     });
@@ -245,6 +259,11 @@ test("manager records an absence, resolves all affected courses and notifies mem
       { action: "replace", candidateName: "Sarah" });
     assert.equal(replaced.status, 200, JSON.stringify(replaced.body));
     assert.equal(replaced.body.instructor, "Sarah");
+    assert.equal((await db.select().from(coursesTable).where(eq(coursesTable.id, morning.id)))[0].revision, 2);
+    const replacedDeliveries = await db.select().from(courseEditPushDeliveriesTable)
+      .where(eq(courseEditPushDeliveriesTable.courseId, morning.id));
+    assert.equal(replacedDeliveries.length, 3);
+    assert.ok(replacedDeliveries.every((delivery) => delivery.status === "skipped" && delivery.claimToken === null));
     assert.equal(replaced.body.pushFailed, 1);
     assert.equal(sends.length, 1);
     assert.deepEqual(sends[0].body.data, { courseId: morning.id, memberId: members[0].id });
@@ -288,7 +307,13 @@ test("manager records an absence, resolves all affected courses and notifies mem
     const [cancelledBooking] = await db.select().from(courseBookingsTable)
       .where(eq(courseBookingsTable.courseId, midday.id));
     assert.equal(cancelledBooking.status, "cancelled");
-    assert.equal((await db.select().from(coursesTable).where(eq(coursesTable.id, midday.id)))[0].status, "cancelled");
+    const [cancelledCourse] = await db.select().from(coursesTable).where(eq(coursesTable.id, midday.id));
+    assert.equal(cancelledCourse.status, "cancelled");
+    assert.equal(cancelledCourse.revision, 2);
+    const cancelledDeliveries = await db.select().from(courseEditPushDeliveriesTable)
+      .where(eq(courseEditPushDeliveriesTable.courseId, midday.id));
+    assert.equal(cancelledDeliveries.length, 3);
+    assert.ok(cancelledDeliveries.every((delivery) => delivery.status === "skipped" && delivery.claimToken === null));
     const updatedAbsence = await api(manager.clerkUserId, "GET", "/trainer-absences");
     assert.equal(updatedAbsence.status, 200);
     assert.equal(updatedAbsence.body.find((item: any) => item.id === created.body.id)

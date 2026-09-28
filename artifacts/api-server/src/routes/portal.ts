@@ -96,6 +96,7 @@ function serializeCourse(course: {
   enrolled: number;
   room: string;
   status: string;
+  revision: number;
 }) {
   return {
     ...course,
@@ -435,6 +436,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
           enrolled: coursesTable.enrolled,
           room: coursesTable.room,
           status: coursesTable.status,
+          revision: coursesTable.revision,
         })
         .from(coursesTable)
         .innerJoin(studiosTable, eq(coursesTable.studioId, studiosTable.id))
@@ -490,6 +492,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
           enrolled: coursesTable.enrolled,
           room: coursesTable.room,
           status: coursesTable.status,
+          revision: coursesTable.revision,
         })
         .from(coursesTable)
         .innerJoin(studiosTable, eq(coursesTable.studioId, studiosTable.id))
@@ -782,6 +785,7 @@ router.get("/courses", async (req, res): Promise<void> => {
           enrolled: coursesTable.enrolled,
           room: coursesTable.room,
           status: coursesTable.status,
+          revision: coursesTable.revision,
         })
         .from(coursesTable)
         .innerJoin(studiosTable, eq(coursesTable.studioId, studiosTable.id))

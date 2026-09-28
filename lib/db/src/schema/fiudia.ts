@@ -1,5 +1,6 @@
 import {
   date,
+  index,
   integer,
   pgTable,
   serial,
@@ -132,6 +133,7 @@ export const coursesTable = pgTable("fiudia_courses", {
   enrolled: integer("enrolled").notNull().default(0),
   room: text("room").notNull(),
   status: text("status").notNull().default("scheduled"),
+  revision: integer("revision").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -278,6 +280,35 @@ export const memberPushSubscriptionsTable = pgTable("fiudia_member_push_subscrip
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const courseEditPushDeliveriesTable = pgTable(
+  "fiudia_course_edit_push_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id").notNull().references(() => coursesTable.id, { onDelete: "cascade" }),
+    courseRevision: integer("course_revision").notNull(),
+    bookingId: integer("booking_id").notNull().references(() => courseBookingsTable.id, { onDelete: "cascade" }),
+    memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+    subscriptionId: text("subscription_id").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    status: text("status").notNull().default("pending"),
+    error: text("error"),
+    providerId: text("provider_id"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    claimToken: text("claim_token"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("fiudia_course_edit_push_ready").on(table.status, table.nextAttemptAt, table.createdAt),
+    unique("fiudia_course_edit_push_revision_booking_subscription")
+      .on(table.courseId, table.courseRevision, table.bookingId, table.subscriptionId),
+  ],
+);
 
 export const courseClosureResolutionsTable = pgTable(
   "fiudia_course_closure_resolutions",

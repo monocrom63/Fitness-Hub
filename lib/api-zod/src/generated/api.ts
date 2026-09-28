@@ -134,6 +134,9 @@ export const GetDashboardQueryParams = zod.object({
   "studioId": zod.coerce.number().int().optional()
 })
 
+
+
+
 export const GetDashboardResponse = zod.object({
   "role": zod.enum(['district_manager', 'studio_manager', 'studio_employee']),
   "userName": zod.string(),
@@ -162,7 +165,8 @@ export const GetDashboardResponse = zod.object({
   "capacity": zod.number().int(),
   "enrolled": zod.number().int(),
   "room": zod.string(),
-  "status": zod.enum(['scheduled', 'full', 'cancelled'])
+  "status": zod.enum(['scheduled', 'full', 'cancelled']),
+  "revision": zod.number().int().min(1)
 }))
 })
 
@@ -277,6 +281,9 @@ export const ListCoursesQueryParams = zod.object({
   "studioId": zod.coerce.number().int().optional()
 })
 
+
+
+
 export const ListCoursesResponseItem = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
@@ -288,7 +295,8 @@ export const ListCoursesResponseItem = zod.object({
   "capacity": zod.number().int(),
   "enrolled": zod.number().int(),
   "room": zod.string(),
-  "status": zod.enum(['scheduled', 'full', 'cancelled'])
+  "status": zod.enum(['scheduled', 'full', 'cancelled']),
+  "revision": zod.number().int().min(1)
 })
 export const ListCoursesResponse = zod.array(ListCoursesResponseItem)
 
@@ -318,6 +326,9 @@ export const CreateCourseBody = zod.object({
   "room": zod.string().min(1).max(createCourseBodyRoomMax)
 })
 
+
+
+
 export const CreateCourseResponse = zod.object({
   "id": zod.number().int(),
   "title": zod.string(),
@@ -329,7 +340,54 @@ export const CreateCourseResponse = zod.object({
   "capacity": zod.number().int(),
   "enrolled": zod.number().int(),
   "room": zod.string(),
-  "status": zod.enum(['scheduled', 'full', 'cancelled'])
+  "status": zod.enum(['scheduled', 'full', 'cancelled']),
+  "revision": zod.number().int().min(1)
+})
+
+
+/**
+ * @summary Edit a future scheduled or full course and notify its booked members
+ */
+export const UpdateCourseParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateCourseBodyTitleMin = 2;
+export const updateCourseBodyTitleMax = 120;
+
+export const updateCourseBodyInstructorMin = 2;
+export const updateCourseBodyInstructorMax = 120;
+
+export const updateCourseBodyRoomMax = 80;
+
+
+
+
+export const UpdateCourseBody = zod.object({
+  "title": zod.string().min(updateCourseBodyTitleMin).max(updateCourseBodyTitleMax),
+  "instructor": zod.string().min(updateCourseBodyInstructorMin).max(updateCourseBodyInstructorMax),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "room": zod.string().min(1).max(updateCourseBodyRoomMax),
+  "revision": zod.number().int().min(1)
+})
+
+
+
+
+export const UpdateCourseResponse = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "status": zod.enum(['scheduled', 'full', 'cancelled']),
+  "revision": zod.number().int().min(1)
 })
 
 

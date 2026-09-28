@@ -19,4 +19,6 @@ export interface Course {
   enrolled: number;
   room: string;
   status: CourseStatus;
+  /** @minimum 1 */
+  revision: number;
 }

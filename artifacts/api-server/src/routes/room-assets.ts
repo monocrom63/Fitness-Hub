@@ -54,6 +54,7 @@ import {
   processResolutionPushDeliveries,
 } from "../lib/closure-push";
 import { listClosureResolutionsForStudio } from "../lib/closure-resolutions";
+import { supersedeCourseEditPushDeliveries } from "../lib/course-edit-deliveries";
 import {
   canAccessStudio,
   canManageCourses,
@@ -567,11 +568,18 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
     }).returning();
 
     if (request.action === "relocate") {
-      await tx.update(coursesTable).set({ room: request.room!.trim() })
+      await tx.update(coursesTable).set({
+        room: request.room!.trim(),
+        revision: lockedCourse.revision + 1,
+      })
         .where(eq(coursesTable.id, lockedCourse.id));
     } else {
       await invalidateCoursePromotionNotices(lockedCourse.id, lockedCourse.title, tx);
-      await tx.update(coursesTable).set({ status: "cancelled", enrolled: 0 })
+      await tx.update(coursesTable).set({
+        status: "cancelled",
+        enrolled: 0,
+        revision: lockedCourse.revision + 1,
+      })
         .where(eq(coursesTable.id, lockedCourse.id));
       await tx.update(courseBookingsTable).set({ status: "cancelled" }).where(and(
         eq(courseBookingsTable.courseId, lockedCourse.id),
@@ -579,6 +587,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
       ));
       await settleCancelledTrainerCourse(lockedCourse.id, staff.id, tx);
     }
+    await supersedeCourseEditPushDeliveries(lockedCourse.id, tx);
 
     if (request.channel === "in_app" || request.channel === "push") {
       if (activeBookings.length) {
