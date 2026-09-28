@@ -1,10 +1,10 @@
-import { and, asc, count, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   BookMemberCourseParams, BookMemberCourseResponse,
   CancelMemberCourseParams, CancelMemberCourseResponse,
   ClaimMembershipBody, ClaimMembershipResponse,
-  GetMemberHomeResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
+  GetMemberHomeResponse, GetMemberNotificationUnreadCountResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
   ListMemberNotificationsQueryParams, ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
   RegisterMemberPushSubscriptionBody, RegisterMemberPushSubscriptionResponse,
@@ -333,6 +333,22 @@ router.get("/member/check-ins", async (req, res): Promise<void> => {
     .where(eq(checkInsTable.memberId, member.id))
     .orderBy(desc(checkInsTable.checkedInAt)).limit(50);
   res.json(ListMemberCheckInsResponse.parse(checkIns));
+});
+
+router.get("/member/notifications/unread-count", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Mitgliedschaft zuerst verbinden." }); return; }
+  if (!(await isModuleEnabled(member.organizationId, "courses"))) {
+    res.status(404).json({ error: "Kurse sind nicht verfügbar." }); return;
+  }
+  const [result] = await db.select({ count: count() }).from(memberNotificationsTable)
+    .where(and(
+      eq(memberNotificationsTable.memberId, member.id),
+      isNull(memberNotificationsTable.readAt),
+    ));
+  res.json(GetMemberNotificationUnreadCountResponse.parse(result));
 });
 
 router.get("/member/notifications", async (req, res): Promise<void> => {

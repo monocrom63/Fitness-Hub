@@ -1012,6 +1012,17 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/MemberNotification" }
+  /member/notifications/unread-count:
+    get:
+      operationId: getMemberNotificationUnreadCount
+      tags: [member-app]
+      summary: Count unread notifications belonging to the signed-in member
+      responses:
+        "200":
+          description: Own unread notification count across the entire history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberNotificationUnreadCount" }
   /member/notifications/{id}/read:
     patch:
       operationId: markMemberNotificationRead
@@ -1785,6 +1796,11 @@ components:
         createdAt: { type: string, format: date-time }
         readAt: { type: ["string", "null"], format: date-time }
         emailDeliveryStatus: { type: ["string", "null"], enum: [pending, sending, sent, failed, skipped, null] }
+    MemberNotificationUnreadCount:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer, minimum: 0 }
     ModuleKey:
       type: string
       enum: [members, courses, pulse, team]

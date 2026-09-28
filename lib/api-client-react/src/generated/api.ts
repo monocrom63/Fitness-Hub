@@ -60,6 +60,7 @@ import type {
   MemberLinkInput,
   MemberNotification,
   MemberNotificationSettings,
+  MemberNotificationUnreadCount,
   MemberUpdate,
   ModuleKey,
   ModuleSetting,
@@ -4080,6 +4081,83 @@ export function useListMemberNotifications<TData = Awaited<ReturnType<typeof lis
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMemberNotificationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMemberNotificationUnreadCountUrl = () => {
+
+
+
+
+  return `/api/member/notifications/unread-count`
+}
+
+/**
+ * @summary Count unread notifications belonging to the signed-in member
+ */
+export const getMemberNotificationUnreadCount = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberNotificationUnreadCount> => {
+
+  return customFetch<MemberNotificationUnreadCount>(getGetMemberNotificationUnreadCountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMemberNotificationUnreadCountQueryKey = () => {
+    return [
+    `/api/member/notifications/unread-count`
+    ] as const;
+    }
+
+
+export const getGetMemberNotificationUnreadCountQueryOptions = <TData = Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMemberNotificationUnreadCountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>> = ({ signal }) => getMemberNotificationUnreadCount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMemberNotificationUnreadCountQueryResult = NonNullable<Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>>
+export type GetMemberNotificationUnreadCountQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Count unread notifications belonging to the signed-in member
+ */
+
+export function useGetMemberNotificationUnreadCount<TData = Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberNotificationUnreadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMemberNotificationUnreadCountQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

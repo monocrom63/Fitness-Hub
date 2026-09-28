@@ -13,7 +13,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotifications, useNotificationRead } from '@/hooks/use-member';
+import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { memberNotificationArchiveQueryOptions } from './notification-history';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
@@ -106,12 +106,12 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
         setSigningOut(false);
       });
   };
-  const notifications = useMemberNotifications(Boolean(member && home?.coursesEnabled));
+  const unreadCount = useMemberNotificationUnreadCount(Boolean(member && home?.coursesEnabled));
   useEffect(() => {
     if (!member || !home?.coursesEnabled) return;
     return listenForCoursePushClicks(member.id, target => navigate(target));
   }, [member, home?.coursesEnabled, navigate]);
-  const unread = notifications.data?.filter(item => !item.readAt).length ?? 0;
+  const unread = unreadCount.data?.count ?? 0;
   const nav = [
     { href: '/', label: 'Heute', icon: Activity },
     ...(member && home?.coursesEnabled ? [{ href: '/courses', label: 'Kurse', icon: CalendarDays }] : []),

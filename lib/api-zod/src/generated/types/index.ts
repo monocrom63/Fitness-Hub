@@ -74,6 +74,7 @@ export * from './memberLinkInput';
 export * from './memberNotification';
 export * from './memberNotificationEmailDeliveryStatus';
 export * from './memberNotificationSettings';
+export * from './memberNotificationUnreadCount';
 export * from './memberStatus';
 export * from './memberUpdate';
 export * from './moduleKey';

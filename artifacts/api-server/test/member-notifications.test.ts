@@ -81,6 +81,16 @@ test("members can read and acknowledge only their own course notifications", asy
 
     assert.equal((await request(null, "GET", "/member/notifications")).status, 401);
     assert.equal((await request("unlinked", "GET", "/member/notifications")).status, 403);
+    const unreadCountPath = "/member/notifications/unread-count";
+    const unreadCount = async (user: string | null) => {
+      const response = await request(user, "GET", unreadCountPath);
+      assert.equal(response.status, 200);
+      return (response.body as { count: number }).count;
+    };
+    assert.equal((await request(null, "GET", unreadCountPath)).status, 401);
+    assert.equal((await request("unlinked", "GET", unreadCountPath)).status, 403);
+    assert.equal(await unreadCount(own.clerkUserId), 1);
+    assert.equal(await unreadCount(other.clerkUserId), 1);
     const settings = "/member/notification-settings";
     assert.equal((await request(null, "PATCH", settings, { waitlistEmailEnabled: true })).status, 401);
     assert.equal((await request("unlinked", "PATCH", settings, { waitlistEmailEnabled: true })).status, 403);
@@ -102,6 +112,8 @@ test("members can read and acknowledge only their own course notifications", asy
     assert.equal(marked.status, 200);
     assert.ok((marked.body as { readAt: string }).readAt);
     assert.equal((marked.body as { emailDeliveryStatus: string | null }).emailDeliveryStatus, null);
+    assert.equal(await unreadCount(own.clerkUserId), 0);
+    assert.equal(await unreadCount(other.clerkUserId), 1);
     assert.equal((await request(other.clerkUserId, "GET", "/member/notifications")).status, 200);
 
     await cancelCourseBooking(course.id, own.id);
@@ -214,6 +226,10 @@ test("members can read and acknowledge only their own course notifications", asy
       firstPageItems.every(({ courseId }) => courseId !== historicalCourse.id),
       "the distinct historical course is not linked from the first page",
     );
+    assert.equal(await unreadCount(own.clerkUserId), 56,
+      "count includes 55 new notices and the older notice beyond the first page");
+    assert.equal(await unreadCount(other.clerkUserId), 1,
+      "another account cannot see the first member's unread notices");
     assert.deepEqual(await courseIds(
       own.clerkUserId,
       `/member/courses?courseId=${firstPageItems[0].courseId}`,
@@ -240,6 +256,16 @@ test("members can read and acknowledge only their own course notifications", asy
       [],
       "another member cannot access the historical course through this notice",
     );
+    assert.equal(
+      (await request(own.clerkUserId, "PATCH", `/member/notifications/${pagedNotices[0].id}/read`)).status,
+      200,
+    );
+    assert.equal(await unreadCount(own.clerkUserId), 55, "reading an older notice updates the count");
+    assert.equal(
+      (await request(own.clerkUserId, "PATCH", `/member/notifications/${pagedNotices[0].id}/read`)).status,
+      200,
+    );
+    assert.equal(await unreadCount(own.clerkUserId), 55, "repeated marking cannot reduce the count twice");
     for (const invalidCursor of ["0", "-1", "1.5", "invalid", String(Number.MAX_SAFE_INTEGER)]) {
       assert.equal(
         (await request(own.clerkUserId, "GET", `/member/notifications?beforeId=${invalidCursor}`)).status,

@@ -1273,6 +1273,18 @@ export const ListMemberNotificationsResponse = zod.array(ListMemberNotifications
 
 
 /**
+ * @summary Count unread notifications belonging to the signed-in member
+ */
+export const getMemberNotificationUnreadCountResponseCountMin = 0;
+
+
+
+export const GetMemberNotificationUnreadCountResponse = zod.object({
+  "count": zod.number().int().min(getMemberNotificationUnreadCountResponseCountMin)
+})
+
+
+/**
  * @summary Mark an own notification as read
  */
 export const MarkMemberNotificationReadParams = zod.object({

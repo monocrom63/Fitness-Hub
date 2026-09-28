@@ -743,6 +743,11 @@ export interface MemberNotification {
   emailDeliveryStatus: MemberNotificationEmailDeliveryStatus;
 }
 
+export interface MemberNotificationUnreadCount {
+  /** @minimum 0 */
+  count: number;
+}
+
 export type ModuleKey = typeof ModuleKey[keyof typeof ModuleKey];
 
 
