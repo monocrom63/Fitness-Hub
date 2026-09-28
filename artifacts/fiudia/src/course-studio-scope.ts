@@ -36,6 +36,34 @@ export function chooseAccessibleStudio(
     ?? available[0];
 }
 
+const cityKey = (city: string) => city.trim().toLocaleLowerCase('de-DE');
+
+export function cityChoices(available: StudioSummary[]): Array<{ name: string; studioCount: number }> {
+  const cities = new Map<string, { name: string; studioCount: number }>();
+  for (const studio of available) {
+    const name = studio.city.trim();
+    if (!name) continue;
+    const key = cityKey(name);
+    const existing = cities.get(key);
+    if (existing) existing.studioCount += 1;
+    else cities.set(key, { name, studioCount: 1 });
+  }
+  return [...cities.values()].sort((a, b) => a.name.localeCompare(b.name, 'de-DE'));
+}
+
+export function studiosInCity(available: StudioSummary[], city: string | null): StudioSummary[] {
+  return city ? available.filter(studio => cityKey(studio.city) === cityKey(city)) : [];
+}
+
+export function chooseStudioForCity(
+  available: StudioSummary[],
+  city: string,
+  selectedStudioId: number | null,
+): StudioSummary | undefined {
+  const matching = studiosInCity(available, city);
+  return matching.find(studio => studio.id === selectedStudioId) ?? matching[0];
+}
+
 export function courseQueryScope(district: boolean, selectedStudioId: number | null) {
   const params = district && selectedStudioId ? { studioId: selectedStudioId } : undefined;
   return {

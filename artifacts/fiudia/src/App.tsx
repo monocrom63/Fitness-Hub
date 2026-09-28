@@ -6,7 +6,7 @@ import { shadcn } from '@clerk/themes';
 import { deDE } from '@clerk/localizations';
 import {
   Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Copy, Dumbbell,
-  LayoutDashboard, LogOut, Mail, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2, DoorOpen,
+  LayoutDashboard, LogOut, Mail, MapPin, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2, DoorOpen,
   ShieldCheck, Sparkles, Users, UserRound, X, Zap,
 } from 'lucide-react';
 import {
@@ -173,10 +173,11 @@ function TextField({ label, name, value, onChange, type = 'text', placeholder }:
 
 function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me; modules: ModuleSetting[] }) {
   const [location, setLocation] = useLocation();
-  const { selectedStudioId, selectedStudioName, selectStudio, studios } = useStudioScope();
+  const { selectedStudioId, selectedStudioName, selectedCity, cities, cityStudios, selectCity, selectStudio, studios } = useStudioScope();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [studioOpen, setStudioOpen] = useState(false);
-  const studioRef = useRef<HTMLDivElement>(null);
+  const [openSwitcher, setOpenSwitcher] = useState<'city' | 'studio' | null>(null);
+  const switchersRef = useRef<HTMLDivElement>(null);
+  const cityTriggerRef = useRef<HTMLButtonElement>(null);
   const studioTriggerRef = useRef<HTMLButtonElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -198,14 +199,14 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
     };
   }, [profileOpen]);
   useEffect(() => {
-    if (!studioOpen) return;
+    if (!openSwitcher) return;
     const closeOnOutside = (event: PointerEvent) => {
-      if (!studioRef.current?.contains(event.target as Node)) setStudioOpen(false);
+      if (!switchersRef.current?.contains(event.target as Node)) setOpenSwitcher(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setStudioOpen(false);
-        studioTriggerRef.current?.focus();
+        setOpenSwitcher(null);
+        (openSwitcher === 'city' ? cityTriggerRef : studioTriggerRef).current?.focus();
       }
     };
     document.addEventListener('pointerdown', closeOnOutside);
@@ -214,7 +215,7 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
       document.removeEventListener('pointerdown', closeOnOutside);
       document.removeEventListener('keydown', closeOnEscape);
     };
-  }, [studioOpen]);
+  }, [openSwitcher]);
   const nav = [
     { href: '/dashboard', label: 'Today', icon: LayoutDashboard },
     ...(moduleEnabled(modules, 'pulse') ? [{ href: '/pulse', label: 'Pulse', icon: Activity }] : []),
@@ -228,35 +229,67 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar-top"><Brand light /><button className="icon-button sidebar-close" onClick={() => setMobileOpen(false)} data-testid="button-close-navigation"><X size={18} /></button></div>
       {me.role === 'district_manager'
-        ? <div className="workspace-menu" ref={studioRef}>
-          <button type="button" ref={studioTriggerRef} className={`workspace-switcher workspace-trigger ${studioOpen ? 'workspace-trigger-open' : ''}`}
-            aria-label="Aktives Studio wechseln" aria-expanded={studioOpen}
-            aria-controls={studioOpen ? 'studio-switcher-options' : undefined}
-            disabled={!studios.data?.length}
-            onClick={() => setStudioOpen(open => !open)} data-testid="select-active-studio">
-            <span className="workspace-dot">{initials(selectedStudioName || me.organizationName || 'F')}</span>
-            <span className="workspace-copy"><strong>{selectedStudioName || (studios.isLoading ? 'Studios laden …' : 'Kein Studio vorhanden')}</strong><span>{me.organizationName || 'Organisation'} · Studio wechseln</span></span>
-            <ChevronDown className="workspace-chevron" size={16} aria-hidden="true" />
-          </button>
-          {studioOpen && <div className="workspace-options" id="studio-switcher-options" aria-label="Studio auswählen">
-            <div className="workspace-options-heading">DEINE STUDIOS</div>
-            <div className="workspace-options-list">
-              {studios.data?.map(studio => <button type="button" key={studio.id}
-                className={`workspace-option ${studio.id === selectedStudioId ? 'workspace-option-active' : ''}`}
-                aria-current={studio.id === selectedStudioId ? 'true' : undefined}
-                onClick={() => {
-                  if (location === '/rooms') setLocation('/rooms', { replace: true });
-                  selectStudio(studio.id);
-                  setStudioOpen(false);
-                  setMobileOpen(false);
-                  if (!mobileOpen) studioTriggerRef.current?.focus();
-                }} data-testid={`button-select-studio-${studio.id}`}>
-                <span className="workspace-option-icon">{initials(studio.name)}</span>
-                <span className="workspace-option-copy"><strong>{studio.name}</strong><small>{studio.city}</small></span>
-                {studio.id === selectedStudioId && <Check size={16} aria-hidden="true" />}
-              </button>)}
-            </div>
-          </div>}
+        ? <div className="workspace-switchers" ref={switchersRef}>
+          <div className="workspace-menu">
+            <button type="button" ref={cityTriggerRef} className={`workspace-switcher workspace-trigger ${openSwitcher === 'city' ? 'workspace-trigger-open' : ''}`}
+              aria-label="Aktive Stadt wechseln" aria-expanded={openSwitcher === 'city'}
+              aria-controls={openSwitcher === 'city' ? 'city-switcher-options' : undefined}
+              disabled={!cities.length}
+              onClick={() => setOpenSwitcher(current => current === 'city' ? null : 'city')} data-testid="select-active-city">
+              <span className="workspace-dot"><MapPin size={16} aria-hidden="true" /></span>
+              <span className="workspace-copy"><strong>{selectedCity || (studios.isLoading ? 'Städte laden …' : 'Keine Stadt vorhanden')}</strong><span>{me.organizationName || 'Organisation'} · Stadt wechseln</span></span>
+              <ChevronDown className="workspace-chevron" size={16} aria-hidden="true" />
+            </button>
+            {openSwitcher === 'city' && <div className="workspace-options" id="city-switcher-options" aria-label="Stadt auswählen">
+              <div className="workspace-options-heading">DEINE STÄDTE</div>
+              <div className="workspace-options-list">
+                {cities.map(city => <button type="button" key={city.name}
+                  className={`workspace-option ${city.name === selectedCity ? 'workspace-option-active' : ''}`}
+                  aria-current={city.name === selectedCity ? 'true' : undefined}
+                  onClick={() => {
+                    if (location === '/rooms') setLocation('/rooms', { replace: true });
+                    selectCity(city.name);
+                    setOpenSwitcher(null);
+                    setMobileOpen(false);
+                    if (!mobileOpen) cityTriggerRef.current?.focus();
+                  }} data-testid={`button-select-city-${city.name}`}>
+                  <span className="workspace-option-icon"><MapPin size={14} aria-hidden="true" /></span>
+                  <span className="workspace-option-copy"><strong>{city.name}</strong><small>{city.studioCount} {city.studioCount === 1 ? 'Studio' : 'Studios'}</small></span>
+                  {city.name === selectedCity && <Check size={16} aria-hidden="true" />}
+                </button>)}
+              </div>
+            </div>}
+          </div>
+          <div className="workspace-menu">
+            <button type="button" ref={studioTriggerRef} className={`workspace-switcher workspace-trigger ${openSwitcher === 'studio' ? 'workspace-trigger-open' : ''}`}
+              aria-label="Aktives Studio wechseln" aria-expanded={openSwitcher === 'studio'}
+              aria-controls={openSwitcher === 'studio' ? 'studio-switcher-options' : undefined}
+              disabled={!cityStudios.length}
+              onClick={() => setOpenSwitcher(current => current === 'studio' ? null : 'studio')} data-testid="select-active-studio">
+              <span className="workspace-dot">{initials(selectedStudioName || me.organizationName || 'F')}</span>
+              <span className="workspace-copy"><strong>{selectedStudioName || (studios.isLoading ? 'Studios laden …' : 'Kein Studio vorhanden')}</strong><span>{selectedCity || me.organizationName || 'Organisation'} · Studio wechseln</span></span>
+              <ChevronDown className="workspace-chevron" size={16} aria-hidden="true" />
+            </button>
+            {openSwitcher === 'studio' && <div className="workspace-options" id="studio-switcher-options" aria-label="Studio auswählen">
+              <div className="workspace-options-heading">STUDIOS IN DEINER STADT</div>
+              <div className="workspace-options-list">
+                {cityStudios.map(studio => <button type="button" key={studio.id}
+                  className={`workspace-option ${studio.id === selectedStudioId ? 'workspace-option-active' : ''}`}
+                  aria-current={studio.id === selectedStudioId ? 'true' : undefined}
+                  onClick={() => {
+                    if (location === '/rooms') setLocation('/rooms', { replace: true });
+                    selectStudio(studio.id);
+                    setOpenSwitcher(null);
+                    setMobileOpen(false);
+                    if (!mobileOpen) studioTriggerRef.current?.focus();
+                  }} data-testid={`button-select-studio-${studio.id}`}>
+                  <span className="workspace-option-icon">{initials(studio.name)}</span>
+                  <span className="workspace-option-copy"><strong>{studio.name}</strong><small>{studio.city}</small></span>
+                  {studio.id === selectedStudioId && <Check size={16} aria-hidden="true" />}
+                </button>)}
+              </div>
+            </div>}
+          </div>
         </div>
         : <div className="workspace-switcher">
           <span className="workspace-dot">{initials(me.studioName || me.organizationName || 'F')}</span>

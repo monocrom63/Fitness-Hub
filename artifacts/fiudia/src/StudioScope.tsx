@@ -2,11 +2,15 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAuth } from '@clerk/react';
 import { getListStudiosQueryKey, useListStudios } from '@workspace/api-client-react';
 import type { Me, StudioSummary } from '@workspace/api-client-react';
-import { chooseAccessibleStudio, persistStudioId, readStoredStudioId, studioScopeStorageKey } from './course-studio-scope';
+import { chooseAccessibleStudio, chooseStudioForCity, cityChoices, persistStudioId, readStoredStudioId, studioScopeStorageKey, studiosInCity } from './course-studio-scope';
 
 type StudioScopeValue = {
   selectedStudioId: number | null;
   selectedStudioName: string | null;
+  selectedCity: string | null;
+  cities: ReturnType<typeof cityChoices>;
+  cityStudios: StudioSummary[];
+  selectCity: (city: string) => void;
   selectStudio: (id: number) => void;
   studios: ReturnType<typeof useListStudios<StudioSummary[]>>;
 };
@@ -34,6 +38,9 @@ export function StudioScopeProvider({ me, children }: { me: Me; children: ReactN
   const selectedStudio = chooseAccessibleStudio(available, chosenId, me.studioId ?? null);
   const selectedStudioId = district ? selectedStudio?.id ?? null : me.studioId ?? null;
   const selectedStudioName = district ? selectedStudio?.name ?? null : me.studioName ?? null;
+  const cities = cityChoices(available);
+  const selectedCity = cities.find(city => selectedStudio && studiosInCity([selectedStudio], city.name).length > 0)?.name ?? null;
+  const cityStudios = studiosInCity(available, selectedCity);
 
   useEffect(() => {
     if (!district || !studios.isSuccess) return;
@@ -45,8 +52,13 @@ export function StudioScopeProvider({ me, children }: { me: Me; children: ReactN
     setChosenId(id);
     persistStudioId(storageKey, id, () => sessionStorage);
   };
+  const selectCity = (city: string) => {
+    if (!district) return;
+    const studio = chooseStudioForCity(available, city, selectedStudioId);
+    if (studio) selectStudio(studio.id);
+  };
 
-  return <StudioScopeContext.Provider value={{ selectedStudioId, selectedStudioName, selectStudio, studios }}>
+  return <StudioScopeContext.Provider value={{ selectedStudioId, selectedStudioName, selectedCity, cities, cityStudios, selectCity, selectStudio, studios }}>
     {children}
   </StudioScopeContext.Provider>;
 }
