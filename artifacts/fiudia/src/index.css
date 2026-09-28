@@ -407,9 +407,9 @@ button { cursor: pointer; }
 .workspace-switcher span { margin-top: 2px; color: rgba(242,244,249,.55); font-size: .68rem; }
 .workspace-switcher .workspace-dot { display: grid; place-items: center; margin-top: 0; color: #20293d; font-size: .64rem; }
 .workspace-menu { position: relative; margin: 0 5px 25px; }
-.workspace-switchers { display: grid; gap: 8px; margin: 0 5px 25px; }
-.workspace-switchers .workspace-menu { margin: 0; }
-.workspace-menu .workspace-switcher { width: 100%; margin: 0; }
+.workspace-switchers { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 8px; margin: 0 5px 25px; }
+.workspace-switchers .workspace-menu { min-width: 0; margin: 0; }
+.workspace-menu .workspace-switcher { width: 100%; min-width: 0; margin: 0; }
 .workspace-trigger { color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .workspace-trigger:hover, .workspace-trigger-open { border-color: rgba(200,187,255,.42); background: rgba(255,255,255,.085); }
 .workspace-trigger-open { box-shadow: 0 0 0 3px rgba(200,187,255,.08); }
