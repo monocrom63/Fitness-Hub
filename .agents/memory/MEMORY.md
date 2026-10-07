@@ -14,3 +14,4 @@
 - [District course destination](district-course-destination.md) — course creation requires an explicit studio choice for district managers, not a silent first-studio default.
 - [District studio context](studio-switch-context.md) — studio switching narrows operational views; Pulse and team administration remain organization-wide.
 - [Staff invitation return](staff-invitation-return.md) — keep invitation return tab-scoped and refresh identity after acceptance before entering the workspace.
+- [Resend connection for waitlist mail](resend-waitlist-connection.md) — waitlist promotion emails use the Replit Resend connection; its credential is separate from the workspace secret.

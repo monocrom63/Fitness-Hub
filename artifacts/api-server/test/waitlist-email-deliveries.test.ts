@@ -7,11 +7,29 @@ import {
   organizationsTable, pool, studiosTable, waitlistEmailDeliveriesTable,
 } from "@workspace/db";
 import { cancelCourseBooking } from "../src/lib/course-bookings";
-import { closureEmailReadiness } from "../src/lib/closure-email";
 import {
   processWaitlistEmailDeliveries,
   runWaitlistEmailSchedulerTick,
+  waitlistEmailReadiness,
 } from "../src/lib/waitlist-email-worker";
+
+test("waitlist email readiness checks the sender domain through the authenticated Resend connection", async () => {
+  let url = "";
+  let method = "";
+  const verified = await waitlistEmailReadiness(async (requestUrl, init) => {
+    url = requestUrl;
+    method = init.method ?? "";
+    return new Response(JSON.stringify({ data: [{ name: "fiudia.com", status: "verified" }] }), { status: 200 });
+  }, "mail@fiudia.com");
+  assert.equal(url, "https://api.resend.com/domains");
+  assert.equal(method, "GET");
+  assert.equal(verified, null);
+
+  const unverified = await waitlistEmailReadiness(async () =>
+    new Response(JSON.stringify({ data: [{ name: "fiudia.com", status: "pending" }] }), { status: 200 }),
+  "mail@fiudia.com");
+  assert.match(unverified ?? "", /nicht verifiziert/);
+});
 
 test("promotion email outbox respects opt-in, retries idempotently, and skips invalidated promotions", async () => {
   const organizationIds: number[] = [];
@@ -22,6 +40,7 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
   const request = async (_url: string, init: RequestInit) => {
     calls += 1;
     idempotencyKeys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+    assert.equal(new Headers(init.headers).get("Authorization"), null, "the Replit connector supplies provider authentication");
     requestBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
     if (calls === 1) return new Response(JSON.stringify({ message: "temporary failure" }), { status: 503 });
     return new Response(JSON.stringify({ id: `resend-${calls}` }), { status: 200 });
@@ -62,14 +81,14 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     assert.equal(eligible.delivery.email, eligible.waitingMember.email);
 
     const firstNow = new Date();
-    assert.equal(await processWaitlistEmailDeliveries({ request, apiKey: "test-key", now: firstNow }), 1);
+    assert.equal(await processWaitlistEmailDeliveries({ request, now: firstNow }), 1);
     let [retried] = await db.select().from(waitlistEmailDeliveriesTable)
       .where(eq(waitlistEmailDeliveriesTable.id, eligible.delivery.id));
     assert.equal(retried.status, "failed");
     assert.equal(retried.attemptCount, 1);
     assert.match(retried.error ?? "", /temporary failure/);
     const retryNow = new Date(retried.nextAttemptAt.getTime() + 1);
-    assert.equal(await processWaitlistEmailDeliveries({ request, apiKey: "test-key", now: retryNow }), 1);
+    assert.equal(await processWaitlistEmailDeliveries({ request, now: retryNow }), 1);
     [retried] = await db.select().from(waitlistEmailDeliveriesTable)
       .where(eq(waitlistEmailDeliveriesTable.id, eligible.delivery.id));
     assert.equal(retried.status, "sent");
@@ -98,13 +117,13 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     const beforeReadinessCheck = calls;
     let readinessCalls = 0;
     assert.equal(await runWaitlistEmailSchedulerTick({
-      readiness: () => closureEmailReadiness(
-        "invalid-test-key",
-        "mail@example.invalid",
-        async () => {
+      readiness: () => waitlistEmailReadiness(
+        async url => {
+          assert.equal(url, "https://api.resend.com/domains");
           readinessCalls += 1;
           return new Response(JSON.stringify({ message: "API key is invalid" }), { status: 400 });
         },
+        "mail@example.invalid",
       ),
       request,
     }), 0);
@@ -116,7 +135,7 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     await db.update(membersTable).set({ waitlistEmailEnabled: 0 })
       .where(eq(membersTable.id, preferenceChanged.waitingMember.id));
     const beforeOptOutProcessing = calls;
-    assert.equal(await processWaitlistEmailDeliveries({ request, apiKey: "test-key" }), 1);
+    assert.equal(await processWaitlistEmailDeliveries({ request }), 1);
     assert.equal(calls, beforeOptOutProcessing, "current opt-out is rechecked before sending");
     const [optOutDelivery] = await db.select().from(waitlistEmailDeliveriesTable)
       .where(eq(waitlistEmailDeliveriesTable.id, preferenceChanged.delivery.id));
@@ -127,7 +146,7 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     await db.update(membersTable).set({ email: `changed-${suffix}@example.invalid` })
       .where(eq(membersTable.id, changedAddress.waitingMember.id));
     const beforeChangedAddress = calls;
-    assert.equal(await processWaitlistEmailDeliveries({ request, apiKey: "test-key" }), 1);
+    assert.equal(await processWaitlistEmailDeliveries({ request }), 1);
     assert.equal(calls, beforeChangedAddress, "a changed email address is never sent to");
     const [addressDelivery] = await db.select().from(waitlistEmailDeliveriesTable)
       .where(eq(waitlistEmailDeliveriesTable.id, changedAddress.delivery.id));
@@ -137,7 +156,7 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     assert.ok(missingProviderId.delivery);
     const invalidSuccessRequest = async () => new Response(JSON.stringify({}), { status: 200 });
     assert.equal(await processWaitlistEmailDeliveries({
-      request: invalidSuccessRequest, apiKey: "test-key",
+      request: invalidSuccessRequest,
     }), 1);
     const [invalidSuccessDelivery] = await db.select().from(waitlistEmailDeliveriesTable)
       .where(eq(waitlistEmailDeliveriesTable.id, missingProviderId.delivery.id));
@@ -153,7 +172,7 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     assert.equal(cancelledDelivery.status, "skipped");
 
     const beforeSkippedProcessing = calls;
-    assert.equal(await processWaitlistEmailDeliveries({ request, apiKey: "test-key" }), 0);
+    assert.equal(await processWaitlistEmailDeliveries({ request }), 0);
     assert.equal(calls, beforeSkippedProcessing, "legacy and invalidated notices never reach Resend");
   } finally {
     for (const organizationId of organizationIds) {

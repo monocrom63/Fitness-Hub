@@ -1,16 +1,83 @@
 import { randomUUID } from "node:crypto";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { and, eq, inArray, lt, lte, or, sql } from "drizzle-orm";
 import {
   courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable,
   waitlistEmailDeliveriesTable,
 } from "@workspace/db";
-import { closureEmailReadiness, closureEmailSender } from "./closure-email";
+import { closureEmailSender } from "./closure-email";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
 const MAX_BACKOFF_MS = 6 * 60 * 60 * 1000;
 const READINESS_CACHE_MS = 5 * 60 * 1000;
 const PROMOTION_TITLE = "Dein Kursplatz ist bestätigt";
+const connectors = new ReplitConnectors();
+
+type EmailRequest = (url: string, init: RequestInit) => Promise<Response>;
+
+function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason ?? new Error("Email provider request timed out."));
+      return;
+    }
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      cleanup();
+      reject(signal.reason ?? new Error("Email provider request timed out."));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      value => { cleanup(); resolve(value); },
+      error => { cleanup(); reject(error); },
+    );
+  });
+}
+
+const resendRequest: EmailRequest = (url, init) => {
+  const target = new URL(url);
+  if (target.origin !== "https://api.resend.com") {
+    throw new Error("Unexpected email provider URL.");
+  }
+  const headers: Record<string, string> = {};
+  new Headers(init.headers).forEach((value, key) => {
+    if (key.toLowerCase() !== "authorization") headers[key] = value;
+  });
+  const request = connectors.proxy("resend", `${target.pathname}${target.search}`, {
+    method: init.method,
+    headers,
+    body: init.body,
+  });
+  return withAbort(request, init.signal ?? undefined);
+};
+
+export async function waitlistEmailReadiness(
+  request: EmailRequest = resendRequest,
+  sender = closureEmailSender(),
+): Promise<string | null> {
+  const domain = sender.match(/@([a-z0-9.-]+)>?$/i)?.[1]?.toLowerCase();
+  if (!domain) return "Die E-Mail-Absenderadresse ist ungültig. Bitte In-App wählen.";
+  try {
+    const response = await request("https://api.resend.com/domains", {
+      method: "GET",
+      signal: AbortSignal.timeout(5_000),
+    });
+    // A sending-only key may not have permission to list domains. The send
+    // itself will still record its outcome durably.
+    if (response.status === 403) return null;
+    if (!response.ok) return "E-Mail ist derzeit nicht versandbereit. Bitte In-App wählen; der Kurs wurde nicht geändert.";
+    const result = await response.json() as { data?: Array<{ name: string; status: string }> };
+    if (!Array.isArray(result.data)) return "Die E-Mail-Absenderdomain konnte nicht geprüft werden. Bitte In-App wählen.";
+    if (!result.data.some(entry => entry.name.toLowerCase() === domain && entry.status === "verified")) {
+      return "Die E-Mail-Absenderdomain ist noch nicht verifiziert. Bitte In-App wählen.";
+    }
+    return null;
+  } catch {
+    return "Der E-Mail-Anbieter ist derzeit nicht erreichbar. Bitte In-App wählen; der Kurs wurde nicht geändert.";
+  }
+}
 
 type ClaimedDelivery = {
   id: number;
@@ -26,8 +93,7 @@ type ClaimedDelivery = {
 
 type WorkerOptions = {
   database?: typeof db;
-  request?: (url: string, init: RequestInit) => Promise<Response>;
-  apiKey?: string;
+  request?: EmailRequest;
   sender?: string;
   now?: Date;
 };
@@ -166,7 +232,7 @@ function retryAt(attemptCount: number, now: Date) {
 }
 
 async function deliverOne(delivery: ClaimedDelivery, options: Required<WorkerOptions>) {
-  const { database, request, apiKey, sender, now } = options;
+  const { database, request, sender, now } = options;
   const current = await loadPreflight(delivery, database);
   const valid = current
     && current.title === PROMOTION_TITLE
@@ -187,20 +253,10 @@ async function deliverOne(delivery: ClaimedDelivery, options: Required<WorkerOpt
     return;
   }
 
-  if (!apiKey.trim()) {
-    await finishClaim(delivery, {
-      status: "failed",
-      error: "RESEND_API_KEY is not configured.",
-      nextAttemptAt: retryAt(delivery.attemptCount, now),
-    }, database);
-    return;
-  }
-
   try {
     const response = await request("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "Idempotency-Key": `fiudia-waitlist-delivery-${delivery.id}`,
       },
@@ -232,8 +288,7 @@ async function deliverOne(delivery: ClaimedDelivery, options: Required<WorkerOpt
 export async function processWaitlistEmailDeliveries(options: WorkerOptions = {}) {
   const workerOptions: Required<WorkerOptions> = {
     database: options.database ?? db,
-    request: options.request ?? fetch,
-    apiKey: options.apiKey ?? process.env.RESEND_API_KEY ?? "",
+    request: options.request ?? resendRequest,
     sender: options.sender ?? closureEmailSender(),
     now: options.now ?? new Date(),
   };
@@ -258,8 +313,8 @@ export async function runWaitlistEmailSchedulerTick(options: SchedulerOptions = 
     if (!readinessCache || now.getTime() - readinessCache.checkedAt >= READINESS_CACHE_MS) {
       readinessCache = {
         checkedAt: now.getTime(),
-        error: await closureEmailReadiness(
-          options.apiKey ?? process.env.RESEND_API_KEY,
+        error: await waitlistEmailReadiness(
+          options.request ?? resendRequest,
           options.sender ?? closureEmailSender(),
         ),
       };
