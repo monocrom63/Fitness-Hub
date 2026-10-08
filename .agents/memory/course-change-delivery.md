@@ -33,6 +33,12 @@ For ordinary course edits, keep external push copy neutral and direct the member
 
 **How to apply:** Recheck recipient eligibility before every attempt, use the shared revision for stale-form protection, keep provider results truthful for already-started sends, and avoid course-specific details in any push that could race a later change.
 
+When backend tests share the development database with the running API workflow, keep seeded pending/failed push records ineligible for the live worker and distinguish queued records from already in-flight sends.
+
+**Why:** The workflow's background worker can claim test fixtures from the same database, making assertions timing-dependent. Already-started sends must also retain their truthful outcome.
+
+**How to apply:** Defer synthetic queued deliveries during test setup, assert that queued/failed old pushes are superseded, and separately assert that an active claim remains for the worker to settle.
+
 Keep operational course scheduling focused on upcoming classes while giving managers a separate, studio-scoped delivery history that remains readable after a class starts or is cancelled. Historical visibility must not imply historical retry eligibility.
 
 **Why:** A push failure may only be noticed after its course disappears from the upcoming schedule. Expanding the scheduling list just to reach delivery records conflates two different jobs.

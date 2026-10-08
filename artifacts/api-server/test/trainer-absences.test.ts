@@ -78,6 +78,9 @@ test("manager records an absence, resolves all affected courses and notifies mem
     const bookings = await db.insert(courseBookingsTable).values([morning, midday, evening].map((course, index) => ({
       courseId: course.id, memberId: members[index].id, status: "confirmed",
     }))).returning();
+    // The API workflow's live delivery worker shares this database with tests.
+    // Keep queued fixtures ineligible for it so this test controls superseding.
+    const deferEditPushUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
     for (const [courseIndex, course] of [[0, morning], [1, midday]] as const) {
       await db.insert(courseEditPushDeliveriesTable).values(["pending", "failed", "sending"].map((status, index) => ({
         courseId: course.id,
@@ -89,7 +92,11 @@ test("manager records an absence, resolves all affected courses and notifies mem
         body: "Course details changed.",
         idempotencyKey: `absence-edit-${suffix}-${courseIndex}-${index}`,
         status,
-        ...(status === "sending" ? { claimToken: `absence-claim-${suffix}-${courseIndex}` } : {}),
+        nextAttemptAt: deferEditPushUntil,
+        ...(status === "sending" ? {
+          claimToken: `absence-claim-${suffix}-${courseIndex}`,
+          claimedAt: new Date(),
+        } : {}),
       })));
     }
     await db.insert(memberPushSubscriptionsTable).values({
@@ -263,7 +270,12 @@ test("manager records an absence, resolves all affected courses and notifies mem
     const replacedDeliveries = await db.select().from(courseEditPushDeliveriesTable)
       .where(eq(courseEditPushDeliveriesTable.courseId, morning.id));
     assert.equal(replacedDeliveries.length, 3);
-    assert.ok(replacedDeliveries.every((delivery) => delivery.status === "skipped" && delivery.claimToken === null));
+    const revokedReplacedPushes = replacedDeliveries.filter((delivery) => delivery.status === "skipped");
+    const inFlightReplacedPushes = replacedDeliveries.filter((delivery) => delivery.status === "sending");
+    assert.equal(revokedReplacedPushes.length, 2, "queued and failed old course pushes are revoked");
+    assert.ok(revokedReplacedPushes.every((delivery) => delivery.claimToken === null));
+    assert.equal(inFlightReplacedPushes.length, 1, "an already-claimed push keeps its truthful in-flight status");
+    assert.equal(inFlightReplacedPushes[0].claimToken, `absence-claim-${suffix}-0`);
     assert.equal(replaced.body.pushFailed, 1);
     assert.equal(sends.length, 1);
     assert.deepEqual(sends[0].body.data, { courseId: morning.id, memberId: members[0].id });
@@ -313,7 +325,12 @@ test("manager records an absence, resolves all affected courses and notifies mem
     const cancelledDeliveries = await db.select().from(courseEditPushDeliveriesTable)
       .where(eq(courseEditPushDeliveriesTable.courseId, midday.id));
     assert.equal(cancelledDeliveries.length, 3);
-    assert.ok(cancelledDeliveries.every((delivery) => delivery.status === "skipped" && delivery.claimToken === null));
+    const revokedCancelledPushes = cancelledDeliveries.filter((delivery) => delivery.status === "skipped");
+    const inFlightCancelledPushes = cancelledDeliveries.filter((delivery) => delivery.status === "sending");
+    assert.equal(revokedCancelledPushes.length, 2, "queued and failed old course pushes are revoked");
+    assert.ok(revokedCancelledPushes.every((delivery) => delivery.claimToken === null));
+    assert.equal(inFlightCancelledPushes.length, 1, "an in-flight push remains for the worker to settle accurately");
+    assert.equal(inFlightCancelledPushes[0].claimToken, `absence-claim-${suffix}-1`);
     const updatedAbsence = await api(manager.clerkUserId, "GET", "/trainer-absences");
     assert.equal(updatedAbsence.status, 200);
     assert.equal(updatedAbsence.body.find((item: any) => item.id === created.body.id)
