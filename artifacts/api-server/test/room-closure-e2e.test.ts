@@ -159,6 +159,9 @@ test("manager room-closure workflow lists, resolves, notifies, and prevents canc
       memberId: members[index].id,
       status: "confirmed",
     }))).returning();
+    // The running API workflow shares this database and must not claim these
+    // synthetic rows while the route-level test checks superseding behavior.
+    const deferEditPushUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
     for (const [courseIndex, statuses] of [[0, ["pending", "failed", "sending"]], [1, ["pending", "failed", "sending"]]] as const) {
       await db.insert(courseEditPushDeliveriesTable).values(statuses.map((status, index) => ({
         courseId: matchingCourses[courseIndex].id,
@@ -170,7 +173,11 @@ test("manager room-closure workflow lists, resolves, notifies, and prevents canc
         body: "Course details changed.",
         idempotencyKey: `closure-${suffix}-${courseIndex}-${index}`,
         status,
-        ...(status === "sending" ? { claimToken: `claim-${suffix}-${courseIndex}` } : {}),
+        nextAttemptAt: deferEditPushUntil,
+        ...(status === "sending" ? {
+          claimToken: `claim-${suffix}-${courseIndex}`,
+          claimedAt: new Date(),
+        } : {}),
       })));
     }
 
@@ -290,8 +297,12 @@ test("manager room-closure workflow lists, resolves, notifies, and prevents canc
     const relocatedDeliveries = await db.select().from(courseEditPushDeliveriesTable)
       .where(eq(courseEditPushDeliveriesTable.courseId, matchingCourses[0].id));
     assert.equal(relocatedDeliveries.length, 3);
-    assert.ok(relocatedDeliveries.every((delivery) => delivery.status === "skipped"));
-    assert.ok(relocatedDeliveries.every((delivery) => delivery.claimToken === null));
+    const revokedRelocatedPushes = relocatedDeliveries.filter((delivery) => delivery.status === "skipped");
+    const inFlightRelocatedPushes = relocatedDeliveries.filter((delivery) => delivery.status === "sending");
+    assert.equal(revokedRelocatedPushes.length, 2);
+    assert.ok(revokedRelocatedPushes.every((delivery) => delivery.claimToken === null));
+    assert.equal(inFlightRelocatedPushes.length, 1);
+    assert.equal(inFlightRelocatedPushes[0].claimToken, `claim-${suffix}-0`);
     const [cancelledCourse] = await db.select().from(coursesTable)
       .where(eq(coursesTable.id, matchingCourses[1].id));
     assert.equal(cancelledCourse.status, "cancelled");
@@ -299,7 +310,12 @@ test("manager room-closure workflow lists, resolves, notifies, and prevents canc
     const cancelledDeliveries = await db.select().from(courseEditPushDeliveriesTable)
       .where(eq(courseEditPushDeliveriesTable.courseId, matchingCourses[1].id));
     assert.equal(cancelledDeliveries.length, 3);
-    assert.ok(cancelledDeliveries.every((delivery) => delivery.status === "skipped" && delivery.claimToken === null));
+    const revokedCancelledPushes = cancelledDeliveries.filter((delivery) => delivery.status === "skipped");
+    const inFlightCancelledPushes = cancelledDeliveries.filter((delivery) => delivery.status === "sending");
+    assert.equal(revokedCancelledPushes.length, 2);
+    assert.ok(revokedCancelledPushes.every((delivery) => delivery.claimToken === null));
+    assert.equal(inFlightCancelledPushes.length, 1);
+    assert.equal(inFlightCancelledPushes[0].claimToken, `claim-${suffix}-1`);
     const cancellationNotices = await db.select().from(memberNotificationsTable).where(and(
       eq(memberNotificationsTable.courseId, matchingCourses[1].id),
       eq(memberNotificationsTable.memberId, members[1].id),
