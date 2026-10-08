@@ -22,6 +22,7 @@ import {
   claimResolutionEmailDeliveries,
   closureEmailSender,
   getResolutionEmailStatuses,
+  processResolutionEmails,
 } from "../src/lib/closure-email";
 import { listClosureResolutionsForStudio } from "../src/lib/closure-resolutions";
 import {
@@ -355,6 +356,32 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
     const [recoveredRow] = await db.select().from(closureEmailDeliveriesTable)
       .where(eq(closureEmailDeliveriesTable.id, delivery.id));
     assert.equal(recoveredRow.attemptCount, 3);
+
+    await db.update(closureEmailDeliveriesTable).set({
+      status: "failed",
+      claimToken: null,
+      claimedAt: null,
+    }).where(eq(closureEmailDeliveriesTable.id, delivery.id));
+    let emailProviderCalls = 0;
+    const sentEmails = await processResolutionEmails(emailResolution.id, {
+      sender: "mail@fiudia.com",
+      request: async (url, init) => {
+        emailProviderCalls += 1;
+        assert.equal(url, "https://api.resend.com/emails");
+        assert.equal(init.method, "POST");
+        const headers = new Headers(init.headers);
+        assert.equal(headers.get("Authorization"), null, "the Replit Resend connection supplies authentication");
+        assert.equal(headers.get("Idempotency-Key"), `fiudia-closure-delivery-${delivery.id}`);
+        const body = JSON.parse(String(init.body));
+        assert.equal(body.from, "mail@fiudia.com");
+        assert.deepEqual(body.to, [member.email]);
+        assert.equal(body.subject, "Dein Kurs wurde storniert");
+        return new Response(JSON.stringify({ id: "closure-email-provider-id" }), { status: 200 });
+      },
+    });
+    assert.equal(emailProviderCalls, 1);
+    assert.equal(sentEmails[0].status, "sent");
+    assert.equal(sentEmails[0].error, null);
   } finally {
     if (organizationId !== undefined) {
       await db.transaction(async (tx) => {

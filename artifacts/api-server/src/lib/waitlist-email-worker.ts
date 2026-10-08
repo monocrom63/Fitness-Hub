@@ -1,60 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import { and, eq, inArray, lt, lte, or, sql } from "drizzle-orm";
 import {
   courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable,
   waitlistEmailDeliveriesTable,
 } from "@workspace/db";
 import { closureEmailSender } from "./closure-email";
+import { resendRequest, type ResendRequest } from "./resend-client";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
 const MAX_BACKOFF_MS = 6 * 60 * 60 * 1000;
 const READINESS_CACHE_MS = 5 * 60 * 1000;
 const PROMOTION_TITLE = "Dein Kursplatz ist bestätigt";
-const connectors = new ReplitConnectors();
-
-type EmailRequest = (url: string, init: RequestInit) => Promise<Response>;
-
-function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return promise;
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(signal.reason ?? new Error("Email provider request timed out."));
-      return;
-    }
-    const cleanup = () => signal.removeEventListener("abort", onAbort);
-    const onAbort = () => {
-      cleanup();
-      reject(signal.reason ?? new Error("Email provider request timed out."));
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-    promise.then(
-      value => { cleanup(); resolve(value); },
-      error => { cleanup(); reject(error); },
-    );
-  });
-}
-
-const resendRequest: EmailRequest = (url, init) => {
-  const target = new URL(url);
-  if (target.origin !== "https://api.resend.com") {
-    throw new Error("Unexpected email provider URL.");
-  }
-  const headers: Record<string, string> = {};
-  new Headers(init.headers).forEach((value, key) => {
-    if (key.toLowerCase() !== "authorization") headers[key] = value;
-  });
-  const request = connectors.proxy("resend", `${target.pathname}${target.search}`, {
-    method: init.method,
-    headers,
-    body: init.body,
-  });
-  return withAbort(request, init.signal ?? undefined);
-};
-
 export async function waitlistEmailReadiness(
-  request: EmailRequest = resendRequest,
+  request: ResendRequest = resendRequest,
   sender = closureEmailSender(),
 ): Promise<string | null> {
   const domain = sender.match(/@([a-z0-9.-]+)>?$/i)?.[1]?.toLowerCase();
@@ -93,7 +52,7 @@ type ClaimedDelivery = {
 
 type WorkerOptions = {
   database?: typeof db;
-  request?: EmailRequest;
+  request?: ResendRequest;
   sender?: string;
   now?: Date;
 };

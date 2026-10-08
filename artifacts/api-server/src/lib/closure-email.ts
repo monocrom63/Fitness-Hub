@@ -6,6 +6,7 @@ import {
   coursesTable,
   db,
 } from "@workspace/db";
+import { resendRequest, type ResendRequest } from "./resend-client";
 import { WAITLIST_EMAIL_SENDER } from "./waitlist-email";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
@@ -19,17 +20,15 @@ export function closureEmailSender(configured = process.env.RESEND_FROM_EMAIL): 
  * delivery later; failed sends remain in the durable delivery queue.
  */
 export async function closureEmailReadiness(
-  apiKey = process.env.RESEND_API_KEY,
+  request: ResendRequest = resendRequest,
   sender = closureEmailSender(),
-  request: (url: string, init: RequestInit) => Promise<Response> = fetch,
 ): Promise<string | null> {
-  if (!apiKey?.trim()) return "E-Mail ist derzeit nicht eingerichtet. Bitte In-App wählen.";
   const domain = sender.match(/@([a-z0-9.-]+)>?$/i)?.[1]?.toLowerCase();
   if (!domain) return "Die E-Mail-Absenderadresse ist ungültig. Bitte In-App wählen.";
 
   try {
     const response = await request("https://api.resend.com/domains", {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      method: "GET",
       signal: AbortSignal.timeout(5_000),
     });
     // A valid sending-only key may not have permission to list domains. Allow
@@ -94,7 +93,12 @@ export async function claimResolutionEmailDeliveries(resolutionId: number) {
   });
 }
 
-async function sendOne(delivery: ClaimableDelivery, resolutionId: number) {
+async function sendOne(
+  delivery: ClaimableDelivery,
+  resolutionId: number,
+  request: ResendRequest,
+  sender: string,
+) {
   const [resolution] = await db.select({
     action: courseClosureResolutionsTable.action,
     targetRoom: courseClosureResolutionsTable.targetRoom,
@@ -112,14 +116,6 @@ async function sendOne(delivery: ClaimableDelivery, resolutionId: number) {
     .limit(1);
   if (!course) return { status: "failed" as const, detail: "Resolved course no longer exists." };
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = closureEmailSender();
-  if (!apiKey) {
-    return {
-      status: "failed" as const,
-      detail: "RESEND_API_KEY is not configured.",
-    };
-  }
   const subject = resolution.action === "cancel"
     ? "Dein Kurs wurde storniert"
     : "Der Kursraum wurde geändert";
@@ -127,16 +123,15 @@ async function sendOne(delivery: ClaimableDelivery, resolutionId: number) {
     ? `Der Kurs „${course.title}“ wurde wegen einer Raumschließung abgesagt.`
     : `Der Kurs „${course.title}“ findet wegen einer Raumschließung nun in ${resolution.targetRoom} statt.`;
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await request("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         // Stable across lease recovery/retries to make ambiguous provider
         // outcomes idempotent at Resend.
         "Idempotency-Key": `fiudia-closure-delivery-${delivery.id}`,
       },
-      body: JSON.stringify({ from, to: [delivery.email], subject, text }),
+      body: JSON.stringify({ from: sender, to: [delivery.email], subject, text }),
       signal: AbortSignal.timeout(60_000),
     });
     const result = await response.json().catch(() => ({})) as { id?: string; message?: string };
@@ -155,10 +150,20 @@ async function sendOne(delivery: ClaimableDelivery, resolutionId: number) {
   }
 }
 
-export async function processResolutionEmails(resolutionId: number) {
+type ResolutionEmailOptions = {
+  request?: ResendRequest;
+  sender?: string;
+};
+
+export async function processResolutionEmails(
+  resolutionId: number,
+  options: ResolutionEmailOptions = {},
+) {
+  const request = options.request ?? resendRequest;
+  const sender = options.sender ?? closureEmailSender();
   const claims = await claimResolutionEmailDeliveries(resolutionId);
   for (const claim of claims) {
-    const outcome = await sendOne(claim, resolutionId);
+    const outcome = await sendOne(claim, resolutionId, request, sender);
     await db.update(closureEmailDeliveriesTable).set({
       status: outcome.status,
       error: outcome.detail,
