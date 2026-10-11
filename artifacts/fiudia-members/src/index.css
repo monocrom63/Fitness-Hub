@@ -120,6 +120,7 @@ button:disabled { cursor: not-allowed; }
 .rail-note strong { display: block; margin-bottom: 5px; color: #f8f6ef; font: 600 17px/1.2 'Space Grotesk', sans-serif; }
 .rail-user { display: flex; align-items: center; gap: 10px; padding: 20px 11px 0; }
 .avatar { width: 35px; height: 35px; flex: 0 0 35px; display: grid; place-items: center; border-radius: 50%; background: #c6e7d7; color: #243d36; font-weight: 700; font-size: 12px; }
+.rail-user .avatar { border-radius: 10px; background: #d2c5f2; color: #263047; }
 .rail-user span { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-user small { display: block; margin-top: 2px; color: #9faaba; font-size: 10px; }
 .signout { border: 0; background: transparent; color: #aeb9cb; padding: 5px; }
