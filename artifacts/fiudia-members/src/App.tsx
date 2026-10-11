@@ -16,6 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { memberNotificationArchiveQueryOptions } from './notification-history';
+import courseBrowsePhoto from './assets/course-browse-strength.jpeg';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
 import { clearCoursePushClickState, getOneSignal, listenForCoursePushClicks, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 import memberLoginPhoto from './assets/member-login-photo.jpeg';
@@ -203,6 +204,7 @@ function CoursesPage() {
     }
   }, [targetId, filter, targetVisible, courses.data]);
   return <div className="page"><PageHeader eyebrow="Kurse" title="Finde deinen Moment." description="Alle kommenden Kurse in deinem Studio. Über deine Hinweise kannst du auch vergangene Kurse wiederfinden." />
+    <section className="course-browse-banner" aria-label="Kurse entdecken"><img src={courseBrowsePhoto} alt="" aria-hidden="true" /><div className="course-browse-copy"><div className="eyebrow">Dein Studio · Dein Moment</div><h2>Jede Einheit bringt dich weiter.</h2></div></section>
     {courses.isLoading ? <div className="skeleton-page"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div> : courses.isError ? <ErrorView onRetry={() => { void courses.refetch(); }} /> : <>
       {targetId !== null && !targetExists && <div className="course-feedback" role="status" data-testid="status-course-unavailable">Dieser Kurs ist für dich nicht verfügbar.</div>}
       {targetExists && !targetVisible && <div className="course-feedback" role="status" data-testid="status-course-filtered">Dieser Kurs ist nicht unter „Meine Plätze“ zu finden. <button type="button" className="text-link" onClick={() => setFilter('all')} data-testid="button-show-target-course">Alle Kurse ansehen</button></div>}
