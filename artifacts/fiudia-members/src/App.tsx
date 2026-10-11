@@ -16,7 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { memberNotificationArchiveQueryOptions } from './notification-history';
-import courseBrowsePhoto from './assets/course-browse-strength.jpeg';
+import courseBrowsePhoto from './assets/course-cable-pulldown.webp';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
 import { clearCoursePushClickState, getOneSignal, listenForCoursePushClicks, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
 import memberLoginPhoto from './assets/member-login-photo.jpeg';
