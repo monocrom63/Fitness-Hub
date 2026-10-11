@@ -343,7 +343,7 @@ function SignInPage() {
 
 function SignUpPage() {
   const redirect = afterAuthInviteUrl(sessionStorage, basePath);
-  return <div className="auth-page"><div className="auth-aside"><Brand light /><div><div className="eyebrow">Starte mit Fiudia</div><h1>Ein besserer Tag<br /><em>beginnt hier.</em></h1><p>Richte deinen Workspace ein und bringe deine Organisation in Bewegung.</p></div><span className="auth-aside-foot">Wächst mit dir. Bleibt bei dir.</span></div><div className="auth-main"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} /></div></div>;
+  return <div className="auth-page auth-page--photo auth-page--signup-photo"><div className="auth-aside auth-aside--photo"><Brand light /><div className="auth-photo-copy"><div className="eyebrow">Starte mit Fiudia</div><h1>Ein besserer Tag<br /><em>beginnt hier.</em></h1><p>Richte deinen Workspace ein und bringe deine Organisation in Bewegung.</p></div><span className="auth-aside-foot">Wächst mit dir. Bleibt bei dir.</span></div><div className="auth-main"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} /></div></div>;
 }
 
 function OnboardingPage() {
