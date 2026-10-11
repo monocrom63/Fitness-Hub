@@ -296,6 +296,7 @@ button:disabled { cursor: not-allowed; }
 .auth-aside--photo::before { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(180deg, rgba(9,12,15,.16) 0%, rgba(9,12,15,.12) 34%, rgba(9,12,15,.82) 100%); }
 .auth-aside--photo::after { z-index: 2; border-color: rgba(211,197,242,.19); box-shadow: 0 0 0 70px rgba(211,197,242,.035),0 0 0 140px rgba(211,197,242,.02); }
 .auth-photo { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 36%; }
+.auth-photo--signup { object-position: center 45%; }
 .auth-aside--photo > .logo,
 .auth-aside--photo h1,
 .auth-aside--photo p,
