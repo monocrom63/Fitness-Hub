@@ -1076,7 +1076,7 @@ export const CancelStaffCourseBookingResponse = zod.object({
 
 
 /**
- * @summary Generate a one-use member onboarding link
+ * @summary Generate and email a one-use member onboarding invitation
  */
 export const CreateMemberInvitationParams = zod.object({
   "id": zod.coerce.number().int()
@@ -1086,7 +1086,8 @@ export const CreateMemberInvitationResponse = zod.object({
   "inviteUrl": zod.string(),
   "expiresAt": zod.coerce.date(),
   "memberName": zod.string(),
-  "memberEmail": zod.string().email()
+  "memberEmail": zod.string().email(),
+  "emailSent": zod.boolean()
 })
 
 

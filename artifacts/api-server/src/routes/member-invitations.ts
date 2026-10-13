@@ -23,6 +23,9 @@ import {
 } from "../lib/fiudia-access";
 import { isModuleEnabled } from "../lib/module-access";
 import { linkedMember, memberHome } from "./member-app";
+import { sendMemberInvitationEmail } from "../lib/member-invitation-email";
+import { resendRequest, type ResendRequest } from "../lib/resend-client";
+import { closureEmailSender } from "../lib/closure-email";
 
 type MemberInvitationDependencies = {
   database: typeof db;
@@ -30,6 +33,8 @@ type MemberInvitationDependencies = {
   identityForUser: typeof getClerkIdentity;
   staffForUser: typeof getStaffContext;
   moduleEnabled: typeof isModuleEnabled;
+  emailRequest: ResendRequest;
+  emailSender: string;
 };
 
 class MemberInvitationError extends Error {
@@ -61,6 +66,8 @@ export function createMemberInvitationsRouter(
   const identityForUser = dependencies.identityForUser ?? getClerkIdentity;
   const staffForUser = dependencies.staffForUser ?? getStaffContext;
   const moduleEnabled = dependencies.moduleEnabled ?? isModuleEnabled;
+  const emailRequest = dependencies.emailRequest ?? resendRequest;
+  const emailSender = dependencies.emailSender ?? closureEmailSender();
 
   async function requireManager(req: Request, res: import("express").Response): Promise<StaffContext | null> {
     const userId = userIdFromRequest(req);
@@ -130,22 +137,54 @@ export function createMemberInvitationsRouter(
             eq(memberInvitationsTable.memberId, member.id),
             eq(memberInvitationsTable.status, "pending"),
           ));
-        await tx.insert(memberInvitationsTable).values({
+        const [createdInvitation] = await tx.insert(memberInvitationsTable).values({
           memberId: member.id,
           invitedByStaffId: staff.id,
           studioId: member.studioId,
           email: memberEmail,
           tokenHash: hashToken(rawToken),
           expiresAt,
-        });
-        return { fullName: member.fullName, email: memberEmail };
+        }).returning({ id: memberInvitationsTable.id });
+        return { id: createdInvitation.id, fullName: member.fullName, email: memberEmail };
       });
 
+      const inviteUrl = `/fiudia-members/invite/${rawToken}`;
+      const origin = req.get("origin");
+      const host = req.get("host");
+      let absoluteInviteUrl: string | null = null;
+      if (origin && host) {
+        try {
+          const parsedOrigin = new URL(origin);
+          const localHttp = parsedOrigin.protocol === "http:" &&
+            ["localhost", "127.0.0.1"].includes(parsedOrigin.hostname);
+          if (parsedOrigin.host.toLowerCase() === host.toLowerCase() &&
+              (parsedOrigin.protocol === "https:" || localHttp)) {
+            absoluteInviteUrl = new URL(inviteUrl, parsedOrigin.origin).toString();
+          }
+        } catch {
+          // Without a trustworthy browser origin, keep the one-time link available
+          // in the UI but do not mail a URL derived from an untrusted host.
+        }
+      }
+
+      const delivery = absoluteInviteUrl
+        ? await sendMemberInvitationEmail({
+            invitationId: invitation.id,
+            memberName: invitation.fullName,
+            memberEmail: invitation.email,
+            inviteUrl: absoluteInviteUrl,
+          }, { request: emailRequest, sender: emailSender })
+        : { sent: false, reason: "The invitation URL could not be verified for email delivery." };
+      if (!delivery.sent) {
+        req.log?.warn({ memberId: params.data.id, reason: delivery.reason }, "Member invitation email was not sent");
+      }
+
       res.status(201).json(CreateMemberInvitationResponse.parse({
-        inviteUrl: `/fiudia-members/invite/${rawToken}`,
+        inviteUrl,
         expiresAt,
         memberName: invitation.fullName,
         memberEmail: invitation.email,
+        emailSent: delivery.sent,
       }));
     } catch (error) {
       if (error instanceof MemberInvitationError) {

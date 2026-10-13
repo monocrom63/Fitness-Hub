@@ -782,6 +782,7 @@ export interface MemberInvitationLink {
   expiresAt: string;
   memberName: string;
   memberEmail: string;
+  emailSent: boolean;
 }
 
 export interface MemberInvitationAcceptInput {

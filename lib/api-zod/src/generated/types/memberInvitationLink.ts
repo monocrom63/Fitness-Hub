@@ -11,4 +11,5 @@ export interface MemberInvitationLink {
   expiresAt: Date;
   memberName: string;
   memberEmail: string;
+  emailSent: boolean;
 }

@@ -836,7 +836,7 @@ paths:
     post:
       operationId: createMemberInvitation
       tags: [portal]
-      summary: Generate a one-use member onboarding link
+      summary: Generate and email a one-use member onboarding invitation
       parameters:
         - name: id
           in: path
@@ -1811,12 +1811,13 @@ components:
         createdAt: { type: string, format: date-time }
     MemberInvitationLink:
       type: object
-      required: [inviteUrl, expiresAt, memberName, memberEmail]
+      required: [inviteUrl, expiresAt, memberName, memberEmail, emailSent]
       properties:
         inviteUrl: { type: string }
         expiresAt: { type: string, format: date-time }
         memberName: { type: string }
         memberEmail: { type: string, format: email }
+        emailSent: { type: boolean }
     MemberInvitationAcceptInput:
       type: object
       required: [token]

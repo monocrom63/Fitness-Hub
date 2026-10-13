@@ -3275,7 +3275,7 @@ export const getCreateMemberInvitationUrl = (id: number,) => {
 }
 
 /**
- * @summary Generate a one-use member onboarding link
+ * @summary Generate and email a one-use member onboarding invitation
  */
 export const createMemberInvitation = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<MemberInvitationLink> => {
 
@@ -3327,7 +3327,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateMemberInvitationMutationVariables = {id: number}
 
     /**
- * @summary Generate a one-use member onboarding link
+ * @summary Generate and email a one-use member onboarding invitation
  */
 export const useCreateMemberInvitation = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMemberInvitation>>, TError,CreateMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

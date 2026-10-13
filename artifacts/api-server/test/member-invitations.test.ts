@@ -42,6 +42,8 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
     replay: `member-replay-${run}`,
   };
   const email = `member-${run}@example.com`;
+  let failEmailDelivery = false;
+  const sentEmails: Array<{ body: Record<string, unknown>; idempotencyKey: string | null }> = [];
   let server: import("node:http").Server | undefined;
   const memberIds: number[] = [];
   try {
@@ -75,6 +77,14 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
       status: "active",
     }).returning();
     memberIds.push(movedMember.id);
+    const [emailFailureMember] = await db.insert(membersTable).values({
+      studioId: studioA1.id,
+      fullName: "Email failure member",
+      email: `email-failure-${run}@example.com`,
+      membershipType: "Standard",
+      status: "active",
+    }).returning();
+    memberIds.push(emailFailureMember.id);
 
     const identities = new Map([
       [users.correct, { userId: users.correct, fullName: "Correct user", email, emailVerified: true }],
@@ -92,16 +102,42 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
         if (!identity) throw new Error("Unexpected test identity.");
         return identity;
       },
+      emailSender: "Fiudia <mail@fiudia.test>",
+      emailRequest: async (url, init) => {
+        if (url.endsWith("/domains")) {
+          return new Response(JSON.stringify({ data: [{ name: "fiudia.test", status: "verified" }] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        sentEmails.push({
+          body,
+          idempotencyKey: new Headers(init.headers).get("Idempotency-Key"),
+        });
+        if (failEmailDelivery) {
+          return new Response(JSON.stringify({ message: "Temporary test provider failure." }), {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ id: `resend-${sentEmails.length}` }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
     }));
     server = app.listen(0, "127.0.0.1");
     await new Promise<void>((resolve) => server?.once("listening", resolve));
-    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+    const appOrigin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const origin = `${appOrigin}/api`;
 
     async function api(user: string | null, path: string, data?: unknown) {
       const response = await fetch(`${origin}${path}`, {
         method: "POST",
         headers: {
           ...(user ? { "x-test-user": user } : {}),
+          origin: appOrigin,
           ...(data === undefined ? {} : { "content-type": "application/json" }),
         },
         ...(data === undefined ? {} : { body: JSON.stringify(data) }),
@@ -116,8 +152,14 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
     assert.equal(created.status, 201);
     assert.equal(created.body.memberName, "Invited member");
     assert.equal(created.body.memberEmail, email);
+    assert.equal(created.body.emailSent, true);
     const inviteUrl = created.body.inviteUrl as string;
     assert.match(inviteUrl, /^\/fiudia-members\/invite\/[a-f0-9]{64}$/);
+    const sentInvitation = sentEmails[0];
+    assert.deepEqual(sentInvitation.body.to, [email]);
+    assert.equal(sentInvitation.body.subject, "Dein Studio lädt dich zu Fiudia ein");
+    assert.match(String(sentInvitation.body.text), new RegExp(`${appOrigin}/fiudia-members/invite/[a-f0-9]{64}`));
+    assert.match(sentInvitation.idempotencyKey ?? "", /^fiudia-member-invitation-\d+$/);
     const oldToken = inviteUrl.split("/").at(-1)!;
     let token = oldToken;
     const [stored] = await db.select().from(memberInvitationsTable)
@@ -157,6 +199,13 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
       .set({ expiresAt: new Date(Date.now() - 1000) })
       .where(eq(memberInvitationsTable.memberId, expiredMember.id));
     assert.equal((await api(users.correct, "/member/invitations/accept", { token: expiredToken })).status, 404);
+
+    failEmailDelivery = true;
+    const emailFailure = await api(users.managerA1, `/members/${emailFailureMember.id}/invite`);
+    assert.equal(emailFailure.status, 201);
+    assert.equal(emailFailure.body.emailSent, false);
+    assert.match(emailFailure.body.inviteUrl as string, /^\/fiudia-members\/invite\/[a-f0-9]{64}$/);
+    failEmailDelivery = false;
 
     const movedLink = await api(users.districtA, `/members/${movedMember.id}/invite`);
     assert.equal(movedLink.status, 201);

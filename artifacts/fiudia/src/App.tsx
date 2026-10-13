@@ -406,10 +406,13 @@ function MemberInvitationDialog({ member, onClose }: { member: Member; onClose: 
       <p>Ein einmaliger, vertraulicher Einladungslink für <strong>{member.fullName}</strong>. Teile ihn nur mit der zugeordneten Person.</p>
       <div className="invitation-recipient"><Mail size={16} /><span data-testid="text-invitation-recipient">{link?.memberEmail || member.email}</span></div>
       {!link ? <>
-        <p className="booking-hint">Der Link wird nur direkt nach dem Erstellen angezeigt. Sichere ihn jetzt, denn er kann später nicht erneut eingesehen werden.</p>
+        <p className="booking-hint">Fiudia erstellt einen einmaligen Link und verschickt ihn an die hinterlegte E-Mail-Adresse. Du kannst den Link anschließend zusätzlich kopieren.</p>
         {invitation.isError && <p className="form-error" role="alert" data-testid="status-invitation-error">Einladung konnte nicht erstellt werden. Bitte versuche es erneut.</p>}
-        <button className="button button-dark button-wide" disabled={invitation.isPending} onClick={() => invitation.mutate({ id: member.id }, { onSuccess: result => setLink(result) })} data-testid={`button-generate-member-invitation-${member.id}`}>{invitation.isPending ? 'Link wird erstellt …' : 'Einmaligen Link erstellen'}</button>
+        <button className="button button-dark button-wide" disabled={invitation.isPending} onClick={() => invitation.mutate({ id: member.id }, { onSuccess: result => setLink(result) })} data-testid={`button-generate-member-invitation-${member.id}`}>{invitation.isPending ? 'Einladung wird versendet …' : 'Einladung per E-Mail senden'}</button>
       </> : <>
+        {link.emailSent
+          ? <p className="booking-result" role="status" data-testid="status-member-invitation-email-sent">Einladung per E-Mail an {link.memberEmail} versendet.</p>
+          : <p className="form-error" role="status" data-testid="status-member-invitation-email-failed">E-Mail konnte nicht versendet werden. Du kannst den Einladungslink kopieren und manuell weitergeben.</p>}
         <div className="invitation-link"><span data-testid="text-member-invitation-link">{shareableUrl}</span></div>
         <p className="booking-hint" data-testid="text-member-invitation-expiry">Gültig bis {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(link.expiresAt))}. Nur für {link.memberEmail}.</p>
         <button className="button button-dark button-wide" onClick={async () => { try { if (!shareableUrl) return; await navigator.clipboard.writeText(shareableUrl); setCopyState('copied'); } catch { setCopyState('error'); } }} data-testid="button-copy-member-invitation"><Copy size={16} /> Link kopieren</button>
