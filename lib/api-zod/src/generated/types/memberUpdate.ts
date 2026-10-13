@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BillingInterval } from './billingInterval';
 import type { MemberStatus } from './memberStatus';
 
 export interface MemberUpdate {
@@ -25,6 +26,7 @@ export interface MemberUpdate {
      * @maxLength 80
      */
   membershipType?: string;
+  billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
      * @nullable

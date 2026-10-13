@@ -194,6 +194,7 @@ export const ListMembersResponseItem = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(listMembersResponseBirthDateRegExp).nullish(),
   "address": zod.string().max(listMembersResponseAddressMax).nullish(),
@@ -233,6 +234,7 @@ export const CreateMemberBody = zod.object({
   "email": zod.string().email().max(createMemberBodyEmailMax),
   "phone": zod.string().max(createMemberBodyPhoneMax).optional(),
   "membershipType": zod.string().min(createMemberBodyMembershipTypeMin).max(createMemberBodyMembershipTypeMax),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional(),
   "status": zod.enum(['active', 'trial', 'paused']).optional(),
   "birthDate": zod.string().regex(createMemberBodyBirthDateRegExp).nullish(),
   "address": zod.string().max(createMemberBodyAddressMax).nullish(),
@@ -255,6 +257,7 @@ export const CreateMemberResponse = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(createMemberResponseBirthDateRegExp).nullish(),
   "address": zod.string().max(createMemberResponseAddressMax).nullish(),
@@ -297,6 +300,7 @@ export const UpdateMemberBody = zod.object({
   "email": zod.string().email().max(updateMemberBodyEmailMax).optional(),
   "phone": zod.string().max(updateMemberBodyPhoneMax).nullish(),
   "membershipType": zod.string().min(updateMemberBodyMembershipTypeMin).max(updateMemberBodyMembershipTypeMax).optional(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional(),
   "status": zod.enum(['active', 'trial', 'paused']).optional(),
   "birthDate": zod.string().regex(updateMemberBodyBirthDateRegExp).nullish(),
   "address": zod.string().max(updateMemberBodyAddressMax).nullish(),
@@ -318,6 +322,7 @@ export const UpdateMemberResponse = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateMemberResponseBirthDateRegExp).nullish(),
   "address": zod.string().max(updateMemberResponseAddressMax).nullish(),
@@ -1132,11 +1137,80 @@ export const GetMemberHomeResponse = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(getMemberHomeResponseMemberOneBirthDateRegExp).nullish(),
   "address": zod.string().max(getMemberHomeResponseMemberOneAddressMax).nullish(),
   "contractStart": zod.string().regex(getMemberHomeResponseMemberOneContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(getMemberHomeResponseMemberOneContractDurationMonthsMax).nullish(),
+  "studioId": zod.number().int(),
+  "studioName": zod.string(),
+  "joinedAt": zod.coerce.date(),
+  "lastCheckIn": zod.coerce.date().nullable()
+}),zod.null()]),
+  "checkInCount": zod.number().int(),
+  "coursesEnabled": zod.boolean(),
+  "checkInsEnabled": zod.boolean(),
+  "waitlistEmailEnabled": zod.boolean(),
+  "nextCourse": zod.union([zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
+  "waitlistPosition": zod.number().int().nullable()
+}),zod.null()]),
+  "upcomingBookings": zod.number().int()
+})
+
+
+/**
+ * @summary Update editable fields of the signed-in member's linked membership
+ */
+export const updateOwnMemberProfileBodyFullNameMin = 2;
+export const updateOwnMemberProfileBodyFullNameMax = 160;
+
+export const updateOwnMemberProfileBodyPhoneMax = 40;
+
+export const updateOwnMemberProfileBodyBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateOwnMemberProfileBodyAddressMax = 400;
+
+
+
+export const UpdateOwnMemberProfileBody = zod.object({
+  "fullName": zod.string().min(updateOwnMemberProfileBodyFullNameMin).max(updateOwnMemberProfileBodyFullNameMax).optional(),
+  "phone": zod.string().max(updateOwnMemberProfileBodyPhoneMax).nullish(),
+  "birthDate": zod.string().regex(updateOwnMemberProfileBodyBirthDateRegExp).nullish(),
+  "address": zod.string().max(updateOwnMemberProfileBodyAddressMax).nullish(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional()
+})
+
+export const updateOwnMemberProfileResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateOwnMemberProfileResponseMemberOneAddressMax = 400;
+
+export const updateOwnMemberProfileResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateOwnMemberProfileResponseMemberOneContractDurationMonthsMax = 1200;
+
+
+
+export const UpdateOwnMemberProfileResponse = zod.object({
+  "member": zod.union([zod.object({
+  "id": zod.number().int(),
+  "fullName": zod.string(),
+  "email": zod.string().email().nullable(),
+  "phone": zod.string().nullable(),
+  "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
+  "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(updateOwnMemberProfileResponseMemberOneBirthDateRegExp).nullish(),
+  "address": zod.string().max(updateOwnMemberProfileResponseMemberOneAddressMax).nullish(),
+  "contractStart": zod.string().regex(updateOwnMemberProfileResponseMemberOneContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(updateOwnMemberProfileResponseMemberOneContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1185,6 +1259,7 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneBirthDateRegExp).nullish(),
   "address": zod.string().max(updateMemberNotificationSettingsResponseMemberOneAddressMax).nullish(),
@@ -1264,6 +1339,7 @@ export const ClaimMembershipResponse = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(claimMembershipResponseMemberOneBirthDateRegExp).nullish(),
   "address": zod.string().max(claimMembershipResponseMemberOneAddressMax).nullish(),
@@ -1322,6 +1398,7 @@ export const AcceptMemberInvitationResponse = zod.object({
   "email": zod.string().email().nullable(),
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(acceptMemberInvitationResponseMemberOneBirthDateRegExp).nullish(),
   "address": zod.string().max(acceptMemberInvitationResponseMemberOneAddressMax).nullish(),

@@ -61,6 +61,7 @@ import type {
   MemberNotification,
   MemberNotificationSettings,
   MemberNotificationUnreadCount,
+  MemberSelfUpdate,
   MemberUpdate,
   ModuleKey,
   ModuleSetting,
@@ -3581,6 +3582,94 @@ export function useGetMemberHome<TData = Awaited<ReturnType<typeof getMemberHome
 
 
 
+
+export const getUpdateOwnMemberProfileUrl = () => {
+
+
+
+
+  return `/api/member/me/profile`
+}
+
+/**
+ * @summary Update editable fields of the signed-in member's linked membership
+ */
+export const updateOwnMemberProfile = async (memberSelfUpdate: MemberSelfUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MemberHome> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MemberHome>(getUpdateOwnMemberProfileUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(memberSelfUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOwnMemberProfileMutationKey = () => ['updateOwnMemberProfile'] as const;
+
+export const getUpdateOwnMemberProfileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnMemberProfile>>, TError,UpdateOwnMemberProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOwnMemberProfile>>, TError,UpdateOwnMemberProfileMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOwnMemberProfileMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOwnMemberProfile>>, UpdateOwnMemberProfileMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateOwnMemberProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOwnMemberProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateOwnMemberProfile>>>
+    export type UpdateOwnMemberProfileMutationBody = BodyType<MemberSelfUpdate>
+    export type UpdateOwnMemberProfileMutationError = ErrorType<void>
+    export type UpdateOwnMemberProfileMutationVariables = {data: BodyType<MemberSelfUpdate>}
+
+    /**
+ * @summary Update editable fields of the signed-in member's linked membership
+ */
+export const useUpdateOwnMemberProfile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnMemberProfile>>, TError,UpdateOwnMemberProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOwnMemberProfile>>,
+        TError,
+        UpdateOwnMemberProfileMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOwnMemberProfileMutationOptions(options));
+    }
 
 export const getUpdateMemberNotificationSettingsUrl = () => {
 

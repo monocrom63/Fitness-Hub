@@ -595,6 +595,7 @@ router.get("/members", async (req, res): Promise<void> => {
       email: membersTable.email,
       phone: membersTable.phone,
       membershipType: membersTable.membershipType,
+      billingInterval: membersTable.billingInterval,
       status: membersTable.status,
       birthDate: membersTable.birthDate,
       address: membersTable.address,

@@ -8,6 +8,7 @@ import {
   ListMemberNotificationsQueryParams, ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
   RegisterMemberPushSubscriptionBody, RegisterMemberPushSubscriptionResponse,
+  UpdateOwnMemberProfileBody,
   UpdateMemberNotificationSettingsBody, UpdateMemberNotificationSettingsResponse,
   UnregisterMemberPushSubscriptionParams, UnregisterMemberPushSubscriptionResponse,
 } from "@workspace/api-zod";
@@ -29,7 +30,12 @@ export async function linkedMember(userId: string) {
     email: membersTable.email,
     phone: membersTable.phone,
     membershipType: membersTable.membershipType,
+    billingInterval: membersTable.billingInterval,
     status: membersTable.status,
+    birthDate: membersTable.birthDate,
+    address: membersTable.address,
+    contractStart: membersTable.contractStart,
+    contractDurationMonths: membersTable.contractDurationMonths,
     waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
@@ -146,6 +152,33 @@ export async function memberHome(member: LinkedMember | null) {
 router.get("/member/me", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));
+});
+
+router.patch("/member/me/profile", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Eine verbundene Mitgliedschaft ist erforderlich." }); return; }
+  const body = UpdateOwnMemberProfileBody.safeParse(req.body);
+  if (!body.success || Object.keys(body.data ?? {}).length === 0) {
+    res.status(400).json({ error: body.success ? "Keine Änderungen angegeben." : body.error.message });
+    return;
+  }
+  const identity = await getClerkIdentity(userId);
+  if (!identity.emailVerified) {
+    res.status(403).json({ error: "Bitte bestätige zuerst deine Konto-E-Mail-Adresse." });
+    return;
+  }
+  const [updated] = await db.update(membersTable).set({
+    ...body.data,
+    email: identity.email,
+    ...(body.data.fullName !== undefined ? { fullName: body.data.fullName.trim() } : {}),
+    ...(body.data.phone !== undefined ? { phone: body.data.phone?.trim() || null } : {}),
+    ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
+    ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
+  }).where(eq(membersTable.id, member.id)).returning({ id: membersTable.id });
+  if (!updated) { res.status(404).json({ error: "Mitgliedschaft nicht gefunden." }); return; }
   res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));
 });
 

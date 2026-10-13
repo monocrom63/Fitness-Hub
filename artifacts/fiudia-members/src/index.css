@@ -236,6 +236,16 @@ button:disabled { cursor: not-allowed; }
 .field:focus { border-color: #8472ac; }
 .field::placeholder { color: #a2a4a9; }
 .field-help { color: #787e89; font-size: 11px; line-height: 1.5; margin: 9px 0 21px; }
+.profile-form { display: grid; gap: 18px; max-width: 860px; }
+.profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.profile-field { display: grid; gap: 8px; color: #39445a; font-size: 12px; font-weight: 700; }
+.profile-field .field { box-sizing: border-box; font: inherit; font-weight: 400; }
+.profile-wide { grid-column: 1 / -1; }
+.profile-textarea { min-height: 86px; height: auto; padding: 12px 15px; resize: vertical; }
+.profile-readonly { display: flex; align-items: center; color: #737987; }
+.profile-success { color: #26734e; font-size: 13px; font-weight: 700; }
+.account-profile { max-width: 850px; overflow: auto; }
+@media (max-width: 680px) { .profile-grid { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } }
 .form-error { color: #aa4c42; background: #faeeeb; padding: 11px 13px; border-radius: 9px; font-size: 12px; line-height: 1.5; margin: 13px 0; }
 .connect-aside { background: #e9e4f5; padding: 30px; border-radius: 20px; }
 .connect-aside svg { color: #756297; }

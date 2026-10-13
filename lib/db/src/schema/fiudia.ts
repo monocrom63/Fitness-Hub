@@ -95,6 +95,7 @@ export const membersTable = pgTable("fiudia_members", {
   email: text("email").notNull(),
   phone: text("phone"),
   membershipType: text("membership_type").notNull(),
+  billingInterval: text("billing_interval").notNull().default("monthly"),
   status: text("status").notNull().default("active"),
   birthDate: date("birth_date", { mode: "string" }),
   address: text("address"),

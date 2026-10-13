@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './billingInterval';
 export * from './bookingCancellationInput';
 export * from './bookingCancellationInputExpectedStatus';
 export * from './checkIn';
@@ -75,6 +76,7 @@ export * from './memberNotification';
 export * from './memberNotificationEmailDeliveryStatus';
 export * from './memberNotificationSettings';
 export * from './memberNotificationUnreadCount';
+export * from './memberSelfUpdate';
 export * from './memberStatus';
 export * from './memberUpdate';
 export * from './moduleKey';

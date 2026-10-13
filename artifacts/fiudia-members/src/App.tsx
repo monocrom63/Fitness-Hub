@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
-import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
+import { ClerkProvider, SignIn, SignUp, UserProfile, useAuth, useClerk, useUser } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { shadcn } from '@clerk/themes';
 import { deDE } from '@clerk/localizations';
 import { useForm } from 'react-hook-form';
-import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, X } from 'lucide-react';
+import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, UserRound, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
 import type { Member, MemberCourse, MemberHome, MemberNotification } from '@workspace/api-client-react';
 import { unregisterMemberPushSubscription } from '@workspace/api-client-react';
@@ -13,7 +13,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead } from '@/hooks/use-member';
+import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead, useOwnMemberProfile } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { memberNotificationArchiveQueryOptions } from './notification-history';
 import courseBrowsePhoto from './assets/course-cable-pulldown.webp';
@@ -121,6 +121,7 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
     ...(member && home?.coursesEnabled ? [{ href: '/notifications', label: 'Hinweise', icon: Bell }] : []),
     ...(member && home?.checkInsEnabled ? [{ href: '/check-ins', label: 'Check-ins', icon: History }] : []),
     { href: '/connect', label: 'Mitgliedschaft', icon: Link2 },
+    ...(member ? [{ href: '/profile', label: 'Mein Profil', icon: UserRound }] : []),
   ];
   return <div className="app-shell">
     <aside className="rail">
@@ -465,13 +466,63 @@ function ConnectPage({ member }: { member: Member | null }) {
     </div><div className="footer-line">Deine Daten gehören zu dir.</div>
   </div>;
 }
+function ProfilePage({ member }: { member: Member }) {
+  const update = useOwnMemberProfile();
+  const form = useForm({
+    defaultValues: {
+      fullName: member.fullName, phone: member.phone || '', birthDate: member.birthDate || '',
+      address: member.address || '', billingInterval: member.billingInterval,
+    },
+  });
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const submit = form.handleSubmit(async values => {
+    setMessage(''); setError('');
+    try {
+      await update.mutateAsync({ data: {
+        fullName: values.fullName.trim(), phone: values.phone || null,
+        birthDate: values.birthDate || null, address: values.address.trim() || null,
+        billingInterval: values.billingInterval,
+      } });
+      setMessage('Deine Angaben wurden gespeichert.');
+    } catch (failure) { setError(errorMessage(failure)); }
+  });
+  return <div className="page">
+    <PageHeader eyebrow="Mein Profil" title="Deine Angaben." description="Hier kannst du deine persönlichen Daten und Vertragsangaben selbst aktualisieren." />
+    <form className="soft-card profile-form" onSubmit={submit}>
+      <div className="profile-grid">
+        <label className="profile-field">Vollständiger Name<input className="field" {...form.register('fullName', { required: true, minLength: 2, maxLength: 160 })} /></label>
+        <label className="profile-field">Telefon<input className="field" type="tel" {...form.register('phone')} /></label>
+        <label className="profile-field">Geburtsdatum<input className="field" type="date" {...form.register('birthDate')} /></label>
+        <label className="profile-field">E-Mail (Konto)<span className="field profile-readonly">{member.email || 'Keine E-Mail'}</span><Link className="text-link" href="/account">E-Mail im Konto ändern</Link></label>
+        <label className="profile-field profile-wide">Adresse<textarea className="field profile-textarea" {...form.register('address')} /></label>
+        <label className="profile-field">Tarif<span className="field profile-readonly">{member.membershipType}</span></label>
+        <label className="profile-field">Abbuchungsrhythmus<select className="field" {...form.register('billingInterval')}>
+          <option value="monthly">Monatlich – kein Rabatt</option>
+          <option value="semiannual">Halbjährlich – 5 % Rabatt</option>
+          <option value="annual">Jährlich – 10 % Rabatt</option>
+        </select></label>
+        <label className="profile-field">Vertragsbeginn<span className="field profile-readonly">{member.contractStart || 'Nicht hinterlegt'}</span></label>
+        <label className="profile-field">Vertragsdauer<span className="field profile-readonly">{member.contractDurationMonths ? `${member.contractDurationMonths} Monate` : 'Nicht hinterlegt'}</span></label>
+      </div>
+      <p className="field-help">Deine E-Mail wird nach ihrer Bestätigung mit deiner Mitgliedschaft synchronisiert. Tarif und Vertragsdaten können vorerst nur vom Studio geändert werden. Die Rabatte werden vorgemerkt; automatische Abbuchungen sind noch nicht aktiv. Mitgliedsstatus und Studiozuordnung kann nur dein Studio ändern.</p>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      {message && <div className="profile-success" role="status">{message}</div>}
+      <button className="button button-primary" type="submit" disabled={update.isPending}>{update.isPending ? 'Wird gespeichert …' : 'Änderungen speichern'} <Check size={15} /></button>
+    </form>
+    <div className="footer-line">Deine Vertragsangaben bleiben mit deinem Studio verbunden.</div>
+  </div>;
+}
+function AccountPage() {
+  return <div className="page"><PageHeader eyebrow="Konto" title="Konto verwalten." description="Ändere hier deine Anmelde-E-Mail und bestätige sie, bevor du dein Mitgliederprofil speicherst." /><div className="account-profile"><UserProfile /></div></div>;
+}
 function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const signIn = mode === 'sign-in';
   const redirect = afterAuthPath(sessionStorage, basePath, signIn ? '/' : '/connect');
   useEffect(() => pageTitle(signIn ? 'Anmelden' : 'Registrieren'), [signIn]);
   return <div className="auth-page"><div className="auth-aside auth-aside--photo"><img className={signIn ? 'auth-photo' : 'auth-photo auth-photo--signup'} src={signIn ? memberLoginPhoto : memberSignupPhoto} alt="" aria-hidden="true" /><Brand /><h1>Dein Studio.<br /><em>Dein Rhythmus.</em></h1><p>Alle Kurse, deine Buchungen und jeder Besuch. Ein ruhiger Ort für alles, was dich in Bewegung hält.</p><small>Fiudia / Dein Raum für Bewegung</small></div><main className="auth-main"><div className="auth-content"><div className="eyebrow">Fiudia Mitglieder</div><h2>{signIn ? 'Willkommen zurück.' : 'Schön, dass du da bist.'}</h2><p>{pendingInvite() ? 'Deine Einladung wartet nach der Anmeldung auf dich. Nutze die E-Mail-Adresse, an die dein Studio sie geschickt hat, und bestätige sie.' : signIn ? 'Melde dich an und mach dort weiter, wo du aufgehört hast.' : 'Erstelle ein Konto und verbinde danach deine Mitgliedschaft.'}</p><div className="auth-clerk">{signIn ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={redirect} /> : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} />}</div><div className="auth-switch">{signIn ? <>Noch kein Konto? <Link href="/sign-up" data-testid="link-sign-up">Registrieren</Link></> : <>Schon dabei? <Link href="/sign-in" data-testid="link-sign-in">Anmelden</Link></>}</div></div></main></div>;
 }
-function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' }) {
+function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <LoadingPage />;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -479,14 +530,14 @@ function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'co
   if (pending) return <Redirect to={pending} />;
   return <AuthenticatedPage page={page} />;
 }
-function AuthenticatedPage({ page, token = '' }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'invite'; token?: string }) {
+function AuthenticatedPage({ page, token = '' }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' | 'invite'; token?: string }) {
   const home = useGetMemberHome();
   if (home.isLoading) return <MemberShell member={null}><LoadingPage /></MemberShell>;
   if (home.isError || !home.data) return <MemberShell member={null}><div className="page"><PageHeader eyebrow="Dein Fiudia" title="Einen Moment." description="Wir versuchen, deine Mitgliedschaft zu laden." /><ErrorView onRetry={() => { void home.refetch(); }} /></div></MemberShell>;
   const memberHome = home.data;
   const member = memberHome.member;
   if ((page === 'courses' || page === 'notifications') && (!member || !memberHome.coursesEnabled) || page === 'check-ins' && !memberHome.checkInsEnabled) return <Redirect to="/" />;
-  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage home={memberHome} /> : page === 'check-ins' ? <CheckInsPage /> : <ConnectPage member={member} />}</MemberShell>;
+  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage home={memberHome} /> : page === 'check-ins' ? <CheckInsPage /> : page === 'profile' ? <ProfilePage member={member!} /> : page === 'account' ? <AccountPage /> : <ConnectPage member={member} />}</MemberShell>;
 }
 function NotFoundPage() {
   useEffect(() => pageTitle('Seite nicht gefunden'), []);
@@ -506,6 +557,8 @@ function Routes() {
     <Route path="/notifications"><ProtectedPage page="notifications" /></Route>
     <Route path="/check-ins"><ProtectedPage page="check-ins" /></Route>
     <Route path="/connect"><ProtectedPage page="connect" /></Route>
+    <Route path="/profile"><ProtectedPage page="profile" /></Route>
+    <Route path="/account"><ProtectedPage page="account" /></Route>
     <Route component={NotFoundPage} />
   </Switch></RoutedErrorBoundary>;
 }

@@ -27,6 +27,15 @@ export const MemberStatus = {
   paused: 'paused',
 } as const;
 
+export type BillingInterval = typeof BillingInterval[keyof typeof BillingInterval];
+
+
+export const BillingInterval = {
+  monthly: 'monthly',
+  semiannual: 'semiannual',
+  annual: 'annual',
+} as const;
+
 export interface Me {
   userId: string;
   userName: string;
@@ -156,6 +165,7 @@ export interface Member {
   /** @nullable */
   phone: string | null;
   membershipType: string;
+  billingInterval: BillingInterval;
   status: MemberStatus;
   /**
      * @nullable
@@ -200,6 +210,7 @@ export interface MemberInput {
      * @maxLength 80
      */
   membershipType: string;
+  billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
      * @nullable
@@ -243,6 +254,7 @@ export interface MemberUpdate {
      * @maxLength 80
      */
   membershipType?: string;
+  billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
      * @nullable
@@ -833,6 +845,30 @@ export interface ModuleUpdate {
 
 export interface MemberLinkInput {
   memberId: number;
+}
+
+export interface MemberSelfUpdate {
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  fullName?: string;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  phone?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  birthDate?: string | null;
+  /**
+     * @maxLength 400
+     * @nullable
+     */
+  address?: string | null;
+  billingInterval?: BillingInterval;
 }
 
 /**
