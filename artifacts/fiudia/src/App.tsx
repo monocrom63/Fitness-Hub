@@ -496,7 +496,7 @@ function CourseRoster({ course, onClose }: { course: Course; onClose: () => void
 
 function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const client = useQueryClient();
-  const { selectedStudioId, selectStudio, studios } = useStudioScope();
+  const { selectedStudioId, selectedStudioName, selectStudio, studios } = useStudioScope();
   const district = me.role === 'district_manager';
   const manager = me.role === 'studio_manager' || me.role === 'district_manager';
   const canBookMembers = manager && moduleEnabled(modules, 'members');
@@ -529,6 +529,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
     setPushHistoryOpen(false);
     setReturnToPushHistory(false);
     setOpen(false);
+    setCsvImportOpen(false);
     setEditingCourse(null);
   }, [selectedStudioId]);
   const update = (key: keyof typeof form) => (value: string) => { setTimeError(''); setForm((current) => ({ ...current, [key]: value })); };
@@ -613,7 +614,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
       {canBookMembers && course.status !== 'cancelled' && new Date(course.startsAt).getTime() > Date.now() && <button className="button button-outline course-book-button" onClick={() => { setBookingCourse(course); setBookingMemberId(''); setBookingResult(null); booking.reset(); }} data-testid={`button-book-course-${course.id}`}>Mitglied buchen <ArrowRight size={15} /></button>}
     </div>)}</div>}
     {manager && rosterCourse && <CourseRoster key={rosterCourse.id} course={rosterCourse} onClose={() => setRosterCourse(null)} />}
-     {manager && csvImportOpen && <Modal title="Kurse aus CSV importieren" onClose={() => setCsvImportOpen(false)}><CourseCsvImport me={me} studios={(studios.data ?? []) as StudioSummary[]} studiosLoading={district && studios.isLoading} studiosError={district && studios.isError} onClose={() => setCsvImportOpen(false)} onImported={() => { void client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); }} /></Modal>}
+    {manager && csvImportOpen && <Modal title="Kurse aus CSV importieren" onClose={() => setCsvImportOpen(false)}><CourseCsvImport activeStudioId={selectedStudioId} activeStudioName={(district ? selectedStudioName : me.studioName) ?? null} studiosLoading={district && studios.isLoading} studiosError={district && studios.isError} onClose={() => setCsvImportOpen(false)} onImported={() => { void client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); }} /></Modal>}
     {manager && pushHistoryOpen && <Modal title="Push-Verlauf der Kursänderungen" onClose={() => setPushHistoryOpen(false)}><CoursePushHistory key={selectedStudioId ?? 'all'} studioId={district ? selectedStudioId ?? undefined : me.studioId ?? undefined} onSelect={course => { setPushHistoryOpen(false); setReturnToPushHistory(true); setPushCourse(course); }} /></Modal>}
     {manager && pushCourse && <Modal title={`${pushCourse.title} · Push-Zustellung`} onClose={() => { setPushCourse(null); if (returnToPushHistory) setPushHistoryOpen(true); }}><CoursePushDeliveries key={pushCourse.id} course={pushCourse} /></Modal>}
     {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardQueryKey,
@@ -7,7 +7,7 @@ import {
   useCreateCourse,
   useListStudioRooms,
 } from '@workspace/api-client-react';
-import type { Me, RoomAsset, StudioSummary } from '@workspace/api-client-react';
+import type { RoomAsset } from '@workspace/api-client-react';
 import { Upload } from 'lucide-react';
 import { berlinDateTimeIso } from './course-time';
 import './CourseCsvImport.css';
@@ -22,7 +22,7 @@ type CourseRow = {
   weekday: string;
 };
 
-type ParsedCsv = { rows: CourseRow[]; error: string | null; invalidRows: string[] };
+type ParsedCsv = { rows: CourseRow[]; error: string | null; invalidRows: string[]; ignoredRows: number };
 type ImportResult = { line: number; message: string };
 
 function parseRecords(text: string): string[][] {
@@ -87,9 +87,10 @@ function parseDate(value: string): string | null {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : null;
 }
 
-function parseCsv(text: string): ParsedCsv {
+function parseCsv(text: string, activeStudioName: string): ParsedCsv {
   const records = parseRecords(text);
-  if (records.length < 2) return { rows: [], error: 'Die CSV braucht eine Kopfzeile und mindestens eine Kurszeile.', invalidRows: [] };
+  if (records.length < 2) return { rows: [], error: 'Die CSV braucht eine Kopfzeile und mindestens eine Kurszeile.', invalidRows: [], ignoredRows: 0 };
+  if (!activeStudioName) return { rows: [], error: 'Wähle zuerst ein aktives Studio aus.', invalidRows: [], ignoredRows: 0 };
   const headers = records[0].map((value, index) => index === 0 ? value.replace(/^\uFEFF/, '') : value);
   const columns = {
     date: columnIndex(headers, ['datum', 'date']),
@@ -101,18 +102,20 @@ function parseCsv(text: string): ParsedCsv {
   };
   const missing = Object.entries({ Datum: columns.date, Uhrzeit: columns.time, Kategorie: columns.title, Coach: columns.instructor, Studio: columns.studio })
     .filter(([, index]) => index < 0).map(([name]) => name);
-  if (missing.length) return { rows: [], error: `Diese Spalten fehlen: ${missing.join(', ')}.`, invalidRows: [] };
+  if (missing.length) return { rows: [], error: `Diese Spalten fehlen: ${missing.join(', ')}.`, invalidRows: [], ignoredRows: 0 };
 
   const rows: CourseRow[] = [];
   const invalidRows: string[] = [];
+  let ignoredRows = 0;
   for (let i = 1; i < records.length; i++) {
     const cells = records[i];
     const value = (index: number) => (cells[index] ?? '').trim();
+    const studioName = value(columns.studio);
+    if (keyOf(studioName) !== keyOf(activeStudioName)) { ignoredRows++; continue; }
     const date = parseDate(value(columns.date));
     const time = value(columns.time);
     const title = value(columns.title);
     const instructor = value(columns.instructor);
-    const studioName = value(columns.studio);
     if (!date || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || title.length < 2 || title.length > 120 ||
         instructor.length < 2 || instructor.length > 120 || !studioName || studioName.length > 120) {
       invalidRows.push(`Zeile ${i + 1}: Datum, Uhrzeit, Kurs, Coach oder Studio ist ungültig.`);
@@ -120,8 +123,8 @@ function parseCsv(text: string): ParsedCsv {
     }
     rows.push({ line: i + 1, title, instructor, date, time, studioName, weekday: columns.weekday >= 0 ? value(columns.weekday) : '' });
   }
-  if (!rows.length) return { rows: [], error: 'Keine gültigen Kurszeilen gefunden. Prüfe Datum, Uhrzeit, Kurs, Coach und Studio.', invalidRows };
-  return { rows, error: null, invalidRows };
+  if (!rows.length) return { rows: [], error: `Keine gültigen Kurszeilen für „${activeStudioName}“ gefunden. Andere Studios werden ignoriert.`, invalidRows, ignoredRows };
+  return { rows, error: null, invalidRows, ignoredRows };
 }
 
 function RoomMapping({ studioId, category, value, disabled, onChange }: {
@@ -144,9 +147,9 @@ function RoomMapping({ studioId, category, value, disabled, onChange }: {
   </label>;
 }
 
-export default function CourseCsvImport({ me, studios, studiosLoading, studiosError, onClose, onImported }: {
-  me: Me;
-  studios: StudioSummary[];
+export default function CourseCsvImport({ activeStudioId, activeStudioName, studiosLoading, studiosError, onClose, onImported }: {
+  activeStudioId: number | null;
+  activeStudioName: string | null;
   studiosLoading: boolean;
   studiosError: boolean;
   onClose: () => void;
@@ -154,29 +157,20 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
 }) {
   const client = useQueryClient();
   const create = useCreateCourse();
-  const availableStudios = useMemo<StudioSummary[]>(() => me.role === 'district_manager'
-    ? studios
-    : me.studioId && me.studioName ? [{ id: me.studioId, name: me.studioName, city: '' }] : [], [me.role, me.studioId, me.studioName, studios]);
   const [fileName, setFileName] = useState('');
-  const [parsed, setParsed] = useState<ParsedCsv>({ rows: [], error: '', invalidRows: [] });
+  const [parsed, setParsed] = useState<ParsedCsv>({ rows: [], error: '', invalidRows: [], ignoredRows: 0 });
   const [duration, setDuration] = useState('60');
   const [capacity, setCapacity] = useState('20');
-  const [studioMap, setStudioMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
 
-  const sourceStudios = [...new Set(parsed.rows.map(row => row.studioName))];
-  const sourceRoomMappings = [...new Map(parsed.rows.map(row => [`${row.studioName}\u001f${row.title}`, { studioName: row.studioName, category: row.title }])).values()];
-  const roomKey = (studioName: string, category: string) => `${studioName}\u001f${category}`;
-  const studioFor = (name: string) => availableStudios.find(studio => studio.id === Number(studioMap[name]));
-  const mappingComplete = sourceStudios.length > 0 && sourceStudios.every(name => !!studioFor(name));
-  const roomsComplete = sourceRoomMappings.length > 0 && sourceRoomMappings.every(({ studioName, category }) =>
-    !!studioFor(studioName) && !!roomMap[roomKey(studioName, category)]);
+  const sourceCategories = [...new Map(parsed.rows.map(row => [keyOf(row.title), row.title])).entries()];
+  const roomsComplete = sourceCategories.length > 0 && sourceCategories.every(([categoryKey]) => !!roomMap[categoryKey]);
   const durationValue = Number(duration);
   const capacityValue = Number(capacity);
-  const ready = !!parsed.rows.length && !parsed.error && !parsed.invalidRows.length && mappingComplete && roomsComplete &&
+  const ready = !!parsed.rows.length && !!activeStudioId && !!activeStudioName && !parsed.error && !parsed.invalidRows.length && roomsComplete &&
     Number.isInteger(durationValue) && durationValue > 0 && durationValue <= 480 &&
     Number.isInteger(capacityValue) && capacityValue >= 1 && capacityValue <= 200 &&
     !studiosLoading && !studiosError;
@@ -185,38 +179,17 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
     setFileName(file?.name ?? '');
     setResults([]);
     setProgress(0);
-    setStudioMap({});
     setRoomMap({});
-    if (!file) { setParsed({ rows: [], error: '', invalidRows: [] }); return; }
+    if (!file) { setParsed({ rows: [], error: '', invalidRows: [], ignoredRows: 0 }); return; }
     if (!file.name.toLowerCase().endsWith('.csv')) {
-      setParsed({ rows: [], error: 'Bitte wähle eine CSV-Datei aus.', invalidRows: [] }); return;
+      setParsed({ rows: [], error: 'Bitte wähle eine CSV-Datei aus.', invalidRows: [], ignoredRows: 0 }); return;
     }
     try {
-      const result = parseCsv(await file.text());
+      const result = parseCsv(await file.text(), activeStudioName ?? '');
       setParsed(result);
-      if (result.rows.length) {
-        const unique = [...new Set(result.rows.map(row => row.studioName))];
-        const initial: Record<string, string> = {};
-        for (const source of unique) {
-          const match = availableStudios.find(studio => keyOf(studio.name) === keyOf(source));
-          if (match) initial[source] = String(match.id);
-        }
-        setStudioMap(initial);
-      }
     } catch {
-      setParsed({ rows: [], error: 'Die CSV-Datei konnte nicht gelesen werden.', invalidRows: [] });
+      setParsed({ rows: [], error: 'Die CSV-Datei konnte nicht gelesen werden.', invalidRows: [], ignoredRows: 0 });
     }
-  }
-
-  function setStudio(source: string, studioId: string) {
-    setStudioMap(current => ({ ...current, [source]: studioId }));
-    setRoomMap(current => {
-      const next = { ...current };
-      for (const mapping of sourceRoomMappings) {
-        if (mapping.studioName === source) delete next[roomKey(source, mapping.category)];
-      }
-      return next;
-    });
   }
 
   function courseDateTime(row: CourseRow, minutesAfterStart: number): string | null {
@@ -236,7 +209,6 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
     let successes = 0;
     for (let index = 0; index < parsed.rows.length; index++) {
       const row = parsed.rows[index];
-      const studioId = Number(studioMap[row.studioName]);
       const startsAt = berlinDateTimeIso(`${row.date}T${row.time}`);
       const endsAt = courseDateTime(row, durationValue);
       if (!startsAt || !endsAt) {
@@ -247,11 +219,11 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
             data: {
               title: row.title,
               instructor: row.instructor,
-              studioId,
+              studioId: activeStudioId!,
               startsAt,
               endsAt,
               capacity: capacityValue,
-              room: roomMap[roomKey(row.studioName, row.title)],
+              room: roomMap[keyOf(row.title)],
             },
           });
           successes++;
@@ -273,7 +245,8 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
 
   const close = () => { if (!busy) onClose(); };
   return <div className="course-csv-import">
-    <p className="booking-hint">Eine Zeile wird als ein datierter Kurstermin angelegt. Studio, Trainer und Startzeit kommen aus der CSV; Dauer, Teilnehmerzahl und Raum legst du hier fest.</p>
+    <p className="booking-hint">Es wird nur das aktive Studio <strong>{activeStudioName || '—'}</strong> importiert. Kurse aus anderen Studios in der CSV werden ignoriert. Dauer und Teilnehmerzahl legst du hier fest.</p>
+    {parsed.ignoredRows > 0 && <p className="course-csv-notice" role="status">{parsed.ignoredRows} Zeilen aus anderen Studios wurden ignoriert.</p>}
     <p className="course-csv-notice">Bei aktiviertem Pulse-Modul veröffentlicht Fiudia für jeden angelegten Kurs zusätzlich den Hinweis „Neuer Kurs geplant“.</p>
     <label className="course-csv-upload">
       <Upload size={18} />
@@ -288,30 +261,17 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
         <label className="field"><span>Teilnehmerzahl</span><input type="number" min="1" max="200" step="1" value={capacity} onChange={event => setCapacity(event.target.value)} disabled={busy} /></label>
       </div>
       <div className="course-csv-studios">
-         <h3>Studio und Kursräume zuordnen</h3>
+         <h3>Kursräume zuordnen · {activeStudioName}</h3>
          <p className="booking-hint">Fiudia ordnet jede Kategorie automatisch einem gleichnamigen Kursraum zu. Wenn kein passender Raumname existiert, wähle den Kursraum hier aus.</p>
-        {sourceStudios.map(source => {
-          const selected = studioFor(source);
-           const categories = [...new Set(parsed.rows.filter(row => row.studioName === source).map(row => row.title))];
-          return <div className="course-csv-studio-row" key={source}>
-            <label className="field"><span>CSV-Studio: {source}</span>
-              <select value={studioMap[source] ?? ''} onChange={event => setStudio(source, event.target.value)} disabled={busy || studiosLoading || studiosError}>
-                <option value="">Zielstudio auswählen</option>
-                {availableStudios.map(studio => <option key={studio.id} value={studio.id}>{studio.name}{studio.city ? ` · ${studio.city}` : ''}</option>)}
-              </select>
-            </label>
-             {selected && categories.map(category => {
-               const key = roomKey(source, category);
-               return <RoomMapping key={key} studioId={selected.id} category={category} value={roomMap[key] ?? ''} disabled={busy} onChange={room => setRoomMap(current => ({ ...current, [key]: room }))} />;
-             })}
-          </div>;
-        })}
+         {activeStudioId && sourceCategories.map(([categoryKey, category]) =>
+           <RoomMapping key={categoryKey} studioId={activeStudioId} category={category} value={roomMap[categoryKey] ?? ''} disabled={busy} onChange={room => setRoomMap(current => ({ ...current, [categoryKey]: room }))} />
+         )}
         {studiosLoading && <p className="booking-hint" role="status">Studios werden geladen …</p>}
         {studiosError && <p className="form-error" role="alert">Studios konnten nicht geladen werden. Bitte schließe den Importdialog und versuche es erneut.</p>}
       </div>
       <div className="course-csv-preview">
         <strong>{parsed.rows.length} Termine erkannt</strong>
-        <span>{parsed.rows[0].date} bis {parsed.rows[parsed.rows.length - 1].date} · {sourceStudios.length} Studios</span>
+         <span>{activeStudioName} · {parsed.rows[0].date} bis {parsed.rows[parsed.rows.length - 1].date}</span>
         <ul>{parsed.rows.slice(0, 5).map(row => <li key={row.line}>{row.date} {row.time} · {row.title} · {row.instructor} · {row.studioName}</li>)}</ul>
         {parsed.rows.length > 5 && <span>und {parsed.rows.length - 5} weitere Termine</span>}
       </div>
