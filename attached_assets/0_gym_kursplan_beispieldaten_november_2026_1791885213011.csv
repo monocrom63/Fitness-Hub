@@ -1,0 +1,283 @@
+﻿Woche;Wochentag;Datum;Uhrzeit;Kategorie;Studio_Name;Coach
+Woche 1;Sonntag;01.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 1;Sonntag;01.11.2026;11:30;Pilates;Studio Mitte;Murat Yilmaz
+Woche 1;Sonntag;01.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Sonntag;01.11.2026;11:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Sonntag;01.11.2026;10:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Sonntag;01.11.2026;12:00;Barre;Studio Charlottenburg;Paul Neumann
+Woche 1;Sonntag;01.11.2026;10:00;Yoga;Studio Friedrichshain;Murat Yilmaz
+Woche 1;Sonntag;01.11.2026;11:30;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 1;Montag;02.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 1;Montag;02.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 1;Montag;02.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 1;Montag;02.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Montag;02.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Montag;02.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 1;Montag;02.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Montag;02.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 1;Montag;02.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 1;Montag;02.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 1;Dienstag;03.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 1;Dienstag;03.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 1;Dienstag;03.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 1;Dienstag;03.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Dienstag;03.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Dienstag;03.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 1;Dienstag;03.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Dienstag;03.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 1;Dienstag;03.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 1;Dienstag;03.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 1;Mittwoch;04.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 1;Mittwoch;04.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 1;Mittwoch;04.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 1;Mittwoch;04.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Mittwoch;04.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Mittwoch;04.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 1;Mittwoch;04.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Mittwoch;04.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 1;Mittwoch;04.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 1;Mittwoch;04.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 1;Donnerstag;05.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 1;Donnerstag;05.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 1;Donnerstag;05.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 1;Donnerstag;05.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Donnerstag;05.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Donnerstag;05.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 1;Donnerstag;05.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Donnerstag;05.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 1;Donnerstag;05.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 1;Donnerstag;05.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 1;Freitag;06.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 1;Freitag;06.11.2026;10:30;Yoga;Studio Mitte;Anna Becker
+Woche 1;Freitag;06.11.2026;17:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 1;Freitag;06.11.2026;08:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Freitag;06.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Freitag;06.11.2026;18:00;Strength;Studio Kreuzberg;David Fischer
+Woche 1;Freitag;06.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 1;Freitag;06.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Freitag;06.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 1;Freitag;06.11.2026;11:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 1;Samstag;07.11.2026;09:00;Yoga;Studio Mitte;Anna Becker
+Woche 1;Samstag;07.11.2026;10:30;Reformer;Studio Mitte;Lena Hoffmann
+Woche 1;Samstag;07.11.2026;09:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 1;Samstag;07.11.2026;10:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 1;Samstag;07.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 1;Samstag;07.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 1;Samstag;07.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 1;Samstag;07.11.2026;10:30;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Sonntag;08.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 2;Sonntag;08.11.2026;11:30;Pilates;Studio Mitte;Murat Yilmaz
+Woche 2;Sonntag;08.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Sonntag;08.11.2026;11:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Sonntag;08.11.2026;10:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Sonntag;08.11.2026;12:00;Barre;Studio Charlottenburg;Paul Neumann
+Woche 2;Sonntag;08.11.2026;10:00;Yoga;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Sonntag;08.11.2026;11:30;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 2;Montag;09.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 2;Montag;09.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 2;Montag;09.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 2;Montag;09.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Montag;09.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Montag;09.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 2;Montag;09.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Montag;09.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 2;Montag;09.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 2;Montag;09.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Dienstag;10.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 2;Dienstag;10.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 2;Dienstag;10.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 2;Dienstag;10.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Dienstag;10.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Dienstag;10.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 2;Dienstag;10.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Dienstag;10.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 2;Dienstag;10.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Dienstag;10.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 2;Mittwoch;11.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 2;Mittwoch;11.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 2;Mittwoch;11.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 2;Mittwoch;11.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Mittwoch;11.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Mittwoch;11.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 2;Mittwoch;11.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Mittwoch;11.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 2;Mittwoch;11.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 2;Mittwoch;11.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Donnerstag;12.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 2;Donnerstag;12.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 2;Donnerstag;12.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 2;Donnerstag;12.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Donnerstag;12.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Donnerstag;12.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 2;Donnerstag;12.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Donnerstag;12.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 2;Donnerstag;12.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Donnerstag;12.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 2;Freitag;13.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 2;Freitag;13.11.2026;10:30;Yoga;Studio Mitte;Anna Becker
+Woche 2;Freitag;13.11.2026;17:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 2;Freitag;13.11.2026;08:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Freitag;13.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Freitag;13.11.2026;18:00;Strength;Studio Kreuzberg;David Fischer
+Woche 2;Freitag;13.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 2;Freitag;13.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Freitag;13.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 2;Freitag;13.11.2026;11:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 2;Samstag;14.11.2026;09:00;Yoga;Studio Mitte;Anna Becker
+Woche 2;Samstag;14.11.2026;10:30;Reformer;Studio Mitte;Lena Hoffmann
+Woche 2;Samstag;14.11.2026;09:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 2;Samstag;14.11.2026;10:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 2;Samstag;14.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 2;Samstag;14.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 2;Samstag;14.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 2;Samstag;14.11.2026;10:30;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Sonntag;15.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 3;Sonntag;15.11.2026;11:30;Pilates;Studio Mitte;Murat Yilmaz
+Woche 3;Sonntag;15.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Sonntag;15.11.2026;11:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Sonntag;15.11.2026;10:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Sonntag;15.11.2026;12:00;Barre;Studio Charlottenburg;Paul Neumann
+Woche 3;Sonntag;15.11.2026;10:00;Yoga;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Sonntag;15.11.2026;11:30;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 3;Montag;16.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 3;Montag;16.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 3;Montag;16.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 3;Montag;16.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Montag;16.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Montag;16.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 3;Montag;16.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Montag;16.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 3;Montag;16.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 3;Montag;16.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Dienstag;17.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 3;Dienstag;17.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 3;Dienstag;17.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 3;Dienstag;17.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Dienstag;17.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Dienstag;17.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 3;Dienstag;17.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Dienstag;17.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 3;Dienstag;17.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Dienstag;17.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 3;Mittwoch;18.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 3;Mittwoch;18.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 3;Mittwoch;18.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 3;Mittwoch;18.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Mittwoch;18.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Mittwoch;18.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 3;Mittwoch;18.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Mittwoch;18.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 3;Mittwoch;18.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 3;Mittwoch;18.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Donnerstag;19.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 3;Donnerstag;19.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 3;Donnerstag;19.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 3;Donnerstag;19.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Donnerstag;19.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Donnerstag;19.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 3;Donnerstag;19.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Donnerstag;19.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 3;Donnerstag;19.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Donnerstag;19.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 3;Freitag;20.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 3;Freitag;20.11.2026;10:30;Yoga;Studio Mitte;Anna Becker
+Woche 3;Freitag;20.11.2026;17:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 3;Freitag;20.11.2026;08:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Freitag;20.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Freitag;20.11.2026;18:00;Strength;Studio Kreuzberg;David Fischer
+Woche 3;Freitag;20.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 3;Freitag;20.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Freitag;20.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 3;Freitag;20.11.2026;11:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 3;Samstag;21.11.2026;09:00;Yoga;Studio Mitte;Anna Becker
+Woche 3;Samstag;21.11.2026;10:30;Reformer;Studio Mitte;Lena Hoffmann
+Woche 3;Samstag;21.11.2026;09:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 3;Samstag;21.11.2026;10:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 3;Samstag;21.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 3;Samstag;21.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 3;Samstag;21.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 3;Samstag;21.11.2026;10:30;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Sonntag;22.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 4;Sonntag;22.11.2026;11:30;Pilates;Studio Mitte;Murat Yilmaz
+Woche 4;Sonntag;22.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Sonntag;22.11.2026;11:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Sonntag;22.11.2026;10:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Sonntag;22.11.2026;12:00;Barre;Studio Charlottenburg;Paul Neumann
+Woche 4;Sonntag;22.11.2026;10:00;Yoga;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Sonntag;22.11.2026;11:30;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 4;Montag;23.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 4;Montag;23.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 4;Montag;23.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 4;Montag;23.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Montag;23.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Montag;23.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 4;Montag;23.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Montag;23.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 4;Montag;23.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 4;Montag;23.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Dienstag;24.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 4;Dienstag;24.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 4;Dienstag;24.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 4;Dienstag;24.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Dienstag;24.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Dienstag;24.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 4;Dienstag;24.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Dienstag;24.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 4;Dienstag;24.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Dienstag;24.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 4;Mittwoch;25.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 4;Mittwoch;25.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 4;Mittwoch;25.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 4;Mittwoch;25.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Mittwoch;25.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Mittwoch;25.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 4;Mittwoch;25.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Mittwoch;25.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 4;Mittwoch;25.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 4;Mittwoch;25.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Donnerstag;26.11.2026;08:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 4;Donnerstag;26.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 4;Donnerstag;26.11.2026;17:30;Mobility;Studio Mitte;Murat Yilmaz
+Woche 4;Donnerstag;26.11.2026;07:30;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Donnerstag;26.11.2026;12:00;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Donnerstag;26.11.2026;18:30;Strength;Studio Kreuzberg;David Fischer
+Woche 4;Donnerstag;26.11.2026;09:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Donnerstag;26.11.2026;17:30;Barre;Studio Charlottenburg;Paul Neumann
+Woche 4;Donnerstag;26.11.2026;08:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Donnerstag;26.11.2026;19:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 4;Freitag;27.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 4;Freitag;27.11.2026;10:30;Yoga;Studio Mitte;Anna Becker
+Woche 4;Freitag;27.11.2026;17:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 4;Freitag;27.11.2026;08:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Freitag;27.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Freitag;27.11.2026;18:00;Strength;Studio Kreuzberg;David Fischer
+Woche 4;Freitag;27.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 4;Freitag;27.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Freitag;27.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 4;Freitag;27.11.2026;11:00;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 4;Samstag;28.11.2026;09:00;Yoga;Studio Mitte;Anna Becker
+Woche 4;Samstag;28.11.2026;10:30;Reformer;Studio Mitte;Lena Hoffmann
+Woche 4;Samstag;28.11.2026;09:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 4;Samstag;28.11.2026;10:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 4;Samstag;28.11.2026;09:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 4;Samstag;28.11.2026;11:00;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 4;Samstag;28.11.2026;09:00;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 4;Samstag;28.11.2026;10:30;Boxing;Studio Friedrichshain;Murat Yilmaz
+Woche 5;Sonntag;29.11.2026;10:00;Yoga;Studio Mitte;Anna Becker
+Woche 5;Sonntag;29.11.2026;11:30;Pilates;Studio Mitte;Murat Yilmaz
+Woche 5;Sonntag;29.11.2026;10:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 5;Sonntag;29.11.2026;11:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 5;Sonntag;29.11.2026;10:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 5;Sonntag;29.11.2026;12:00;Barre;Studio Charlottenburg;Paul Neumann
+Woche 5;Sonntag;29.11.2026;10:00;Yoga;Studio Friedrichshain;Murat Yilmaz
+Woche 5;Sonntag;29.11.2026;11:30;HYROX;Studio Friedrichshain;Nina Wagner
+Woche 5;Montag;30.11.2026;07:30;Yoga;Studio Mitte;Anna Becker
+Woche 5;Montag;30.11.2026;09:00;Reformer;Studio Mitte;Lena Hoffmann
+Woche 5;Montag;30.11.2026;18:00;Pilates;Studio Mitte;Murat Yilmaz
+Woche 5;Montag;30.11.2026;08:00;HYROX;Studio Kreuzberg;Jonas Weber
+Woche 5;Montag;30.11.2026;17:30;Functional Training;Studio Kreuzberg;Mia Schneider
+Woche 5;Montag;30.11.2026;19:00;Strength;Studio Kreuzberg;David Fischer
+Woche 5;Montag;30.11.2026;08:30;Reformer;Studio Charlottenburg;Lena Hoffmann
+Woche 5;Montag;30.11.2026;18:30;Yoga;Studio Charlottenburg;Sophie Klein
+Woche 5;Montag;30.11.2026;07:00;HYROX;Studio Friedrichshain;David Fischer
+Woche 5;Montag;30.11.2026;18:00;Boxing;Studio Friedrichshain;Murat Yilmaz
