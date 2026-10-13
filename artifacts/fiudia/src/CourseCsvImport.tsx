@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardQueryKey,
@@ -124,14 +124,18 @@ function parseCsv(text: string): ParsedCsv {
   return { rows, error: null, invalidRows };
 }
 
-function RoomMapping({ studioId, value, disabled, onChange }: {
-  studioId: number; value: string; disabled: boolean; onChange: (room: string) => void;
+function RoomMapping({ studioId, category, value, disabled, onChange }: {
+  studioId: number; category: string; value: string; disabled: boolean; onChange: (room: string) => void;
 }) {
   const rooms = useListStudioRooms(studioId, {
     query: { enabled: studioId > 0, queryKey: getListStudioRoomsQueryKey(studioId), refetchOnMount: 'always' },
   });
+  const match = rooms.data?.find(room => keyOf(room.name) === keyOf(category));
+  useEffect(() => {
+    if (!value && match) onChange(match.name);
+  }, [value, match?.name, onChange]);
   return <label className="field">
-    <span>Raum</span>
+    <span>Kategorie „{category}“ → Kursraum</span>
     <select required value={value} disabled={disabled || rooms.isLoading || rooms.isError || !rooms.data?.length} onChange={event => onChange(event.target.value)}>
       <option value="">{rooms.isLoading ? 'Räume werden geladen …' : rooms.isError ? 'Räume konnten nicht geladen werden' : rooms.data?.length ? 'Raum auswählen' : 'Noch kein Raum angelegt'}</option>
       {rooms.data?.map((room: RoomAsset) => <option key={room.id} value={room.name}>{room.name}</option>)}
@@ -164,9 +168,12 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
   const [results, setResults] = useState<ImportResult[]>([]);
 
   const sourceStudios = [...new Set(parsed.rows.map(row => row.studioName))];
+  const sourceRoomMappings = [...new Map(parsed.rows.map(row => [`${row.studioName}\u001f${row.title}`, { studioName: row.studioName, category: row.title }])).values()];
+  const roomKey = (studioName: string, category: string) => `${studioName}\u001f${category}`;
   const studioFor = (name: string) => availableStudios.find(studio => studio.id === Number(studioMap[name]));
   const mappingComplete = sourceStudios.length > 0 && sourceStudios.every(name => !!studioFor(name));
-  const roomsComplete = sourceStudios.length > 0 && sourceStudios.every(name => !!studioFor(name) && !!roomMap[name]);
+  const roomsComplete = sourceRoomMappings.length > 0 && sourceRoomMappings.every(({ studioName, category }) =>
+    !!studioFor(studioName) && !!roomMap[roomKey(studioName, category)]);
   const durationValue = Number(duration);
   const capacityValue = Number(capacity);
   const ready = !!parsed.rows.length && !parsed.error && !parsed.invalidRows.length && mappingComplete && roomsComplete &&
@@ -203,7 +210,13 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
 
   function setStudio(source: string, studioId: string) {
     setStudioMap(current => ({ ...current, [source]: studioId }));
-    setRoomMap(current => ({ ...current, [source]: '' }));
+    setRoomMap(current => {
+      const next = { ...current };
+      for (const mapping of sourceRoomMappings) {
+        if (mapping.studioName === source) delete next[roomKey(source, mapping.category)];
+      }
+      return next;
+    });
   }
 
   function courseDateTime(row: CourseRow, minutesAfterStart: number): string | null {
@@ -238,7 +251,7 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
               startsAt,
               endsAt,
               capacity: capacityValue,
-              room: roomMap[row.studioName],
+              room: roomMap[roomKey(row.studioName, row.title)],
             },
           });
           successes++;
@@ -275,9 +288,11 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
         <label className="field"><span>Teilnehmerzahl</span><input type="number" min="1" max="200" step="1" value={capacity} onChange={event => setCapacity(event.target.value)} disabled={busy} /></label>
       </div>
       <div className="course-csv-studios">
-        <h3>Studio und Raum zuordnen</h3>
+         <h3>Studio und Kursräume zuordnen</h3>
+         <p className="booking-hint">Fiudia ordnet jede Kategorie automatisch einem gleichnamigen Kursraum zu. Wenn kein passender Raumname existiert, wähle den Kursraum hier aus.</p>
         {sourceStudios.map(source => {
           const selected = studioFor(source);
+           const categories = [...new Set(parsed.rows.filter(row => row.studioName === source).map(row => row.title))];
           return <div className="course-csv-studio-row" key={source}>
             <label className="field"><span>CSV-Studio: {source}</span>
               <select value={studioMap[source] ?? ''} onChange={event => setStudio(source, event.target.value)} disabled={busy || studiosLoading || studiosError}>
@@ -285,7 +300,10 @@ export default function CourseCsvImport({ me, studios, studiosLoading, studiosEr
                 {availableStudios.map(studio => <option key={studio.id} value={studio.id}>{studio.name}{studio.city ? ` · ${studio.city}` : ''}</option>)}
               </select>
             </label>
-            {selected && <RoomMapping studioId={selected.id} value={roomMap[source] ?? ''} disabled={busy} onChange={room => setRoomMap(current => ({ ...current, [source]: room }))} />}
+             {selected && categories.map(category => {
+               const key = roomKey(source, category);
+               return <RoomMapping key={key} studioId={selected.id} category={category} value={roomMap[key] ?? ''} disabled={busy} onChange={room => setRoomMap(current => ({ ...current, [key]: room }))} />;
+             })}
           </div>;
         })}
         {studiosLoading && <p className="booking-hint" role="status">Studios werden geladen …</p>}
