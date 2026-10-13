@@ -408,7 +408,7 @@ function MemberInvitationDialog({ member, onClose }: { member: Member; onClose: 
       {!link ? <>
         <p className="booking-hint">Fiudia erstellt einen einmaligen Link und verschickt ihn an die hinterlegte E-Mail-Adresse. Du kannst den Link anschließend zusätzlich kopieren.</p>
         {invitation.isError && <p className="form-error" role="alert" data-testid="status-invitation-error">Einladung konnte nicht erstellt werden. Bitte versuche es erneut.</p>}
-        <button className="button button-dark button-wide" disabled={invitation.isPending} onClick={() => invitation.mutate({ id: member.id }, { onSuccess: result => setLink(result) })} data-testid={`button-generate-member-invitation-${member.id}`}>{invitation.isPending ? 'Einladung wird versendet …' : 'Einladung per E-Mail senden'}</button>
+        <button className="button button-dark button-wide" disabled={invitation.isPending} onClick={() => invitation.mutate({ id: member.id }, { onSuccess: result => setLink(result) })} data-testid={`button-generate-member-invitation-${member.id}`}>{invitation.isPending ? 'Bestätigungslink wird erzeugt …' : 'Bestätigungslink erzeugen und per E-Mail senden'}</button>
       </> : <>
         {link.emailSent
           ? <p className="booking-result" role="status" data-testid="status-member-invitation-email-sent">Einladung per E-Mail an {link.memberEmail} versendet.</p>
