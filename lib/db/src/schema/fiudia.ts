@@ -96,6 +96,10 @@ export const membersTable = pgTable("fiudia_members", {
   phone: text("phone"),
   membershipType: text("membership_type").notNull(),
   status: text("status").notNull().default("active"),
+  birthDate: date("birth_date", { mode: "string" }),
+  address: text("address"),
+  contractStart: date("contract_start", { mode: "string" }),
+  contractDurationMonths: integer("contract_duration_months"),
   waitlistEmailEnabled: integer("waitlist_email_enabled").notNull().default(0),
   joinedAt: timestamp("joined_at", { withTimezone: true })
     .notNull()

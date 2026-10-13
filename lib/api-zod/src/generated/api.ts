@@ -180,6 +180,14 @@ export const ListMembersQueryParams = zod.object({
   "studioId": zod.coerce.number().int().optional()
 })
 
+export const listMembersResponseBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const listMembersResponseAddressMax = 400;
+
+export const listMembersResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const listMembersResponseContractDurationMonthsMax = 1200;
+
+
+
 export const ListMembersResponseItem = zod.object({
   "id": zod.number().int(),
   "fullName": zod.string(),
@@ -187,6 +195,10 @@ export const ListMembersResponseItem = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(listMembersResponseBirthDateRegExp).nullish(),
+  "address": zod.string().max(listMembersResponseAddressMax).nullish(),
+  "contractStart": zod.string().regex(listMembersResponseContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(listMembersResponseContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -208,6 +220,12 @@ export const createMemberBodyPhoneMax = 40;
 export const createMemberBodyMembershipTypeMin = 2;
 export const createMemberBodyMembershipTypeMax = 80;
 
+export const createMemberBodyBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const createMemberBodyAddressMax = 400;
+
+export const createMemberBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const createMemberBodyContractDurationMonthsMax = 1200;
+
 
 
 export const CreateMemberBody = zod.object({
@@ -216,8 +234,20 @@ export const CreateMemberBody = zod.object({
   "phone": zod.string().max(createMemberBodyPhoneMax).optional(),
   "membershipType": zod.string().min(createMemberBodyMembershipTypeMin).max(createMemberBodyMembershipTypeMax),
   "status": zod.enum(['active', 'trial', 'paused']).optional(),
+  "birthDate": zod.string().regex(createMemberBodyBirthDateRegExp).nullish(),
+  "address": zod.string().max(createMemberBodyAddressMax).nullish(),
+  "contractStart": zod.string().regex(createMemberBodyContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(createMemberBodyContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int()
 })
+
+export const createMemberResponseBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const createMemberResponseAddressMax = 400;
+
+export const createMemberResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const createMemberResponseContractDurationMonthsMax = 1200;
+
+
 
 export const CreateMemberResponse = zod.object({
   "id": zod.number().int(),
@@ -226,6 +256,10 @@ export const CreateMemberResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(createMemberResponseBirthDateRegExp).nullish(),
+  "address": zod.string().max(createMemberResponseAddressMax).nullish(),
+  "contractStart": zod.string().regex(createMemberResponseContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(createMemberResponseContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -250,6 +284,12 @@ export const updateMemberBodyPhoneMax = 40;
 export const updateMemberBodyMembershipTypeMin = 2;
 export const updateMemberBodyMembershipTypeMax = 80;
 
+export const updateMemberBodyBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberBodyAddressMax = 400;
+
+export const updateMemberBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberBodyContractDurationMonthsMax = 1200;
+
 
 
 export const UpdateMemberBody = zod.object({
@@ -257,8 +297,20 @@ export const UpdateMemberBody = zod.object({
   "email": zod.string().email().max(updateMemberBodyEmailMax).optional(),
   "phone": zod.string().max(updateMemberBodyPhoneMax).nullish(),
   "membershipType": zod.string().min(updateMemberBodyMembershipTypeMin).max(updateMemberBodyMembershipTypeMax).optional(),
-  "status": zod.enum(['active', 'trial', 'paused']).optional()
+  "status": zod.enum(['active', 'trial', 'paused']).optional(),
+  "birthDate": zod.string().regex(updateMemberBodyBirthDateRegExp).nullish(),
+  "address": zod.string().max(updateMemberBodyAddressMax).nullish(),
+  "contractStart": zod.string().regex(updateMemberBodyContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(updateMemberBodyContractDurationMonthsMax).nullish()
 })
+
+export const updateMemberResponseBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberResponseAddressMax = 400;
+
+export const updateMemberResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberResponseContractDurationMonthsMax = 1200;
+
+
 
 export const UpdateMemberResponse = zod.object({
   "id": zod.number().int(),
@@ -267,6 +319,10 @@ export const UpdateMemberResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(updateMemberResponseBirthDateRegExp).nullish(),
+  "address": zod.string().max(updateMemberResponseAddressMax).nullish(),
+  "contractStart": zod.string().regex(updateMemberResponseContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(updateMemberResponseContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1061,6 +1117,14 @@ export const UpdateModuleResponse = zod.object({
 /**
  * @summary Get the signed-in member's own profile and activity summary
  */
+export const getMemberHomeResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const getMemberHomeResponseMemberOneAddressMax = 400;
+
+export const getMemberHomeResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const getMemberHomeResponseMemberOneContractDurationMonthsMax = 1200;
+
+
+
 export const GetMemberHomeResponse = zod.object({
   "member": zod.union([zod.object({
   "id": zod.number().int(),
@@ -1069,6 +1133,10 @@ export const GetMemberHomeResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(getMemberHomeResponseMemberOneBirthDateRegExp).nullish(),
+  "address": zod.string().max(getMemberHomeResponseMemberOneAddressMax).nullish(),
+  "contractStart": zod.string().regex(getMemberHomeResponseMemberOneContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(getMemberHomeResponseMemberOneContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1102,6 +1170,14 @@ export const UpdateMemberNotificationSettingsBody = zod.object({
   "waitlistEmailEnabled": zod.boolean()
 })
 
+export const updateMemberNotificationSettingsResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberNotificationSettingsResponseMemberOneAddressMax = 400;
+
+export const updateMemberNotificationSettingsResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberNotificationSettingsResponseMemberOneContractDurationMonthsMax = 1200;
+
+
+
 export const UpdateMemberNotificationSettingsResponse = zod.object({
   "member": zod.union([zod.object({
   "id": zod.number().int(),
@@ -1110,6 +1186,10 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneBirthDateRegExp).nullish(),
+  "address": zod.string().max(updateMemberNotificationSettingsResponseMemberOneAddressMax).nullish(),
+  "contractStart": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(updateMemberNotificationSettingsResponseMemberOneContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1169,6 +1249,14 @@ export const ClaimMembershipBody = zod.object({
   "memberId": zod.number().int()
 })
 
+export const claimMembershipResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const claimMembershipResponseMemberOneAddressMax = 400;
+
+export const claimMembershipResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const claimMembershipResponseMemberOneContractDurationMonthsMax = 1200;
+
+
+
 export const ClaimMembershipResponse = zod.object({
   "member": zod.union([zod.object({
   "id": zod.number().int(),
@@ -1177,6 +1265,10 @@ export const ClaimMembershipResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(claimMembershipResponseMemberOneBirthDateRegExp).nullish(),
+  "address": zod.string().max(claimMembershipResponseMemberOneAddressMax).nullish(),
+  "contractStart": zod.string().regex(claimMembershipResponseMemberOneContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(claimMembershipResponseMemberOneContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1215,6 +1307,14 @@ export const AcceptMemberInvitationBody = zod.object({
   "token": zod.string().min(acceptMemberInvitationBodyTokenMin).max(acceptMemberInvitationBodyTokenMax)
 })
 
+export const acceptMemberInvitationResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const acceptMemberInvitationResponseMemberOneAddressMax = 400;
+
+export const acceptMemberInvitationResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const acceptMemberInvitationResponseMemberOneContractDurationMonthsMax = 1200;
+
+
+
 export const AcceptMemberInvitationResponse = zod.object({
   "member": zod.union([zod.object({
   "id": zod.number().int(),
@@ -1223,6 +1323,10 @@ export const AcceptMemberInvitationResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "status": zod.enum(['active', 'trial', 'paused']),
+  "birthDate": zod.string().regex(acceptMemberInvitationResponseMemberOneBirthDateRegExp).nullish(),
+  "address": zod.string().max(acceptMemberInvitationResponseMemberOneAddressMax).nullish(),
+  "contractStart": zod.string().regex(acceptMemberInvitationResponseMemberOneContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(acceptMemberInvitationResponseMemberOneContractDurationMonthsMax).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),

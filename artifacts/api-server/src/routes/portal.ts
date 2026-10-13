@@ -596,6 +596,10 @@ router.get("/members", async (req, res): Promise<void> => {
       phone: membersTable.phone,
       membershipType: membersTable.membershipType,
       status: membersTable.status,
+      birthDate: membersTable.birthDate,
+      address: membersTable.address,
+      contractStart: membersTable.contractStart,
+      contractDurationMonths: membersTable.contractDurationMonths,
       studioId: membersTable.studioId,
       studioName: studiosTable.name,
       joinedAt: membersTable.joinedAt,
@@ -629,7 +633,7 @@ router.get("/members", async (req, res): Promise<void> => {
       rows.map((member) => ({
         ...member,
         ...(staff.role === "studio_employee"
-          ? { email: null, phone: null }
+          ? { email: null, phone: null, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
           : {}),
         joinedAt: member.joinedAt.toISOString(),
         lastCheckIn: latestCheckIn.get(member.id)?.toISOString() ?? null,
@@ -664,6 +668,10 @@ router.post("/members", async (req, res): Promise<void> => {
       phone: body.data.phone?.trim() || null,
       membershipType: body.data.membershipType.trim(),
       status: body.data.status ?? "active",
+      birthDate: body.data.birthDate || null,
+      address: body.data.address?.trim() || null,
+      contractStart: body.data.contractStart || null,
+      contractDurationMonths: body.data.contractDurationMonths ?? null,
     })
     .returning();
   const [studio] = await db
@@ -727,6 +735,10 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     ...(body.data.phone !== undefined
       ? { phone: body.data.phone?.trim() || null }
       : {}),
+    ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
+    ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
+    ...(body.data.contractStart !== undefined ? { contractStart: body.data.contractStart || null } : {}),
+    ...(body.data.contractDurationMonths !== undefined ? { contractDurationMonths: body.data.contractDurationMonths } : {}),
   };
   const [updated] = await db
     .update(membersTable)

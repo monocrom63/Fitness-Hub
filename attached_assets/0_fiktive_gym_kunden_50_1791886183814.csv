@@ -1,0 +1,51 @@
+﻿Name;Vorname;Geburtsdatum;Adresse;E-Mail;Tel_Nummer;Vertragsbeginn;Vertragsdauer;Kategorie
+Becker;Anna;14.03.1988;Musterstraße 12, 10115 Berlin;anna.becker@example.com;03012345678;01.09.2026;12 Monate;Platinum
+Schmidt;Ben;08.04.1975;Prenzlauer Allee 78, 10405 Berlin;ben.schmidt@example.com;03097226012;14.09.2026;12 Monate;Standard
+Müller;Clara;25.01.1987;Friedrichstraße 90, 12047 Berlin;clara.mueller@example.com;03047295260;07.03.2026;12 Monate;Basic
+Schneider;David;12.02.1994;Sonnenweg 78, 10115 Berlin;david.schneider@example.com;03071662963;04.09.2026;24 Monate;Basic
+Fischer;Emilia;20.11.1988;Sonnenweg 74, 10117 Berlin;emilia.fischer@example.com;03016150444;25.04.2026;12 Monate;Platinum
+Weber;Felix;13.02.1984;Schillerstraße 59, 10243 Berlin;felix.weber@example.com;03059684848;07.06.2026;12 Monate;Premium
+Meyer;Greta;21.10.1974;Friedrichstraße 69, 10243 Berlin;greta.meyer@example.com;03072043515;09.07.2026;12 Monate;Premium
+Wagner;Jonas;27.04.1973;Hauptstraße 104, 13353 Berlin;jonas.wagner@example.com;03045935572;07.02.2026;12 Monate;Basic
+Schulz;Lena;29.07.2001;Rosenstraße 19, 10243 Berlin;lena.schulz@example.com;03043101783;18.09.2026;12 Monate;Premium
+Hoffmann;Max;13.10.1997;Sonnenweg 29, 14057 Berlin;max.hoffmann@example.com;03022201654;28.01.2026;6 Monate;Basic
+Schäfer;Mia;14.11.1980;Berliner Straße 50, 14057 Berlin;mia.schaefer@example.com;03081016525;18.05.2026;6 Monate;Premium
+Koch;Noah;29.11.1977;Invalidenstraße 97, 12047 Berlin;noah.koch@example.com;03024972279;14.05.2026;12 Monate;Standard
+Bauer;Olivia;25.09.1986;Friedrichstraße 65, 10997 Berlin;olivia.bauer@example.com;03095758349;20.09.2026;12 Monate;Basic
+Richter;Paul;25.09.1980;Prenzlauer Allee 118, 12047 Berlin;paul.richter@example.com;03075579548;04.01.2026;12 Monate;Platinum
+Klein;Sophie;02.04.1989;Waldstraße 113, 10117 Berlin;sophie.klein@example.com;03075228535;25.02.2026;12 Monate;Basic
+Wolf;Leon;06.09.2000;Schillerstraße 68, 10405 Berlin;leon.wolf@example.com;03082383095;23.04.2026;12 Monate;Standard
+Schröder;Marie;29.08.1993;Prenzlauer Allee 58, 10405 Berlin;marie.schroeder@example.com;03040158366;11.02.2026;6 Monate;Standard
+Neumann;Elias;08.10.1984;Musterstraße 10, 10405 Berlin;elias.neumann@example.com;03019046318;28.01.2026;12 Monate;Basic
+Schwarz;Laura;22.05.1985;Kantstraße 28, 14057 Berlin;laura.schwarz@example.com;03042614537;26.08.2026;24 Monate;Basic
+Zimmermann;Tim;14.11.1976;Sonnenweg 55, 14057 Berlin;tim.zimmermann@example.com;03017270733;02.02.2026;24 Monate;Premium
+Braun;Nina;07.04.1976;Bahnhofstraße 69, 10243 Berlin;nina.braun@example.com;03066623995;09.03.2026;24 Monate;Basic
+Krüger;Lukas;26.08.1974;Invalidenstraße 13, 10115 Berlin;lukas.krueger@example.com;03022517517;06.04.2026;24 Monate;Standard
+Hofmann;Sarah;29.07.1983;Hauptstraße 22, 10115 Berlin;sarah.hofmann@example.com;03062401521;26.05.2026;24 Monate;Standard
+Hartmann;Finn;07.03.2001;Goethestraße 28, 10115 Berlin;finn.hartmann@example.com;03052091325;02.01.2026;24 Monate;Standard
+Lange;Julia;02.03.2003;Prenzlauer Allee 11, 10117 Berlin;julia.lange@example.com;03089864260;22.02.2026;12 Monate;Standard
+Schmitt;Tom;20.10.1985;Hauptstraße 80, 13353 Berlin;tom.schmitt@example.com;03098231132;19.10.2026;12 Monate;Platinum
+Werner;Amelie;23.11.1983;Parkallee 31, 13353 Berlin;amelie.werner@example.com;03027566185;15.05.2026;12 Monate;Platinum
+Schmitz;Moritz;15.01.1974;Lindenweg 10, 10997 Berlin;moritz.schmitz@example.com;03027778019;03.06.2026;12 Monate;Standard
+Krause;Hannah;27.08.1980;Invalidenstraße 91, 10115 Berlin;hannah.krause@example.com;03099639081;10.09.2026;6 Monate;Platinum
+Meier;Jan;04.05.1978;Lindenweg 96, 10997 Berlin;jan.meier@example.com;03047816686;07.10.2026;12 Monate;Basic
+Lehmann;Lisa;16.09.1986;Schillerstraße 116, 10117 Berlin;lisa.lehmann@example.com;03095132217;27.07.2026;12 Monate;Basic
+Schmid;Simon;21.03.1991;Schillerstraße 21, 13353 Berlin;simon.schmid@example.com;03085283645;04.01.2026;6 Monate;Platinum
+Schulze;Lea;02.09.1979;Sonnenweg 75, 13353 Berlin;lea.schulze@example.com;03027105448;10.01.2026;12 Monate;Platinum
+Maier;Oskar;07.06.1972;Waldstraße 86, 12047 Berlin;oskar.maier@example.com;03085146293;20.07.2026;12 Monate;Platinum
+Köhler;Pia;26.03.1985;Friedrichstraße 113, 10115 Berlin;pia.koehler@example.com;03034073380;26.06.2026;24 Monate;Premium
+Herrmann;Theo;06.05.1985;Lindenweg 49, 14057 Berlin;theo.herrmann@example.com;03039854548;27.04.2026;24 Monate;Standard
+König;Marlene;01.04.1984;Bahnhofstraße 52, 10997 Berlin;marlene.koenig@example.com;03019317495;12.05.2026;24 Monate;Premium
+Walter;Erik;04.01.1991;Schillerstraße 23, 10115 Berlin;erik.walter@example.com;03024549543;14.10.2026;12 Monate;Premium
+Mayer;Johanna;20.07.1990;Prenzlauer Allee 15, 10405 Berlin;johanna.mayer@example.com;03044188276;23.01.2026;24 Monate;Basic
+Huber;Luis;14.06.1982;Berliner Straße 86, 12047 Berlin;luis.huber@example.com;03099038359;24.02.2026;12 Monate;Standard
+Kaiser;Charlotte;13.06.1996;Goethestraße 71, 10405 Berlin;charlotte.kaiser@example.com;03066431351;22.07.2026;12 Monate;Premium
+Fuchs;Mats;18.07.1989;Musterstraße 39, 10405 Berlin;mats.fuchs@example.com;03067698610;20.10.2026;12 Monate;Standard
+Peters;Isabel;07.11.1998;Prenzlauer Allee 61, 10117 Berlin;isabel.peters@example.com;03048089166;22.09.2026;12 Monate;Basic
+Lang;Philipp;10.11.1985;Waldstraße 104, 10243 Berlin;philipp.lang@example.com;03013278320;08.01.2026;24 Monate;Premium
+Jung;Katharina;14.08.1974;Bahnhofstraße 92, 14057 Berlin;katharina.jung@example.com;03063640499;05.04.2026;6 Monate;Platinum
+Vogel;Niklas;08.07.1976;Friedrichstraße 103, 10115 Berlin;niklas.vogel@example.com;03084813739;28.04.2026;6 Monate;Standard
+Keller;Zoe;17.11.1999;Invalidenstraße 77, 14057 Berlin;zoe.keller@example.com;03092228802;14.09.2026;24 Monate;Platinum
+Günther;Anton;09.08.2000;Waldstraße 108, 14057 Berlin;anton.guenther@example.com;03094120751;09.04.2026;24 Monate;Basic
+Frank;Elisa;09.04.1988;Parkallee 41, 10243 Berlin;elisa.frank@example.com;03030244148;13.04.2026;12 Monate;Premium
+Berger;Fabian;14.07.1974;Parkallee 70, 13353 Berlin;fabian.berger@example.com;03018357162;27.04.2026;24 Monate;Standard

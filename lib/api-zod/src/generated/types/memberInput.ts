@@ -23,5 +23,26 @@ export interface MemberInput {
      */
   membershipType: string;
   status?: MemberStatus;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  birthDate?: string | null;
+  /**
+     * @maxLength 400
+     * @nullable
+     */
+  address?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  contractStart?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 1200
+     * @nullable
+     */
+  contractDurationMonths?: number | null;
   studioId: number;
 }
