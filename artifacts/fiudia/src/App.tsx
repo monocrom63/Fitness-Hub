@@ -7,7 +7,7 @@ import { deDE } from '@clerk/localizations';
 import {
   Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Copy, Dumbbell,
   LayoutDashboard, LogOut, Mail, MapPin, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2, DoorOpen,
-  ShieldCheck, Sparkles, Users, UserRound, X, Zap,
+  ShieldCheck, Sparkles, Users, UserRound, X, Zap, Upload,
 } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCourseBookingsQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
@@ -15,7 +15,7 @@ import {
   useCancelStaffCourseBooking, useCreateCourse, useUpdateCourse, useCreateInvitation, useCreateMember, useCreateMemberInvitation, useCreateStaffCourseBooking, useGetDashboard, useGetMe,
   getListStudiosQueryKey, useListCourseBookings, useListCourses, useListInvitations, useListMembers, useListModules, useListStudios, useUpdateMember, useUpdateModule,
 } from '@workspace/api-client-react';
-import type { Course, CourseRosterBooking, Dashboard, Invitation, Member, MemberInvitationLink, Me, ModuleKey, ModuleSetting, Role } from '@workspace/api-client-react';
+import type { Course, CourseRosterBooking, Dashboard, Invitation, Member, MemberInvitationLink, Me, ModuleKey, ModuleSetting, Role, StudioSummary } from '@workspace/api-client-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useRoute } from 'wouter';
 import onboardingPhoto from './assets/onboarding-strength.jpeg';
 import { Toaster } from '@/components/ui/toaster';
@@ -28,6 +28,7 @@ import { StudioScopeProvider, useStudioScope } from './StudioScope';
 import TrainerAbsencesPage from './TrainerAbsencesPage';
 import CoursePushDeliveries from './CoursePushDeliveries';
 import CoursePushHistory from './CoursePushHistory';
+import CourseCsvImport from './CourseCsvImport';
 import { berlinDateTimeInput, berlinDateTimeIso } from './course-time';
 import { courseQueryScope } from './course-studio-scope';
 import { acceptStaffInvitation, afterAuthInviteUrl, clearInvite, enterInvitation, pendingInvitationPath } from './invitation-return';
@@ -508,6 +509,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const membersQuery = useListMembers(bookingMemberParams, { query: { queryKey: getListMembersQueryKey(bookingMemberParams), enabled: !!bookingCourse && canBookMembers } });
   useEffect(() => { if (!canBookMembers) setBookingCourse(null); }, [canBookMembers]);
   const [open, setOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [selectedStudio, setSelectedStudio] = useState('');
   const [studioError, setStudioError] = useState('');
@@ -592,7 +594,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
   const book = (e: React.FormEvent) => { e.preventDefault(); if (!bookingCourse || !bookingMemberId || !canBookMembers) return; setBookingResult(null); booking.mutate({ id: bookingCourse.id, data: { memberId: Number(bookingMemberId) } }, { onSuccess: result => { setBookingResult(result.status === 'confirmed' ? 'Platz bestätigt.' : result.status === 'waitlisted' ? `Auf der Warteliste${result.waitlistPosition ? ` · Position ${result.waitlistPosition}` : ''}.` : 'Buchungsstatus: ' + result.status); void client.invalidateQueries({ queryKey: getListCourseBookingsQueryKey(bookingCourse.id) }); void client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } }); };
   const courses = query.data || [];
   return <>
-    <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={manager && <div className="course-header-actions"><button className="button button-outline" onClick={() => setPushHistoryOpen(true)} data-testid="button-course-push-history"><Zap size={17} /> Push-Verlauf</button><button className="button button-dark" onClick={openCreate} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button></div>} />
+     <PageHeader eyebrow={`${me.studioName || 'Workspace'} / Rhythmus`} title="Kurse" description="Kursplan und Buchungen im Blick." action={manager && <div className="course-header-actions"><button className="button button-outline" onClick={() => setPushHistoryOpen(true)} data-testid="button-course-push-history"><Zap size={17} /> Push-Verlauf</button><button className="button button-outline" onClick={() => setCsvImportOpen(true)} data-testid="button-import-courses-csv"><Upload size={17} /> CSV importieren</button><button className="button button-dark" onClick={openCreate} data-testid="button-create-course"><Plus size={17} /> Kurs planen</button></div>} />
     {district && studios.isLoading ? <LoadingBlock label="Studios werden geladen" /> : district && studios.isError ? <ErrorBlock retry={() => studios.refetch()} /> : district && !selectedStudioId ? <div className="empty-state" role="status">Kein Studio für den Kursplan verfügbar.</div> : query.isLoading ? <LoadingBlock label="Kursplan wird geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> : courses.length === 0 ? <div className="empty-state"><div className="empty-icon"><CalendarDays size={22} /></div><h3>Dein Kursplan ist noch leer</h3><p>Neue Kurse erscheinen hier.</p>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={openCreate} data-testid="button-empty-create-course"><Plus size={16} /> Ersten Kurs planen</button>}</div> : <div className="course-grid">{courses.map((course: Course) => <div className="course-card" key={course.id} data-testid={`course-card-${course.id}`}>
       <div className="course-accent" /><div className="course-card-top"><span className={`pill pill-${course.status}`}>{course.status === 'scheduled' ? 'Geplant' : course.status === 'full' ? 'Ausgebucht' : 'Abgesagt'}</span><span className="course-date">{new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(course.startsAt))}</span></div>
       <div className="course-time">{formatTime(course.startsAt)} <span>—</span> {formatTime(course.endsAt)}</div><h3>{course.title}</h3><p>{district && <><strong data-testid={`text-course-studio-${course.id}`}>{course.studioName}</strong> · </>}{course.instructor} · {course.room}</p>
@@ -604,6 +606,7 @@ function CoursesPage({ me, modules }: { me: Me; modules: ModuleSetting[] }) {
       {canBookMembers && course.status !== 'cancelled' && new Date(course.startsAt).getTime() > Date.now() && <button className="button button-outline course-book-button" onClick={() => { setBookingCourse(course); setBookingMemberId(''); setBookingResult(null); booking.reset(); }} data-testid={`button-book-course-${course.id}`}>Mitglied buchen <ArrowRight size={15} /></button>}
     </div>)}</div>}
     {manager && rosterCourse && <CourseRoster key={rosterCourse.id} course={rosterCourse} onClose={() => setRosterCourse(null)} />}
+     {manager && csvImportOpen && <Modal title="Kurse aus CSV importieren" onClose={() => setCsvImportOpen(false)}><CourseCsvImport me={me} studios={(studios.data ?? []) as StudioSummary[]} studiosLoading={district && studios.isLoading} studiosError={district && studios.isError} onClose={() => setCsvImportOpen(false)} onImported={() => { void client.invalidateQueries({ queryKey: getListCoursesQueryKey() }); void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); }} /></Modal>}
     {manager && pushHistoryOpen && <Modal title="Push-Verlauf der Kursänderungen" onClose={() => setPushHistoryOpen(false)}><CoursePushHistory key={selectedStudioId ?? 'all'} studioId={district ? selectedStudioId ?? undefined : me.studioId ?? undefined} onSelect={course => { setPushHistoryOpen(false); setReturnToPushHistory(true); setPushCourse(course); }} /></Modal>}
     {manager && pushCourse && <Modal title={`${pushCourse.title} · Push-Zustellung`} onClose={() => { setPushCourse(null); if (returnToPushHistory) setPushHistoryOpen(true); }}><CoursePushDeliveries key={pushCourse.id} course={pushCourse} /></Modal>}
     {canBookMembers && bookingCourse && <Modal title={`${bookingCourse.title} · Mitglied buchen`} onClose={() => setBookingCourse(null)}><form className="modal-form" onSubmit={book}><p className="booking-hint">Wähle ein aktives Mitglied. Bei ausgebuchten Kursen entscheidet die Buchung automatisch über die Warteliste.</p>{membersQuery.isLoading ? <div className="pulse-skeleton" role="status"><i /></div> : membersQuery.isError ? <ErrorBlock retry={() => membersQuery.refetch()} /> : <label className="field"><span>Aktives Mitglied</span><select required value={bookingMemberId} onChange={e => { setBookingMemberId(e.target.value); setBookingResult(null); }} data-testid="select-booking-member"><option value="">Mitglied auswählen</option>{(membersQuery.data || []).filter(member => member.status === 'active' && member.studioId === bookingCourse.studioId).map(member => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></label>}{!membersQuery.isLoading && !membersQuery.isError && !(membersQuery.data || []).some(member => member.status === 'active' && member.studioId === bookingCourse.studioId) && <p className="booking-hint">Keine aktiven Mitglieder für dieses Studio verfügbar.</p>}{bookingResult && <p className="booking-result" role="status" data-testid="status-booking-result">{bookingResult}</p>}{booking.isError && <p className="form-error" role="alert" data-testid="status-booking-error">Buchung fehlgeschlagen. Bitte prüfe die Berechtigung und versuche es erneut.</p>}<button className="button button-dark button-wide" disabled={!bookingMemberId || booking.isPending || membersQuery.isError || membersQuery.isLoading} data-testid="button-confirm-booking">{booking.isPending ? 'Buchung läuft …' : 'Buchung bestätigen'}</button></form></Modal>}
