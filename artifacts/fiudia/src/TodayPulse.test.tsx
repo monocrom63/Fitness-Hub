@@ -40,7 +40,7 @@ type RequestLog = { method: string; path: string; params: Record<string, string>
 
 function servePulse(
   rows: PulseMessage[],
-  hold?: (request: RequestLog) => void | Promise<void>,
+  hold?: (request: RequestLog) => void | Response | Promise<void | Response>,
   history: Array<{
     id: number;
     action: 'correction' | 'retraction';
@@ -62,7 +62,8 @@ function servePulse(
       ...(init?.body ? { body: JSON.parse(String(init.body)) as unknown } : {}),
     };
     requests.push(request);
-    await hold?.(request);
+    const override = await hold?.(request);
+    if (override instanceof Response) return override;
     if (request.method === 'GET' && request.path === '/api/pulse') {
       const beforeId = Number(url.searchParams.get('beforeId'));
       const page = rows
@@ -290,6 +291,56 @@ test('loads older pages per filter and refreshes an older read receipt across Al
   await screen.findByText('34 Nachrichten angezeigt');
   expect(screen.queryByTestId('pulse-message-63')).toBeNull();
   expect(visibleIds()).toEqual(rows.filter(row => !row.isRead).map(row => row.id));
+});
+
+test('a failed older-page request keeps loaded messages visible and can be retried', async () => {
+  const rows = notices();
+  let failOnce = true;
+  const requests = servePulse(rows, request => {
+    if (request.method === 'GET' && request.params.beforeId === '71' && failOnce) {
+      failOnce = false;
+      return Response.json({ error: 'Temporarily unavailable' }, { status: 503 });
+    }
+    return undefined;
+  });
+  const { user } = renderPulse();
+
+  await screen.findByText('30 Nachrichten angezeigt · weitere laden');
+  await user.click(screen.getByRole('button', { name: 'Ältere Nachrichten laden' }));
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toMatch(/Ältere Nachrichten konnten nicht geladen werden/);
+  expect(visibleIds()).toEqual(allDisplayOrder(rows.slice(0, 30)));
+  expect(screen.queryByTestId('pulse-message-63')).toBeNull();
+
+  await user.click(within(alert).getByRole('button', { name: 'Erneut versuchen' }));
+  await screen.findByText('38 Nachrichten angezeigt');
+  expect(visibleIds()).toEqual(allDisplayOrder(rows));
+  expect(requests.filter(request => request.params.beforeId === '71')).toHaveLength(2);
+});
+
+test('a failed read confirmation keeps an unread message visible and retryable', async () => {
+  const rows = notices().slice(1, 2);
+  let failOnce = true;
+  const requests = servePulse(rows, request => {
+    if (request.method === 'POST' && failOnce) {
+      failOnce = false;
+      return Response.json({ error: 'Temporarily unavailable' }, { status: 503 });
+    }
+    return undefined;
+  });
+  const { user } = renderPulse();
+
+  await user.click(screen.getByRole('button', { name: 'Ungelesen' }));
+  await screen.findByText('1 Nachricht angezeigt');
+  await user.click(screen.getByTestId('button-mark-pulse-read-99'));
+  expect((await screen.findByRole('alert')).textContent).toMatch(/Lesebestätigung fehlgeschlagen/);
+  const unread = screen.getByTestId('pulse-message-99');
+  expect(unread.classList.contains('unread')).toBe(true);
+  expect(within(unread).getByRole('button', { name: 'Als gelesen markieren' })).toBeTruthy();
+
+  await user.click(within(unread).getByRole('button', { name: 'Als gelesen markieren' }));
+  await waitFor(() => expect(screen.queryByTestId('pulse-message-99')).toBeNull());
+  expect(requests.filter(request => request.method === 'POST')).toHaveLength(2);
 });
 
 test('search after loading older pages starts a clean archive and paginates matching results', async () => {
