@@ -4,7 +4,7 @@ import {
   BookMemberCourseParams, BookMemberCourseResponse,
   CancelMemberCourseParams, CancelMemberCourseResponse,
   ClaimMembershipBody, ClaimMembershipResponse,
-  GetMemberHomeResponse, GetMemberNotificationUnreadCountResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
+  GetMemberHomeResponse, GetMemberCourseParams, GetMemberCourseResponse, GetMemberNotificationUnreadCountResponse, ListMemberCheckInsResponse, ListMemberCoursesQueryParams, ListMemberCoursesResponse,
   ListMemberNotificationsQueryParams, ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
   RegisterMemberPushSubscriptionBody, RegisterMemberPushSubscriptionResponse,
@@ -49,7 +49,7 @@ export async function linkedMember(userId: string) {
 
 type LinkedMember = NonNullable<Awaited<ReturnType<typeof linkedMember>>>;
 
-async function memberCourses(member: LinkedMember, requestedId?: number) {
+async function memberCourses(member: LinkedMember, requestedId?: number, detailOnly = false) {
   if (!(await isModuleEnabled(member.organizationId, "courses"))) return [];
   const upcoming = await db.select({
     id: coursesTable.id,
@@ -60,9 +60,11 @@ async function memberCourses(member: LinkedMember, requestedId?: number) {
     capacity: coursesTable.capacity,
     enrolled: coursesTable.enrolled,
     room: coursesTable.room,
+    status: coursesTable.status,
   }).from(coursesTable)
     .where(and(
       eq(coursesTable.studioId, member.studioId),
+      detailOnly ? eq(coursesTable.id, requestedId!) : undefined,
       gte(coursesTable.startsAt, new Date()),
       inArray(coursesTable.status, ["scheduled", "full"]),
     )).orderBy(asc(coursesTable.startsAt)).limit(60);
@@ -86,6 +88,7 @@ async function memberCourses(member: LinkedMember, requestedId?: number) {
         capacity: coursesTable.capacity,
         enrolled: coursesTable.enrolled,
         room: coursesTable.room,
+        status: coursesTable.status,
       }).from(coursesTable)
         .where(and(eq(coursesTable.id, requestedId), eq(coursesTable.studioId, member.studioId)))
         .limit(1);
@@ -301,6 +304,21 @@ router.get("/member/courses", async (req, res): Promise<void> => {
   const query = ListMemberCoursesQueryParams.safeParse(req.query);
   if (!query.success) { res.status(400).json({ error: "Ungültiger Kurs." }); return; }
   res.json(ListMemberCoursesResponse.parse(await memberCourses(member, query.data.courseId)));
+});
+
+router.get("/member/courses/:id", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Mitgliedschaft zuerst verbinden." }); return; }
+  if (!(await isModuleEnabled(member.organizationId, "courses"))) {
+    res.status(404).json({ error: "Kurs nicht gefunden." }); return;
+  }
+  const params = GetMemberCourseParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: "Ungültiger Kurs." }); return; }
+  const [course] = await memberCourses(member, params.data.id, true);
+  if (!course) { res.status(404).json({ error: "Kurs nicht gefunden." }); return; }
+  res.json(GetMemberCourseResponse.parse(course));
 });
 
 router.post("/member/courses/:id/book", async (req, res): Promise<void> => {

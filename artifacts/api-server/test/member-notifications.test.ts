@@ -6,7 +6,7 @@ import express from "express";
 import { eq } from "drizzle-orm";
 import {
   courseBookingsTable, coursesTable, db, memberNotificationsTable, waitlistEmailDeliveriesTable,
-  membersTable, organizationsTable, pool, studiosTable,
+  membersTable, organizationModulesTable, organizationsTable, pool, studiosTable,
 } from "@workspace/db";
 import memberAppRouter from "../src/routes/member-app";
 import { BookingError, cancelCourseBooking } from "../src/lib/course-bookings";
@@ -155,9 +155,11 @@ test("members can read and acknowledge only their own course notifications", asy
 
     // A notification remains actionable as a link after its course has left the
     // upcoming list, but must not expose unrelated historical courses.
+    const pastStartsAt = new Date(Date.now() - 2 * 86400000);
+    const pastEndsAt = new Date(pastStartsAt.getTime() + 3600000);
     await db.update(coursesTable).set({
-      startsAt: new Date(Date.now() - 2 * 86400000),
-      endsAt: new Date(Date.now() - 2 * 86400000 + 3600000),
+      startsAt: pastStartsAt,
+      endsAt: pastEndsAt,
     }).where(eq(coursesTable.id, course.id));
     const [unnotified] = await db.insert(coursesTable).values({
       studioId: studio.id, title: "Ohne Hinweis", instructor: "Trainer",
@@ -192,6 +194,32 @@ test("members can read and acknowledge only their own course notifications", asy
     assert.deepEqual(await courseIds(own.clerkUserId, `/member/courses?courseId=${foreignCourse.id}`), []);
     assert.deepEqual(await courseIds(waiting.clerkUserId, `/member/courses?courseId=${course.id}`), [course.id]);
     assert.equal((await request(own.clerkUserId, "GET", "/member/courses?courseId=invalid")).status, 400);
+
+    const detailPath = `/member/courses/${course.id}`;
+    assert.equal((await request(null, "GET", detailPath)).status, 401);
+    assert.equal((await request("unlinked", "GET", detailPath)).status, 403);
+    const detail = await request(own.clerkUserId, "GET", detailPath);
+    assert.equal(detail.status, 200);
+    assert.deepEqual(detail.body, {
+      id: course.id, title: course.title, instructor: course.instructor,
+      startsAt: pastStartsAt.toISOString(),
+      endsAt: pastEndsAt.toISOString(),
+      capacity: course.capacity, enrolled: 2, room: course.room,
+      studioName: studio.name, bookingStatus: null, waitlistPosition: null, status: "full",
+    });
+    assert.equal((await request(own.clerkUserId, "GET", `/member/courses/${unnotified.id}`)).status, 404);
+    const deniedForeign = await request(own.clerkUserId, "GET", `/member/courses/${foreignCourse.id}`);
+    const missing = await request(own.clerkUserId, "GET", "/member/courses/2147483647");
+    assert.equal(deniedForeign.status, 404);
+    assert.deepEqual(deniedForeign, missing, "foreign and missing courses have indistinguishable responses");
+    const waitingDetail = await request(waiting.clerkUserId, "GET", detailPath);
+    assert.equal(waitingDetail.status, 200);
+    assert.equal((waitingDetail.body as { bookingStatus: string }).bookingStatus, "confirmed");
+    for (const invalid of ["0", "-1", "1.5", "invalid", "2147483648"]) {
+      assert.equal((await request(own.clerkUserId, "GET", `/member/courses/${invalid}`)).status, 400);
+    }
+    await db.update(coursesTable).set({ status: "cancelled" }).where(eq(coursesTable.id, course.id));
+    assert.equal(((await request(own.clerkUserId, "GET", detailPath)).body as { status: string }).status, "cancelled");
 
     const sharedTimestamp = new Date("2099-01-01T00:00:00.000Z");
     const [historicalCourse] = await db.insert(coursesTable).values({
@@ -246,6 +274,10 @@ test("members can read and acknowledge only their own course notifications", asy
       nextPageItems.some(({ id, courseId }) => id === pagedNotices[0].id && courseId === historicalCourse.id),
       "the second page contains the sole notice for the distinct historical course",
     );
+    const archivedDetail = await request(own.clerkUserId, "GET", `/member/courses/${historicalCourse.id}`);
+    assert.equal(archivedDetail.status, 200, "courses from older pages have independent details");
+    assert.equal((archivedDetail.body as { title: string }).title, historicalCourse.title);
+    assert.equal((await request(other.clerkUserId, "GET", `/member/courses/${historicalCourse.id}`)).status, 404);
     assert.deepEqual(
       await courseIds(own.clerkUserId, `/member/courses?courseId=${historicalCourse.id}`),
       [historicalCourse.id],
@@ -278,6 +310,24 @@ test("members can read and acknowledge only their own course notifications", asy
       400,
       "a cursor belonging to another member is rejected",
     );
+    const futureCourses = await db.insert(coursesTable).values(Array.from({ length: 61 }, (_, index) => ({
+      studioId: studio.id, title: `Future ${index}`, instructor: "Trainer",
+      startsAt: new Date(Date.now() + (index + 1) * 86400000),
+      endsAt: new Date(Date.now() + (index + 1) * 86400000 + 3600000),
+      capacity: 2, room: "A",
+    }))).returning();
+    const beyondLimit = futureCourses[60];
+    assert.ok(!(await courseIds(own.clerkUserId, "/member/courses")).includes(beyondLimit.id));
+    const distantDetail = await request(own.clerkUserId, "GET", `/member/courses/${beyondLimit.id}`);
+    assert.equal(distantDetail.status, 200, "direct details are not restricted by the upcoming list limit");
+    assert.equal((distantDetail.body as { id: number }).id, beyondLimit.id);
+    await db.update(coursesTable).set({
+      startsAt: new Date(Date.now() + 86400000), endsAt: new Date(Date.now() + 90000000),
+    }).where(eq(coursesTable.id, foreignCourse.id));
+    assert.equal((await request(own.clerkUserId, "GET", `/member/courses/${foreignCourse.id}`)).status, 404,
+      "upcoming courses in another studio stay private even with an own stale notice");
+    await db.insert(organizationModulesTable).values({ organizationId: organization.id, key: "courses", enabled: 0 });
+    assert.equal((await request(own.clerkUserId, "GET", detailPath)).status, 404);
   } finally {
     if (server?.listening) {
       await new Promise<void>((resolve, reject) =>

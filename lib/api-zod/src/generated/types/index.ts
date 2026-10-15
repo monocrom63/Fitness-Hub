@@ -67,6 +67,8 @@ export * from './member';
 export * from './memberCheckIn';
 export * from './memberCourse';
 export * from './memberCourseBookingStatus';
+export * from './memberCourseDetail';
+export * from './memberCourseDetailStatus';
 export * from './memberHome';
 export * from './memberInput';
 export * from './memberInvitationAcceptInput';

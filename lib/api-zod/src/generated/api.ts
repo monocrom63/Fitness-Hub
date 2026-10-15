@@ -1511,6 +1511,34 @@ export const ListMemberCoursesResponse = zod.array(ListMemberCoursesResponseItem
 
 
 /**
+ * @summary Get a course in the member's studio, including historical courses linked from an own notification
+ */
+export const getMemberCoursePathIdMax = 2147483647;
+
+
+
+export const GetMemberCourseParams = zod.object({
+  "id": zod.coerce.number().int().min(1).max(getMemberCoursePathIdMax)
+})
+
+export const GetMemberCourseResponse = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
+  "waitlistPosition": zod.number().int().nullable()
+}).and(zod.object({
+  "status": zod.enum(['scheduled', 'full', 'cancelled'])
+}))
+
+
+/**
  * @summary Book the signed-in member or join the waitlist
  */
 export const BookMemberCourseParams = zod.object({

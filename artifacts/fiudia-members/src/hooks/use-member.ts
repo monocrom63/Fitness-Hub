@@ -11,6 +11,7 @@ import {
   useCancelMemberCourse,
   useClaimMembership,
   useGetMemberHome,
+  useGetMemberCourse,
   useGetMemberNotificationUnreadCount,
   useListMemberCheckIns,
   useListMemberCourses,
@@ -20,7 +21,7 @@ import {
 } from '@workspace/api-client-react';
 import { memberNotificationArchiveQueryKey } from '../notification-history';
 
-export { useGetMemberHome, useListMemberCourses, useListMemberCheckIns };
+export { useGetMemberHome, useGetMemberCourse, useListMemberCourses, useListMemberCheckIns };
 
 export function useMemberNotificationUnreadCount(enabled: boolean) {
   return useGetMemberNotificationUnreadCount({
@@ -97,6 +98,7 @@ export function useMemberActions() {
   const refresh = async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: getGetMemberHomeQueryKey() }),
+      client.invalidateQueries({ predicate: query => typeof query.queryKey[0] === 'string' && /^\/api\/member\/courses\/\d+$/.test(query.queryKey[0]) }),
       client.invalidateQueries({ queryKey: getListMemberCoursesQueryKey() }),
       client.invalidateQueries({ queryKey: getListMemberCheckInsQueryKey() }),
       client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() }),

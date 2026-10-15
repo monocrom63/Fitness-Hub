@@ -8,12 +8,12 @@ import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, UserRound, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
 import type { Member, MemberCourse, MemberHome, MemberNotification } from '@workspace/api-client-react';
-import { unregisterMemberPushSubscription } from '@workspace/api-client-react';
+import { getGetMemberCourseQueryKey, unregisterMemberPushSubscription } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useEmailPreference, useGetMemberHome, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead, useOwnMemberProfile } from '@/hooks/use-member';
+import { useEmailPreference, useGetMemberHome, useGetMemberCourse, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead, useOwnMemberProfile } from '@/hooks/use-member';
 import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
 import { memberNotificationArchiveQueryOptions } from './notification-history';
 import courseBrowsePhoto from './assets/course-cable-pulldown.webp';
@@ -162,13 +162,13 @@ function TodayPage({ member, home }: { member: Member; home: MemberHome }) {
     <div className="footer-line">Fiudia Mitglieder · Ein Ort für deinen eigenen Rhythmus.</div>
   </div>;
 }
-function CourseRow({ course, targeted = false }: { course: MemberCourse; targeted?: boolean }) {
+function CourseRow({ course, targeted = false, unavailable = false }: { course: MemberCourse; targeted?: boolean; unavailable?: boolean }) {
   const { book, cancel } = useMemberActions();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const booked = course.bookingStatus === 'confirmed' || course.bookingStatus === 'waitlisted';
-  const isPast = new Date(course.startsAt).getTime() <= Date.now();
+  const isPast = unavailable || new Date(course.startsAt).getTime() <= Date.now();
   const reserve = async () => {
     setError(''); setMessage('');
     try {
@@ -185,10 +185,30 @@ function CourseRow({ course, targeted = false }: { course: MemberCourse; targete
     <div className="course-day"><strong>{dayNumber(course.startsAt)}</strong><span>{monthLabel(course.startsAt)}</span></div>
     <div className="course-detail"><div className="eyebrow">{new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(course.startsAt))} · {timeLabel(course.startsAt)} – {timeLabel(course.endsAt)} Uhr</div><h3 data-testid={`text-course-title-${course.id}`}>{course.title}</h3><p>mit {course.instructor} · {course.studioName}</p></div>
     <div className="course-meta"><p><MapPin /> {course.room}</p><p><Users /> {course.enrolled} / {course.capacity} Plätze belegt</p></div>
-    <div className="course-action">{isPast ? <span className="status-chip none" data-testid={`status-course-past-${course.id}`}>Vergangener Kurs</span> : <><StatusChip course={course} />{booked ? <button type="button" className="button button-quiet" onClick={() => setConfirmCancel(true)} disabled={cancel.isPending} data-testid={`button-cancel-course-${course.id}`}>Stornieren</button> : <button type="button" className="button button-primary" onClick={() => { void reserve(); }} disabled={book.isPending} data-testid={`button-book-course-${course.id}`}>{book.isPending ? 'Wird gebucht …' : course.enrolled >= course.capacity ? 'Warteliste' : 'Platz buchen'} <ArrowRight size={14} /></button>}</>}</div>
+    <div className="course-action">{isPast ? <span className="status-chip none" data-testid={`status-course-past-${course.id}`}>{unavailable ? 'Kurs abgesagt' : new Date(course.endsAt).getTime() <= Date.now() ? 'Vergangener Kurs' : 'Kurs läuft bereits'}</span> : <><StatusChip course={course} />{booked ? <button type="button" className="button button-quiet" onClick={() => setConfirmCancel(true)} disabled={cancel.isPending} data-testid={`button-cancel-course-${course.id}`}>Stornieren</button> : <button type="button" className="button button-primary" onClick={() => { void reserve(); }} disabled={book.isPending} data-testid={`button-book-course-${course.id}`}>{book.isPending ? 'Wird gebucht …' : course.enrolled >= course.capacity ? 'Warteliste' : 'Platz buchen'} <ArrowRight size={14} /></button>}</>}</div>
     {(error || message) && <div className={error ? 'form-error' : 'course-feedback'} role="status" data-testid={`status-course-action-${course.id}`}>{error || message}</div>}
     {confirmCancel && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancel.isPending) setConfirmCancel(false); }}><div className="dialog-card" role="alertdialog" aria-modal="true" aria-labelledby={`dialog-title-${course.id}`} aria-describedby={`dialog-description-${course.id}`}><button className="dialog-close" type="button" onClick={() => setConfirmCancel(false)} disabled={cancel.isPending} aria-label="Schließen" data-testid={`button-close-cancel-${course.id}`}><X size={18} /></button><div className="empty-icon"><CalendarDays size={22} /></div><h3 id={`dialog-title-${course.id}`}>Platz freigeben?</h3><p id={`dialog-description-${course.id}`}>Du möchtest deine {course.bookingStatus === 'waitlisted' ? 'Wartelistenposition' : 'Buchung'} für „{course.title}“ am {dateLabel(course.startsAt)} stornieren.</p>{error && <div className="form-error" role="alert">{error}</div>}<div className="dialog-actions"><button type="button" className="button button-quiet" onClick={() => setConfirmCancel(false)} disabled={cancel.isPending} data-testid={`button-keep-course-${course.id}`}>Platz behalten</button><button type="button" className="button button-danger" onClick={() => { void remove(); }} disabled={cancel.isPending} data-testid={`button-confirm-cancel-${course.id}`}>{cancel.isPending ? 'Wird storniert …' : 'Ja, stornieren'}</button></div></div></div>}
   </article>;
+}
+function CourseDetailPage() {
+  const { id = '' } = useParams<{ id: string }>();
+  const courseId = /^[1-9]\d*$/.test(id) ? Number(id) : 0;
+  const validId = Number.isInteger(courseId) && courseId > 0 && courseId <= 2147483647;
+  const detail = useGetMemberCourse(courseId, { query: { queryKey: getGetMemberCourseQueryKey(courseId), enabled: validId, retry: false } });
+  const notFound = !validId || (detail.error && 'status' in detail.error && detail.error.status === 404);
+  const course = detail.data;
+  return <div className="page">
+    <PageHeader eyebrow="Kursdetails" title="Dein Kurs im Überblick." description="Hier findest du den Kurs zu deinem Hinweis – auch nach seinem Ende." />
+    <div className="section-head"><Link href="/notifications" className="text-link">Zurück zu den Hinweisen</Link><Link href="/courses" className="text-link">Zum Kursplan</Link></div>
+    {notFound ? <EmptyView icon={<CalendarDays size={22} />} title="Kurs nicht verfügbar." description="Dieser Kurs ist nicht mehr vorhanden oder gehört nicht zu deinen zugänglichen Kursen." /> :
+      detail.isLoading ? <LoadingPage /> :
+      detail.isError ? <ErrorView title="Kurs nicht erreichbar" onRetry={() => { void detail.refetch(); }} /> :
+      course ? <>
+        <p data-testid="text-course-date">{new Intl.DateTimeFormat('de-DE', { dateStyle: 'full' }).format(new Date(course.startsAt))} · {timeLabel(course.startsAt)} – {timeLabel(course.endsAt)} Uhr · Kurs #{course.id}</p>
+        <CourseRow key={course.id} course={course} targeted unavailable={course.status === 'cancelled'} />
+        <p data-testid="text-course-booking">{course.bookingStatus === 'confirmed' ? 'Dein Buchungsstatus: bestätigt.' : course.bookingStatus === 'waitlisted' ? `Dein Buchungsstatus: Warteliste, Position ${course.waitlistPosition}.` : 'Keine aktive Buchung für diesen Kurs.'}</p>
+      </> : null}
+  </div>;
 }
 function CoursesPage() {
   const [, navigate] = useLocation();
@@ -397,7 +417,7 @@ function NotificationsPage({ home }: { home: MemberHome }) {
       notifications.isError && !notifications.data ? <ErrorView title="Hinweise nicht erreichbar" onRetry={() => { void notifications.refetch(); }} /> :
       items.length ? <><div className="notification-list" data-testid="list-notifications">{items.map(item => <article className={`notification-item ${item.readAt ? '' : 'unread'}`} key={item.id} data-testid={`card-notification-${item.id}`}>
         <div className="notification-icon"><Bell size={20} /></div><div className="notification-content"><div className="eyebrow">{item.readAt ? 'Gelesen' : 'Neu'}</div><h3>{item.title}</h3><p>{item.body}</p>{item.emailDeliveryStatus && <div className={`notification-email-status email-${item.emailDeliveryStatus}`} role="status" data-testid={`status-notification-email-${item.id}`}>{emailDeliveryMessage(item.emailDeliveryStatus)}</div>}<time dateTime={item.createdAt}>{dateLabel(item.createdAt)} · {timeLabel(item.createdAt)} Uhr</time>
-          <div className="notification-actions"><Link href={`/courses?courseId=${item.courseId}`} className="text-link" data-testid={`link-notification-courses-${item.id}`}>Kurs ansehen <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
+          <div className="notification-actions"><Link href={`/courses/${item.courseId}`} className="text-link" data-testid={`link-notification-courses-${item.id}`}>Kurs ansehen <ArrowRight size={14} /></Link>{item.readAt ? <span className="read-label" data-testid={`status-notification-read-${item.id}`}><Check size={13} /> Gelesen</span> : <button className="button button-quiet" type="button" disabled={markRead.isPending} onClick={() => { void read(item.id); }} data-testid={`button-mark-read-${item.id}`}>{markRead.isPending && markRead.variables?.id === item.id ? 'Wird gespeichert …' : 'Als gelesen markieren'}</button>}</div>
           {actionError?.id === item.id && <div className="form-error" role="alert" data-testid={`status-notification-error-${item.id}`}>{actionError.message}</div>}
         </div></article>)}</div>
         {notifications.hasNextPage && <button type="button" className="button button-secondary" disabled={notifications.isFetchingNextPage} onClick={() => { void notifications.fetchNextPage(); }} data-testid="button-older-notifications">{notifications.isFetchingNextPage ? 'Ältere Hinweise werden geladen …' : 'Ältere Hinweise laden'}</button>}
@@ -522,21 +542,22 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   useEffect(() => pageTitle(signIn ? 'Anmelden' : 'Registrieren'), [signIn]);
   return <div className="auth-page"><div className="auth-aside auth-aside--photo"><img className={signIn ? 'auth-photo' : 'auth-photo auth-photo--signup'} src={signIn ? memberLoginPhoto : memberSignupPhoto} alt="" aria-hidden="true" /><Brand /><h1>Dein Studio.<br /><em>Dein Rhythmus.</em></h1><p>Alle Kurse, deine Buchungen und jeder Besuch. Ein ruhiger Ort für alles, was dich in Bewegung hält.</p><small>Fiudia / Dein Raum für Bewegung</small></div><main className="auth-main"><div className="auth-content"><div className="eyebrow">Fiudia Mitglieder</div><h2>{signIn ? 'Willkommen zurück.' : 'Schön, dass du da bist.'}</h2><p>{pendingInvite() ? 'Deine Einladung wartet nach der Anmeldung auf dich. Nutze die E-Mail-Adresse, an die dein Studio sie geschickt hat, und bestätige sie.' : signIn ? 'Melde dich an und mach dort weiter, wo du aufgehört hast.' : 'Erstelle ein Konto und verbinde danach deine Mitgliedschaft.'}</p><div className="auth-clerk">{signIn ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={redirect} /> : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} />}</div><div className="auth-switch">{signIn ? <>Noch kein Konto? <Link href="/sign-up" data-testid="link-sign-up">Registrieren</Link></> : <>Schon dabei? <Link href="/sign-in" data-testid="link-sign-in">Anmelden</Link></>}</div></div></main></div>;
 }
-function ProtectedPage({ page }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' }) {
+function ProtectedPage({ page, courseDetail = false }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account'; courseDetail?: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <LoadingPage />;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
   const pending = pendingInvitationPath(sessionStorage);
   if (pending) return <Redirect to={pending} />;
-  return <AuthenticatedPage page={page} />;
+  return <AuthenticatedPage page={page} courseDetail={courseDetail} />;
 }
-function AuthenticatedPage({ page, token = '' }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' | 'invite'; token?: string }) {
+function AuthenticatedPage({ page, token = '', courseDetail = false }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' | 'invite'; token?: string; courseDetail?: boolean }) {
   const home = useGetMemberHome();
   if (home.isLoading) return <MemberShell member={null}><LoadingPage /></MemberShell>;
   if (home.isError || !home.data) return <MemberShell member={null}><div className="page"><PageHeader eyebrow="Dein Fiudia" title="Einen Moment." description="Wir versuchen, deine Mitgliedschaft zu laden." /><ErrorView onRetry={() => { void home.refetch(); }} /></div></MemberShell>;
   const memberHome = home.data;
   const member = memberHome.member;
   if ((page === 'courses' || page === 'notifications') && (!member || !memberHome.coursesEnabled) || page === 'check-ins' && !memberHome.checkInsEnabled) return <Redirect to="/" />;
+  if (courseDetail) return <MemberShell member={member} home={memberHome}><CourseDetailPage /></MemberShell>;
   return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage home={memberHome} /> : page === 'check-ins' ? <CheckInsPage /> : page === 'profile' ? <ProfilePage member={member!} /> : page === 'account' ? <AccountPage /> : <ConnectPage member={member} />}</MemberShell>;
 }
 function NotFoundPage() {
@@ -553,6 +574,7 @@ function Routes() {
     <Route path="/sign-up/*?"><AuthPage mode="sign-up" /></Route>
     <Route path="/"><ProtectedPage page="today" /></Route>
     <Route path="/invite/:token"><InviteEntry /></Route>
+    <Route path="/courses/:id"><ProtectedPage page="courses" courseDetail /></Route>
     <Route path="/courses"><ProtectedPage page="courses" /></Route>
     <Route path="/notifications"><ProtectedPage page="notifications" /></Route>
     <Route path="/check-ins"><ProtectedPage page="check-ins" /></Route>

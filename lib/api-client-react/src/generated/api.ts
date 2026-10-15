@@ -53,6 +53,7 @@ import type {
   Member,
   MemberCheckIn,
   MemberCourse,
+  MemberCourseDetail,
   MemberHome,
   MemberInput,
   MemberInvitationAcceptInput,
@@ -4406,6 +4407,83 @@ export function useListMemberCourses<TData = Awaited<ReturnType<typeof listMembe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMemberCoursesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMemberCourseUrl = (id: number,) => {
+
+
+
+
+  return `/api/member/courses/${id}`
+}
+
+/**
+ * @summary Get a course in the member's studio, including historical courses linked from an own notification
+ */
+export const getMemberCourse = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<MemberCourseDetail> => {
+
+  return customFetch<MemberCourseDetail>(getGetMemberCourseUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMemberCourseQueryKey = (id: number,) => {
+    return [
+    `/api/member/courses/${id}`
+    ] as const;
+    }
+
+
+export const getGetMemberCourseQueryOptions = <TData = Awaited<ReturnType<typeof getMemberCourse>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberCourse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMemberCourseQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemberCourse>>> = ({ signal }) => getMemberCourse(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemberCourse>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMemberCourseQueryResult = NonNullable<Awaited<ReturnType<typeof getMemberCourse>>>
+export type GetMemberCourseQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a course in the member's studio, including historical courses linked from an own notification
+ */
+
+export function useGetMemberCourse<TData = Awaited<ReturnType<typeof getMemberCourse>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberCourse>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMemberCourseQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

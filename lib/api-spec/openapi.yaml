@@ -1077,6 +1077,26 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/MemberCourse" }
+  /member/courses/{id}:
+    get:
+      operationId: getMemberCourse
+      tags: [member-app]
+      summary: Get a course in the member's studio, including historical courses linked from an own notification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 2147483647 }
+      responses:
+        "200":
+          description: Course details and own booking state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberCourseDetail" }
+        "400": { description: Invalid course identifier }
+        "401": { description: Sign-in required }
+        "403": { description: Linked membership required }
+        "404": { description: Course unavailable or not accessible }
   /member/courses/{id}/book:
     post:
       operationId: bookMemberCourse
@@ -1918,6 +1938,13 @@ components:
         room: { type: string }
         bookingStatus: { type: ["string", "null"], enum: [confirmed, waitlisted, null] }
         waitlistPosition: { type: ["integer", "null"] }
+    MemberCourseDetail:
+      allOf:
+        - { $ref: "#/components/schemas/MemberCourse" }
+        - type: object
+          required: [status]
+          properties:
+            status: { type: string, enum: [scheduled, full, cancelled] }
     MemberCheckIn:
       type: object
       required: [id, studioName, checkedInAt]

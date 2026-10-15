@@ -913,6 +913,19 @@ export interface MemberNotificationSettings {
   waitlistEmailEnabled: boolean;
 }
 
+export type MemberCourseDetailStatus = typeof MemberCourseDetailStatus[keyof typeof MemberCourseDetailStatus];
+
+
+export const MemberCourseDetailStatus = {
+  scheduled: 'scheduled',
+  full: 'full',
+  cancelled: 'cancelled',
+} as const;
+
+export type MemberCourseDetail = MemberCourse & {
+  status: MemberCourseDetailStatus;
+};
+
 export interface MemberCheckIn {
   id: number;
   studioName: string;
