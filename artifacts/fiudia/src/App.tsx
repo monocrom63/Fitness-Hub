@@ -679,7 +679,8 @@ function InvitePage() {
   const client = useQueryClient();
   const [, params] = useRoute('/invite/:token');
   const mutation = useAcceptInvitation();
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <LoadingBlock label="Einladung wird geladen" />;
   const accept = () => {
     if (!params?.token) return;
     if (!isSignedIn) {
