@@ -111,7 +111,8 @@ router.get("/pulse", async (req, res): Promise<void> => {
   if (!staff) return;
   const params = ListPulseQueryParams.safeParse(req.query);
   // Zod's boolean coercion treats the string "false" as true; accept only literal query values.
-  if (!params.success || (req.query.search !== undefined && !params.data.search?.trim()) ||
+  if (!params.success || (req.query.search !== undefined &&
+      (typeof req.query.search !== "string" || !params.data.search?.trim())) ||
       (req.query.unreadOnly !== undefined &&
       req.query.unreadOnly !== "true" && req.query.unreadOnly !== "false")) {
     res.status(400).json({ error: "Ungültiger Nachrichtenfilter oder Cursor." });

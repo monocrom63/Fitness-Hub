@@ -17,7 +17,7 @@ beforeId?: number;
  */
 unreadOnly?: boolean;
 /**
- * Find visible announcements by title or body, including older messages
+ * Case-insensitive literal substring search in the current title or body, including older messages. Leading and trailing whitespace is trimmed; whitespace-only searches are invalid. SQL wildcard characters are treated literally. Search combines with beforeId and unreadOnly and never expands organization, studio, audience, or retraction visibility.
  * @minLength 1
  * @maxLength 120
  */

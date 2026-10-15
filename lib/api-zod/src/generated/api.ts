@@ -46,6 +46,7 @@ export const completeOnboardingBodyCityMin = 2;
 export const completeOnboardingBodyCityMax = 120;
 
 
+
 export const CompleteOnboardingBody = zod.object({
   "organizationName": zod.string().min(completeOnboardingBodyOrganizationNameMin).max(completeOnboardingBodyOrganizationNameMax),
   "studioName": zod.string().min(completeOnboardingBodyStudioNameMin).max(completeOnboardingBodyStudioNameMax),
@@ -86,6 +87,7 @@ export const createStudioBodyCityMin = 2;
 export const createStudioBodyCityMax = 120;
 
 
+
 export const CreateStudioBody = zod.object({
   "name": zod.string().min(createStudioBodyNameMin).max(createStudioBodyNameMax),
   "city": zod.string().min(createStudioBodyCityMin).max(createStudioBodyCityMax)
@@ -112,6 +114,7 @@ export const updateStudioBodyCityMin = 2;
 export const updateStudioBodyCityMax = 120;
 
 
+
 export const UpdateStudioBody = zod.object({
   "name": zod.string().min(updateStudioBodyNameMin).max(updateStudioBodyNameMax),
   "city": zod.string().min(updateStudioBodyCityMin).max(updateStudioBodyCityMax)
@@ -130,6 +133,8 @@ export const UpdateStudioResponse = zod.object({
 export const GetDashboardQueryParams = zod.object({
   "studioId": zod.coerce.number().int().optional()
 })
+
+
 
 
 export const GetDashboardResponse = zod.object({
@@ -182,6 +187,7 @@ export const listMembersResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9
 export const listMembersResponseContractDurationMonthsMax = 1200;
 
 
+
 export const ListMembersResponseItem = zod.object({
   "id": zod.number().int(),
   "fullName": zod.string(),
@@ -222,6 +228,7 @@ export const createMemberBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2
 export const createMemberBodyContractDurationMonthsMax = 1200;
 
 
+
 export const CreateMemberBody = zod.object({
   "fullName": zod.string().min(createMemberBodyFullNameMin).max(createMemberBodyFullNameMax),
   "email": zod.string().email().max(createMemberBodyEmailMax),
@@ -241,6 +248,7 @@ export const createMemberResponseAddressMax = 400;
 
 export const createMemberResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const createMemberResponseContractDurationMonthsMax = 1200;
+
 
 
 export const CreateMemberResponse = zod.object({
@@ -286,6 +294,7 @@ export const updateMemberBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2
 export const updateMemberBodyContractDurationMonthsMax = 1200;
 
 
+
 export const UpdateMemberBody = zod.object({
   "fullName": zod.string().min(updateMemberBodyFullNameMin).max(updateMemberBodyFullNameMax).optional(),
   "email": zod.string().email().max(updateMemberBodyEmailMax).optional(),
@@ -304,6 +313,7 @@ export const updateMemberResponseAddressMax = 400;
 
 export const updateMemberResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberResponseContractDurationMonthsMax = 1200;
+
 
 
 export const UpdateMemberResponse = zod.object({
@@ -331,6 +341,8 @@ export const UpdateMemberResponse = zod.object({
 export const ListCoursesQueryParams = zod.object({
   "studioId": zod.coerce.number().int().optional()
 })
+
+
 
 
 export const ListCoursesResponseItem = zod.object({
@@ -364,6 +376,7 @@ export const createCourseBodyCapacityMax = 200;
 export const createCourseBodyRoomMax = 80;
 
 
+
 export const CreateCourseBody = zod.object({
   "title": zod.string().min(createCourseBodyTitleMin).max(createCourseBodyTitleMax),
   "instructor": zod.string().min(createCourseBodyInstructorMin).max(createCourseBodyInstructorMax),
@@ -373,6 +386,8 @@ export const CreateCourseBody = zod.object({
   "capacity": zod.number().int().min(1).max(createCourseBodyCapacityMax),
   "room": zod.string().min(1).max(createCourseBodyRoomMax)
 })
+
+
 
 
 export const CreateCourseResponse = zod.object({
@@ -407,6 +422,8 @@ export const updateCourseBodyInstructorMax = 120;
 export const updateCourseBodyRoomMax = 80;
 
 
+
+
 export const UpdateCourseBody = zod.object({
   "title": zod.string().min(updateCourseBodyTitleMin).max(updateCourseBodyTitleMax),
   "instructor": zod.string().min(updateCourseBodyInstructorMin).max(updateCourseBodyInstructorMax),
@@ -415,6 +432,8 @@ export const UpdateCourseBody = zod.object({
   "room": zod.string().min(1).max(updateCourseBodyRoomMax),
   "revision": zod.number().int().min(1)
 })
+
+
 
 
 export const UpdateCourseResponse = zod.object({
@@ -441,6 +460,7 @@ export const listCourseEditPushHistoryQueryOffsetMin = 0;
 
 export const listCourseEditPushHistoryQueryLimitDefault = 30;
 export const listCourseEditPushHistoryQueryLimitMax = 100;
+
 
 
 export const ListCourseEditPushHistoryQueryParams = zod.object({
@@ -551,6 +571,7 @@ export const createTrainerAbsenceBodyInstructorMin = 2;
 export const createTrainerAbsenceBodyInstructorMax = 120;
 
 
+
 export const CreateTrainerAbsenceBody = zod.object({
   "studioId": zod.number().int(),
   "instructor": zod.string().min(createTrainerAbsenceBodyInstructorMin).max(createTrainerAbsenceBodyInstructorMax),
@@ -612,6 +633,7 @@ export const requestTrainerReplacementBodyCandidateNameMin = 2;
 export const requestTrainerReplacementBodyCandidateNameMax = 120;
 
 
+
 export const RequestTrainerReplacementBody = zod.object({
   "candidateName": zod.string().min(requestTrainerReplacementBodyCandidateNameMin).max(requestTrainerReplacementBodyCandidateNameMax)
 })
@@ -646,6 +668,7 @@ export const resolveTrainerAbsenceCourseBodyCandidateNameMax = 120;
 
 export const resolveTrainerAbsenceCourseBodyExternalNameMin = 2;
 export const resolveTrainerAbsenceCourseBodyExternalNameMax = 120;
+
 
 
 export const ResolveTrainerAbsenceCourseBody = zod.object({
@@ -722,6 +745,7 @@ export const CreateStudioRoomParams = zod.object({
 export const createStudioRoomBodyNameMax = 80;
 
 
+
 export const CreateStudioRoomBody = zod.object({
   "name": zod.string().min(1).max(createStudioRoomBodyNameMax)
 })
@@ -766,6 +790,7 @@ export const createStudioRoomClosureBodyRoomNameMax = 80;
 export const createStudioRoomClosureBodyReasonMax = 500;
 
 export const createStudioRoomClosureBodyResponsibleMax = 160;
+
 
 
 export const CreateStudioRoomClosureBody = zod.object({
@@ -883,6 +908,7 @@ export const resolveCourseRoomClosureBodyRoomMax = 80;
 
 export const resolveCourseRoomClosureBodyIdempotencyKeyMin = 8;
 export const resolveCourseRoomClosureBodyIdempotencyKeyMax = 128;
+
 
 
 export const ResolveCourseRoomClosureBody = zod.object({
@@ -1104,6 +1130,7 @@ export const getMemberHomeResponseMemberOneContractStartRegExp = new RegExp('^[0
 export const getMemberHomeResponseMemberOneContractDurationMonthsMax = 1200;
 
 
+
 export const GetMemberHomeResponse = zod.object({
   "member": zod.union([zod.object({
   "id": zod.number().int(),
@@ -1155,6 +1182,7 @@ export const updateOwnMemberProfileBodyBirthDateRegExp = new RegExp('^[0-9]{4}-[
 export const updateOwnMemberProfileBodyAddressMax = 400;
 
 
+
 export const UpdateOwnMemberProfileBody = zod.object({
   "fullName": zod.string().min(updateOwnMemberProfileBodyFullNameMin).max(updateOwnMemberProfileBodyFullNameMax).optional(),
   "phone": zod.string().max(updateOwnMemberProfileBodyPhoneMax).nullish(),
@@ -1168,6 +1196,7 @@ export const updateOwnMemberProfileResponseMemberOneAddressMax = 400;
 
 export const updateOwnMemberProfileResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateOwnMemberProfileResponseMemberOneContractDurationMonthsMax = 1200;
+
 
 
 export const UpdateOwnMemberProfileResponse = zod.object({
@@ -1221,6 +1250,7 @@ export const updateMemberNotificationSettingsResponseMemberOneAddressMax = 400;
 
 export const updateMemberNotificationSettingsResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberNotificationSettingsResponseMemberOneContractDurationMonthsMax = 1200;
+
 
 
 export const UpdateMemberNotificationSettingsResponse = zod.object({
@@ -1302,6 +1332,7 @@ export const claimMembershipResponseMemberOneContractStartRegExp = new RegExp('^
 export const claimMembershipResponseMemberOneContractDurationMonthsMax = 1200;
 
 
+
 export const ClaimMembershipResponse = zod.object({
   "member": zod.union([zod.object({
   "id": zod.number().int(),
@@ -1348,6 +1379,7 @@ export const acceptMemberInvitationBodyTokenMin = 32;
 export const acceptMemberInvitationBodyTokenMax = 128;
 
 
+
 export const AcceptMemberInvitationBody = zod.object({
   "token": zod.string().min(acceptMemberInvitationBodyTokenMin).max(acceptMemberInvitationBodyTokenMax)
 })
@@ -1357,6 +1389,7 @@ export const acceptMemberInvitationResponseMemberOneAddressMax = 400;
 
 export const acceptMemberInvitationResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const acceptMemberInvitationResponseMemberOneContractDurationMonthsMax = 1200;
+
 
 
 export const AcceptMemberInvitationResponse = zod.object({
@@ -1404,6 +1437,7 @@ export const AcceptMemberInvitationResponse = zod.object({
  */
 
 
+
 export const ListMemberNotificationsQueryParams = zod.object({
   "beforeId": zod.coerce.number().int().min(1).optional().describe('Positive id of an earlier notification owned by the signed-in member; results continue before that notification.')
 })
@@ -1419,6 +1453,7 @@ export const ListMemberNotificationsResponseItem = zod.object({
 })
 export const ListMemberNotificationsResponse = zod.array(ListMemberNotificationsResponseItem)
 
+
 /**
  * @summary Read own optional waitlist email preference
  */
@@ -1432,6 +1467,7 @@ export const GetMemberNotificationPreferencesResponse = zod.object({
  * @summary Count unread notifications belonging to the signed-in member
  */
 export const getMemberNotificationUnreadCountResponseCountMin = 0;
+
 
 
 export const GetMemberNotificationUnreadCountResponse = zod.object({
@@ -1460,6 +1496,7 @@ export const MarkMemberNotificationReadResponse = zod.object({
 /**
  * @summary Upcoming courses and own booking states, optionally including a course linked from an own notification
  */
+
 
 
 export const ListMemberCoursesQueryParams = zod.object({
@@ -1549,11 +1586,14 @@ export const CreateCheckInResponse = zod.object({
 export const listPulseQuerySearchMax = 120;
 
 
+
 export const ListPulseQueryParams = zod.object({
   "beforeId": zod.coerce.number().int().min(1).optional().describe('Load messages older than this message ID'),
   "unreadOnly": zod.coerce.boolean().optional().describe('Show only messages not yet read by the signed-in staff member'),
-  "search": zod.coerce.string().min(1).max(listPulseQuerySearchMax).optional().describe('Find visible announcements by title or body, including older messages')
+  "search": zod.coerce.string().min(1).max(listPulseQuerySearchMax).optional().describe('Case-insensitive literal substring search in the current title or body, including older messages. Leading and trailing whitespace is trimmed; whitespace-only searches are invalid. SQL wildcard characters are treated literally. Search combines with beforeId and unreadOnly and never expands organization, studio, audience, or retraction visibility.')
 })
+
+
 
 
 export const ListPulseResponseItem = zod.object({
@@ -1585,6 +1625,7 @@ export const createPulseMessageBodyTitleMax = 140;
 export const createPulseMessageBodyBodyMax = 2000;
 
 
+
 export const CreatePulseMessageBody = zod.object({
   "title": zod.string().min(createPulseMessageBodyTitleMin).max(createPulseMessageBodyTitleMax),
   "body": zod.string().min(1).max(createPulseMessageBodyBodyMax),
@@ -1592,6 +1633,8 @@ export const CreatePulseMessageBody = zod.object({
   "audience": zod.enum(['all', 'managers', 'employees']),
   "studioId": zod.number().int().nullable()
 })
+
+
 
 
 export const CreatePulseMessageResponse = zod.object({
@@ -1627,12 +1670,16 @@ export const updatePulseMessageBodyTitleMax = 140;
 export const updatePulseMessageBodyBodyMax = 2000;
 
 
+
+
 export const UpdatePulseMessageBody = zod.object({
   "title": zod.string().min(updatePulseMessageBodyTitleMin).max(updatePulseMessageBodyTitleMax),
   "body": zod.string().min(1).max(updatePulseMessageBodyBodyMax),
   "priority": zod.enum(['info', 'important', 'urgent']),
   "revision": zod.number().int().min(1)
 })
+
+
 
 
 export const UpdatePulseMessageResponse = zod.object({
@@ -1682,6 +1729,7 @@ export const MarkPulseReadResponse = zod.object({
  */
 
 
+
 export const ListPulseHistoryParams = zod.object({
   "id": zod.coerce.number().int().min(1)
 })
@@ -1719,6 +1767,7 @@ export const ListInvitationsResponse = zod.array(ListInvitationsResponseItem)
  * @summary Invite a colleague with a manager-assigned role
  */
 export const createInvitationBodyEmailMax = 320;
+
 
 
 export const CreateInvitationBody = zod.object({

@@ -338,9 +338,27 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
           assert.ok(!ids.some(id => [wrongOrg.id, wrongStudio.id, wrongAudience.id, retracted.id].includes(id)));
           const unread = await query(`/pulse?${search}&unreadOnly=true`);
           assert.ok(!unread.some(row => row.id === newer[0].id));
+          const unreadOlder = await query(`/pulse?${search}&unreadOnly=true&beforeId=${unread.at(-1)!.id}`);
+          assert.equal(unread.length, 30);
+          assert.equal(unreadOlder.length, 5);
+          assert.ok([...unread, ...unreadOlder].every(row => !row.isRead && row.readCount === 0));
+          assert.equal(new Set([...unread, ...unreadOlder].map(row => row.id)).size, 35);
+          const includingRead = await query(`/pulse?${search}&unreadOnly=false&beforeId=${first.at(-1)!.id}`);
+          assert.deepEqual(includingRead, second);
+          assert.equal(includingRead.find(row => row.id === newer[0].id)?.isRead, true);
+          assert.equal(includingRead.find(row => row.id === newer[0].id)?.readCount, 1);
+          assert.deepEqual(await query(`/pulse?search=${encodeURIComponent(`  ${token}  `)}`), first);
+          assert.deepEqual(await query(`/pulse?search=${encodeURIComponent(`missing-${token}`)}`), []);
           assert.deepEqual((await query(`/pulse?search=${encodeURIComponent("40%_")}`)).map(row => row.id), [literal.id]);
           assert.equal((await query(`/pulse?search=${encodeURIComponent("40%")}`)).length, 1);
+          const [backslash] = await tx.insert(pulseMessagesTable).values({
+            organizationId: orgA.id, studioId: studioA1.id, authorStaffId: authorA.id,
+            audience: "employees", title: `Path ${token}\\notice`, body: "Literal backslash", priority: "info",
+          }).returning();
+          assert.deepEqual((await query(`/pulse?search=${encodeURIComponent(`${token}\\notice`)}`)).map(row => row.id), [backslash.id]);
+          assert.equal((await call(users.employeeA1, "/pulse?search=")).status, 400);
           assert.equal((await call(users.employeeA1, "/pulse?search=%20%20")).status, 400);
+          assert.equal((await call(users.employeeA1, "/pulse?search=a&search=b")).status, 400);
           assert.equal((await call(users.employeeA1, `/pulse?search=${"a".repeat(121)}`)).status, 400);
           assert.equal((await call(null, `/pulse?${search}`)).status, 401);
         });
