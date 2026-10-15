@@ -1162,6 +1162,8 @@ export const getMemberHomeResponseMemberOneAddressMax = 400;
 export const getMemberHomeResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const getMemberHomeResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const getMemberHomeResponseUpcomingBookingsMin = 0;
+
 
 
 export const GetMemberHomeResponse = zod.object({
@@ -1199,7 +1201,7 @@ export const GetMemberHomeResponse = zod.object({
   "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
-  "upcomingBookings": zod.number().int()
+  "upcomingBookings": zod.number().int().min(getMemberHomeResponseUpcomingBookingsMin)
 })
 
 
@@ -1229,6 +1231,8 @@ export const updateOwnMemberProfileResponseMemberOneAddressMax = 400;
 
 export const updateOwnMemberProfileResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateOwnMemberProfileResponseMemberOneContractDurationMonthsMax = 1200;
+
+export const updateOwnMemberProfileResponseUpcomingBookingsMin = 0;
 
 
 
@@ -1267,7 +1271,40 @@ export const UpdateOwnMemberProfileResponse = zod.object({
   "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
-  "upcomingBookings": zod.number().int()
+  "upcomingBookings": zod.number().int().min(updateOwnMemberProfileResponseUpcomingBookingsMin)
+})
+
+
+/**
+ * @summary Get the signed-in member's SEPA subscription status
+ */
+export const GetMemberBillingResponse = zod.object({
+  "status": zod.enum(['not_started', 'checkout_pending', 'pending', 'active', 'past_due', 'canceled']),
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
+  "membershipType": zod.string(),
+  "canStartCheckout": zod.boolean()
+})
+
+
+/**
+ * @summary Start a hosted Stripe SEPA mandate and subscription checkout
+ */
+export const CreateMemberBillingCheckoutResponse = zod.object({
+  "url": zod.string().url(),
+  "nextCourse": zod.union([zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "instructor": zod.string(),
+  "studioName": zod.string(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date(),
+  "capacity": zod.number().int(),
+  "enrolled": zod.number().int(),
+  "room": zod.string(),
+  "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
+  "waitlistPosition": zod.number().int().nullable()
+}),zod.null()]).optional(),
+  "upcomingBookings": zod.number().int().optional()
 })
 
 
@@ -1283,6 +1320,8 @@ export const updateMemberNotificationSettingsResponseMemberOneAddressMax = 400;
 
 export const updateMemberNotificationSettingsResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberNotificationSettingsResponseMemberOneContractDurationMonthsMax = 1200;
+
+export const updateMemberNotificationSettingsResponseUpcomingBookingsMin = 0;
 
 
 
@@ -1321,7 +1360,7 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
-  "upcomingBookings": zod.number().int()
+  "upcomingBookings": zod.number().int().min(updateMemberNotificationSettingsResponseUpcomingBookingsMin)
 })
 
 
@@ -1364,6 +1403,8 @@ export const claimMembershipResponseMemberOneAddressMax = 400;
 export const claimMembershipResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const claimMembershipResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const claimMembershipResponseUpcomingBookingsMin = 0;
+
 
 
 export const ClaimMembershipResponse = zod.object({
@@ -1401,7 +1442,7 @@ export const ClaimMembershipResponse = zod.object({
   "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
-  "upcomingBookings": zod.number().int()
+  "upcomingBookings": zod.number().int().min(claimMembershipResponseUpcomingBookingsMin)
 })
 
 
@@ -1422,6 +1463,8 @@ export const acceptMemberInvitationResponseMemberOneAddressMax = 400;
 
 export const acceptMemberInvitationResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const acceptMemberInvitationResponseMemberOneContractDurationMonthsMax = 1200;
+
+export const acceptMemberInvitationResponseUpcomingBookingsMin = 0;
 
 
 
@@ -1460,7 +1503,7 @@ export const AcceptMemberInvitationResponse = zod.object({
   "bookingStatus": zod.union([zod.literal('confirmed'),zod.literal('waitlisted'),zod.literal(null)]).nullable(),
   "waitlistPosition": zod.number().int().nullable()
 }),zod.null()]),
-  "upcomingBookings": zod.number().int()
+  "upcomingBookings": zod.number().int().min(acceptMemberInvitationResponseUpcomingBookingsMin)
 })
 
 

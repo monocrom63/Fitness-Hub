@@ -937,7 +937,33 @@ export interface MemberHome {
   checkInsEnabled: boolean;
   waitlistEmailEnabled: boolean;
   nextCourse: MemberCourse | null;
+  /** @minimum 0 */
   upcomingBookings: number;
+}
+
+export type MemberBillingStatus = typeof MemberBillingStatus[keyof typeof MemberBillingStatus];
+
+
+export const MemberBillingStatus = {
+  not_started: 'not_started',
+  checkout_pending: 'checkout_pending',
+  pending: 'pending',
+  active: 'active',
+  past_due: 'past_due',
+  canceled: 'canceled',
+} as const;
+
+export interface MemberBilling {
+  status: MemberBillingStatus;
+  billingInterval: BillingInterval;
+  membershipType: string;
+  canStartCheckout: boolean;
+}
+
+export interface MemberBillingCheckout {
+  url: string;
+  nextCourse?: MemberCourse | null;
+  upcomingBookings?: number;
 }
 
 export interface MemberNotificationSettings {

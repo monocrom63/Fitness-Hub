@@ -941,6 +941,32 @@ paths:
         "400": { description: Invalid profile data }
         "401": { description: Sign-in required }
         "403": { description: Membership not linked }
+  /member/me/billing:
+    get:
+      operationId: getMemberBilling
+      tags: [member-app]
+      summary: Get the signed-in member's SEPA subscription status
+      responses:
+        "200":
+          description: Saved payment interval and subscription state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberBilling" }
+        "401": { description: Sign-in required }
+        "403": { description: Membership not linked }
+    post:
+      operationId: createMemberBillingCheckout
+      tags: [member-app]
+      summary: Start a hosted Stripe SEPA mandate and subscription checkout
+      responses:
+        "200":
+          description: Stripe Checkout URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberBillingCheckout" }
+        "401": { description: Sign-in required }
+        "403": { description: Active linked membership required }
+        "409": { description: Subscription already started or tariff has no configured price }
   /member/notification-settings:
     patch:
       operationId: updateMemberNotificationSettings
@@ -1964,6 +1990,26 @@ components:
         coursesEnabled: { type: boolean }
         checkInsEnabled: { type: boolean }
         waitlistEmailEnabled: { type: boolean }
+        nextCourse:
+          oneOf:
+            - { $ref: "#/components/schemas/MemberCourse" }
+            - { type: "null" }
+        upcomingBookings: { type: integer, minimum: 0 }
+    MemberBilling:
+      type: object
+      additionalProperties: false
+      required: [status, billingInterval, membershipType, canStartCheckout]
+      properties:
+        status: { type: string, enum: [not_started, checkout_pending, pending, active, past_due, canceled] }
+        billingInterval: { $ref: "#/components/schemas/BillingInterval" }
+        membershipType: { type: string }
+        canStartCheckout: { type: boolean }
+    MemberBillingCheckout:
+      type: object
+      additionalProperties: false
+      required: [url]
+      properties:
+        url: { type: string, format: uri }
         nextCourse:
           oneOf:
             - { $ref: "#/components/schemas/MemberCourse" }

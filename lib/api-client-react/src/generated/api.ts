@@ -53,6 +53,8 @@ import type {
   ListTrainerAbsencesParams,
   Me,
   Member,
+  MemberBilling,
+  MemberBillingCheckout,
   MemberCheckIn,
   MemberCourse,
   MemberCourseDetail,
@@ -3761,6 +3763,157 @@ export const useUpdateOwnMemberProfile = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateOwnMemberProfileMutationOptions(options));
+    }
+
+export const getGetMemberBillingUrl = () => {
+
+
+
+
+  return `/api/member/me/billing`
+}
+
+/**
+ * @summary Get the signed-in member's SEPA subscription status
+ */
+export const getMemberBilling = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberBilling> => {
+
+  return customFetch<MemberBilling>(getGetMemberBillingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMemberBillingQueryKey = () => {
+    return [
+    `/api/member/me/billing`
+    ] as const;
+    }
+
+
+export const getGetMemberBillingQueryOptions = <TData = Awaited<ReturnType<typeof getMemberBilling>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberBilling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMemberBillingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemberBilling>>> = ({ signal }) => getMemberBilling({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemberBilling>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMemberBillingQueryResult = NonNullable<Awaited<ReturnType<typeof getMemberBilling>>>
+export type GetMemberBillingQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in member's SEPA subscription status
+ */
+
+export function useGetMemberBilling<TData = Awaited<ReturnType<typeof getMemberBilling>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberBilling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMemberBillingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateMemberBillingCheckoutUrl = () => {
+
+
+
+
+  return `/api/member/me/billing`
+}
+
+/**
+ * @summary Start a hosted Stripe SEPA mandate and subscription checkout
+ */
+export const createMemberBillingCheckout = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberBillingCheckout> => {
+
+  return customFetch<MemberBillingCheckout>(getCreateMemberBillingCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateMemberBillingCheckoutMutationKey = () => ['createMemberBillingCheckout'] as const;
+
+export const getCreateMemberBillingCheckoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMemberBillingCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMemberBillingCheckout>>, TError,void, TContext> => {
+
+const mutationKey = getCreateMemberBillingCheckoutMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMemberBillingCheckout>>, void> = () => {
+
+
+          return  createMemberBillingCheckout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMemberBillingCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createMemberBillingCheckout>>>
+
+    export type CreateMemberBillingCheckoutMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Start a hosted Stripe SEPA mandate and subscription checkout
+ */
+export const useCreateMemberBillingCheckout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMemberBillingCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMemberBillingCheckout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateMemberBillingCheckoutMutationOptions(options));
     }
 
 export const getUpdateMemberNotificationSettingsUrl = () => {

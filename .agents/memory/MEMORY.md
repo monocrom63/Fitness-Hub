@@ -1,6 +1,7 @@
 - [Authentik transition](auth-transition.md) — keep Fiudia sign-in working until a real Authentik issuer and OIDC app are ready; the product concept alone is not setup.
 - [Backend test runtime](backend-test-runtime.md) — mixed workspace modules fail under native TS/ESM loading; bundled CommonJS avoids loader-only failures in API tests.
 - [Targeted pnpm installs](targeted-pnpm-installs.md) — scoped package additions may rewrite unrelated workspace and Replit config; review and restore incidental changes.
+- [Stripe connector runtime](stripe-connector-runtime.md) — use the Replit connector proxy for app-side Stripe calls; the legacy secret-fetch path may fail in API workflows.
 - [Member account linking](member-linking.md) — never auto-select a membership by email alone when one address may belong to multiple studios.
 - [Organization modules](module-availability.md) — operational switches preserve existing access by default; they are not proof of a paid entitlement.
 - [Managed Clerk publishing](managed-clerk-publishing.md) — development-key warnings do not imply live keys need manual replacement; managed tenants switch automatically on publish.

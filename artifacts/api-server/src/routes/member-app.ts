@@ -8,6 +8,7 @@ import {
   ListMemberNotificationsQueryParams, ListMemberNotificationsResponse, MarkMemberNotificationReadParams,
   MarkMemberNotificationReadResponse,
   RegisterMemberPushSubscriptionBody, RegisterMemberPushSubscriptionResponse,
+  GetMemberBillingResponse, CreateMemberBillingCheckoutResponse,
   UpdateOwnMemberProfileBody,
   UpdateMemberNotificationSettingsBody, UpdateMemberNotificationSettingsResponse,
   UnregisterMemberPushSubscriptionParams, UnregisterMemberPushSubscriptionResponse,
@@ -20,6 +21,7 @@ import { BookingError, bookCourse, cancelCourseBooking } from "../lib/course-boo
 import { getClerkIdentity, getRequestUserId } from "../lib/fiudia-access";
 import { linkMembership, MemberLinkError } from "../lib/member-link";
 import { isModuleEnabled } from "../lib/module-access";
+import { getStripeClient } from "../lib/stripe-client";
 
 const router: IRouter = Router();
 
@@ -36,6 +38,10 @@ export async function linkedMember(userId: string) {
     address: membersTable.address,
     contractStart: membersTable.contractStart,
     contractDurationMonths: membersTable.contractDurationMonths,
+    stripeCustomerId: membersTable.stripeCustomerId,
+    stripeSubscriptionId: membersTable.stripeSubscriptionId,
+    stripeCheckoutSessionId: membersTable.stripeCheckoutSessionId,
+    billingStatus: membersTable.billingStatus,
     waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
@@ -183,6 +189,134 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
   }).where(eq(membersTable.id, member.id)).returning({ id: membersTable.id });
   if (!updated) { res.status(404).json({ error: "Mitgliedschaft nicht gefunden." }); return; }
   res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));
+});
+
+router.get("/member/me/billing", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(403).json({ error: "Eine verbundene Mitgliedschaft ist erforderlich." }); return; }
+  let billingStatus = member.billingStatus;
+  let subscriptionId = member.stripeSubscriptionId;
+  try {
+    const stripe = await getStripeClient();
+    if (member.stripeCheckoutSessionId && billingStatus === "checkout_pending") {
+      const session = await stripe.checkoutSessions.retrieve(member.stripeCheckoutSessionId);
+      if (session.status === "expired") {
+        billingStatus = "not_started";
+        await db.update(membersTable).set({ billingStatus, stripeCheckoutSessionId: null })
+          .where(eq(membersTable.id, member.id));
+      }
+    }
+    if (member.stripeCustomerId) {
+      const subscriptions = await stripe.subscriptions.list({ customer: member.stripeCustomerId, status: "all", limit: 100 });
+      const current = subscriptions.data.find(item => item.status !== "canceled") ?? subscriptions.data[0];
+      if (current) {
+        subscriptionId = current.id;
+        billingStatus = current.status === "active" || current.status === "trialing" ? "active"
+          : current.status === "past_due" || current.status === "unpaid" ? "past_due"
+            : current.status === "canceled" ? "canceled" : "pending";
+        await db.update(membersTable).set({ billingStatus, stripeSubscriptionId: subscriptionId })
+          .where(eq(membersTable.id, member.id));
+      }
+    }
+  } catch {
+    // Preserve the last known status if Stripe is temporarily unavailable.
+  }
+  res.json(GetMemberBillingResponse.parse({
+    status: billingStatus,
+    billingInterval: member.billingInterval,
+    membershipType: member.membershipType,
+    canStartCheckout: member.status === "active" &&
+      ["not_started", "canceled"].includes(billingStatus),
+  }));
+});
+
+router.post("/member/me/billing", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member || member.status !== "active") {
+    res.status(403).json({ error: "Ein aktives, verbundenes Mitgliedskonto ist erforderlich." }); return;
+  }
+  if (!["not_started", "canceled"].includes(member.billingStatus)) {
+    res.status(409).json({ error: "Für diese Mitgliedschaft wurde die SEPA-Abrechnung bereits gestartet." }); return;
+  }
+  const origin = req.get("origin");
+  if (!origin) { res.status(400).json({ error: "Die sichere Rücksprungadresse fehlt." }); return; }
+  let returnBase: URL;
+  try { returnBase = new URL(origin); } catch {
+    res.status(400).json({ error: "Ungültige Rücksprungadresse." }); return;
+  }
+  const allowedHosts = [
+    ...(process.env.REPLIT_DOMAINS ?? "").split(","),
+    process.env.REPLIT_DEV_DOMAIN ?? "",
+    "localhost",
+    "127.0.0.1",
+  ].filter(Boolean);
+  if (!allowedHosts.includes(returnBase.host)) {
+    res.status(400).json({ error: "Ungültige Rücksprungadresse." }); return;
+  }
+  const normalize = (value: string) => value.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+  const tariff = normalize(member.membershipType);
+  const expectedAmounts: Record<string, Record<string, number>> = {
+    basis: { monthly: 2990, semiannual: 17043, annual: 32292 },
+    premium: { monthly: 4990, semiannual: 28443, annual: 53892 },
+  };
+  const expectedAmount = expectedAmounts[tariff]?.[member.billingInterval];
+  if (!expectedAmount) {
+    res.status(409).json({ error: "Für diesen Tarif oder Abbuchungsrhythmus ist kein Preis eingerichtet." }); return;
+  }
+
+  try {
+    const stripe = await getStripeClient();
+    const products = await stripe.products.list({ active: true, limit: 100 });
+    const product = products.data.find(item => item.metadata.fiudia_tariff === tariff);
+    if (!product) {
+      res.status(409).json({ error: "Der Tarifpreis wurde in Stripe noch nicht eingerichtet." }); return;
+    }
+    const prices = await stripe.prices.list({ product: product.id, active: true, limit: 100 });
+    const price = prices.data.find(item =>
+      item.metadata.fiudia_interval === member.billingInterval &&
+      item.currency === "eur" && item.unit_amount === expectedAmount);
+    if (!price) {
+      res.status(409).json({ error: "Der Preis in Stripe stimmt nicht mit dem gespeicherten Tarif überein." }); return;
+    }
+    const customer = member.stripeCustomerId
+      ? await stripe.customers.retrieve(member.stripeCustomerId)
+      : await stripe.customers.create({
+        email: member.email,
+        name: member.fullName,
+        metadata: { fiudia_member_id: String(member.id), fiudia_studio_id: String(member.studioId) },
+      });
+    if (customer.deleted) {
+      res.status(409).json({ error: "Das verbundene Stripe-Konto muss vom Studio geprüft werden." }); return;
+    }
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customer.id,
+      allowed_payment_method_types: ["sepa_debit"],
+      line_items: [{ price: price.id, quantity: 1 }],
+      client_reference_id: String(member.id),
+      metadata: { fiudia_member_id: String(member.id) },
+      subscription_data: { metadata: { fiudia_member_id: String(member.id), fiudia_tariff: tariff } },
+      success_url: `${returnBase.origin}/fiudia-members/profile?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${returnBase.origin}/fiudia-members/profile?billing=cancelled`,
+    });
+    if (!session.url) {
+      res.status(502).json({ error: "Stripe hat keinen Checkout-Link zurückgegeben." });
+      return;
+    }
+    await db.update(membersTable).set({
+      stripeCustomerId: customer.id,
+      billingStatus: "checkout_pending",
+      stripeCheckoutSessionId: session.id,
+    }).where(eq(membersTable.id, member.id));
+    res.json(CreateMemberBillingCheckoutResponse.parse({ url: session.url }));
+  } catch (error) {
+    res.status(502).json({ error: "Stripe konnte den SEPA-Checkout nicht starten. Bitte versuche es später erneut." });
+  }
 });
 
 router.post("/member/push-subscriptions", async (req, res): Promise<void> => {

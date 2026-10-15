@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { Activity, ArrowRight, Bell, CalendarDays, Check, Clock3, DoorOpen, History, Link2, LogOut, MapPin, ShieldCheck, Ticket, Users, UserRound, X } from 'lucide-react';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from 'wouter';
 import type { Member, MemberCourse, MemberHome, MemberNotification } from '@workspace/api-client-react';
-import { getGetMemberCourseQueryKey, unregisterMemberPushSubscription } from '@workspace/api-client-react';
+import { getGetMemberCourseQueryKey, unregisterMemberPushSubscription, useCreateMemberBillingCheckout, useGetMemberBilling } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Toaster } from '@/components/ui/toaster';
@@ -488,6 +488,8 @@ function ConnectPage({ member }: { member: Member | null }) {
 }
 function ProfilePage({ member }: { member: Member }) {
   const update = useOwnMemberProfile();
+  const billing = useGetMemberBilling();
+  const checkout = useCreateMemberBillingCheckout();
   const form = useForm({
     defaultValues: {
       fullName: member.fullName, phone: member.phone || '', birthDate: member.birthDate || '',
@@ -496,6 +498,16 @@ function ProfilePage({ member }: { member: Member }) {
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [billingError, setBillingError] = useState('');
+  const startSepa = async () => {
+    setBillingError('');
+    try {
+      const result = await checkout.mutateAsync();
+      window.location.assign(result.url);
+    } catch {
+      setBillingError('Der SEPA-Checkout konnte nicht gestartet werden. Bitte versuche es erneut.');
+    }
+  };
   const submit = form.handleSubmit(async values => {
     setMessage(''); setError('');
     try {
@@ -517,7 +529,7 @@ function ProfilePage({ member }: { member: Member }) {
         <label className="profile-field">E-Mail (Konto)<span className="field profile-readonly">{member.email || 'Keine E-Mail'}</span><Link className="text-link" href="/account">E-Mail im Konto ändern</Link></label>
         <label className="profile-field profile-wide">Adresse<textarea className="field profile-textarea" {...form.register('address')} /></label>
         <label className="profile-field">Tarif<span className="field profile-readonly">{member.membershipType}</span></label>
-        <label className="profile-field">Abbuchungsrhythmus<select className="field" {...form.register('billingInterval')}>
+        <label className="profile-field">Abbuchungsrhythmus<select className="field" disabled={!billing.data?.canStartCheckout} {...form.register('billingInterval')}>
           <option value="monthly">Monatlich – kein Rabatt</option>
           <option value="semiannual">Halbjährlich – 5 % Rabatt</option>
           <option value="annual">Jährlich – 10 % Rabatt</option>
@@ -525,7 +537,17 @@ function ProfilePage({ member }: { member: Member }) {
         <label className="profile-field">Vertragsbeginn<span className="field profile-readonly">{member.contractStart || 'Nicht hinterlegt'}</span></label>
         <label className="profile-field">Vertragsdauer<span className="field profile-readonly">{member.contractDurationMonths ? `${member.contractDurationMonths} Monate` : 'Nicht hinterlegt'}</span></label>
       </div>
-      <p className="field-help">Deine E-Mail wird nach ihrer Bestätigung mit deiner Mitgliedschaft synchronisiert. Tarif und Vertragsdaten können vorerst nur vom Studio geändert werden. Die Rabatte werden vorgemerkt; automatische Abbuchungen sind noch nicht aktiv. Mitgliedsstatus und Studiozuordnung kann nur dein Studio ändern.</p>
+      <p className="field-help">Tarif und Vertragsdaten können nur vom Studio geändert werden. Deine Bankdaten und dein SEPA-Mandat gibst du sicher bei Stripe ein; Fiudia speichert keine Bankverbindung.</p>
+      {billing.isLoading && <p className="field-help" role="status">SEPA-Status wird geladen …</p>}
+      {billing.isError && <p className="form-error" role="alert">Der SEPA-Status konnte nicht geladen werden.</p>}
+      {billing.data?.status === 'active' && <p className="profile-success" role="status">SEPA-Lastschrift ist aktiv. Der Tarifwechsel ist bis zur Änderung durch dein Studio gesperrt.</p>}
+      {billing.data?.status === 'checkout_pending' && <p className="field-help" role="status">Dein SEPA-Checkout läuft noch. Bitte schließe ihn bei Stripe ab.</p>}
+      {billing.data?.status === 'pending' && <p className="field-help" role="status">Dein SEPA-Mandat wird von Stripe verarbeitet.</p>}
+      {billing.data?.status === 'past_due' && <p className="form-error" role="alert">Bei deiner letzten Abbuchung gab es ein Problem. Bitte wende dich an dein Studio.</p>}
+      {billing.data?.canStartCheckout && <button className="button button-primary" type="button" onClick={() => void startSepa()} disabled={checkout.isPending}>
+        {checkout.isPending ? 'Stripe wird geöffnet …' : 'SEPA-Lastschrift einrichten'} <ArrowRight size={15} />
+      </button>}
+      {billingError && <div className="form-error" role="alert">{billingError}</div>}
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="profile-success" role="status">{message}</div>}
       <button className="button button-primary" type="submit" disabled={update.isPending}>{update.isPending ? 'Wird gespeichert …' : 'Änderungen speichern'} <Check size={15} /></button>

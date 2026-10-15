@@ -15,5 +15,6 @@ export interface MemberHome {
   checkInsEnabled: boolean;
   waitlistEmailEnabled: boolean;
   nextCourse: MemberCourse | null;
+  /** @minimum 0 */
   upcomingBookings: number;
 }
