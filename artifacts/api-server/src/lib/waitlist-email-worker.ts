@@ -23,9 +23,15 @@ export async function waitlistEmailReadiness(
       method: "GET",
       signal: AbortSignal.timeout(5_000),
     });
-    // A sending-only key may not have permission to list domains. The send
-    // itself will still record its outcome durably.
+    // A sending-only key may not have permission to list domains. Resend may
+    // return 401 or 403 for this scope restriction; the send itself records
+    // its delivery outcome durably.
     if (response.status === 403) return null;
+    if (response.status === 401) {
+      const denied = await response.json().catch(() => ({})) as { message?: string };
+      if (denied.message?.toLowerCase().includes("restricted to only send emails")) return null;
+      return "E-Mail ist derzeit nicht versandbereit. Bitte In-App wählen; der Kurs wurde nicht geändert.";
+    }
     if (!response.ok) return "E-Mail ist derzeit nicht versandbereit. Bitte In-App wählen; der Kurs wurde nicht geändert.";
     const result = await response.json() as { data?: Array<{ name: string; status: string }> };
     if (!Array.isArray(result.data)) return "Die E-Mail-Absenderdomain konnte nicht geprüft werden. Bitte In-App wählen.";

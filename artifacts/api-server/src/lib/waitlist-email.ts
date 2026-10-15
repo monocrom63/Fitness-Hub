@@ -32,3 +32,5 @@ export function waitlistEmailDraft(recipient: string, notice: ReturnType<typeof 
     text: `${notice.body}\n\nDein Fiudia-Team`,
   };
 }
+
+

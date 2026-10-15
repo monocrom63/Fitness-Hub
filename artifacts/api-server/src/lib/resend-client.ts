@@ -35,9 +35,15 @@ export const resendRequest: ResendRequest = (url, init) => {
     if (key.toLowerCase() !== "authorization") headers[key] = value;
   });
 
-  return withAbort(connectors.proxy("resend", `${target.pathname}${target.search}`, {
-    method: init.method,
-    headers,
-    body: init.body,
-  }), init.signal);
+  const request = process.env.RESEND_API_KEY
+    ? fetch(url, {
+      ...init,
+      headers: { ...headers, Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+    })
+    : connectors.proxy("resend", `${target.pathname}${target.search}`, {
+      method: init.method,
+      headers,
+      body: init.body,
+    });
+  return withAbort(request, init.signal);
 };

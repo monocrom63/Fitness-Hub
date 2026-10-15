@@ -25,6 +25,16 @@ test("waitlist email readiness checks the sender domain through the authenticate
   assert.equal(method, "GET");
   assert.equal(verified, null);
 
+  const sendOnlyKey = await waitlistEmailReadiness(async () =>
+    new Response(JSON.stringify({ message: "This API key is restricted to only send emails" }), { status: 401 }),
+  "mail@fiudia.com");
+  assert.equal(sendOnlyKey, null);
+
+  const invalidKey = await waitlistEmailReadiness(async () =>
+    new Response(JSON.stringify({ message: "Invalid API key" }), { status: 401 }),
+  "mail@fiudia.com");
+  assert.match(invalidKey ?? "", /nicht versandbereit/);
+
   const unverified = await waitlistEmailReadiness(async () =>
     new Response(JSON.stringify({ data: [{ name: "fiudia.com", status: "pending" }] }), { status: 200 }),
   "mail@fiudia.com");

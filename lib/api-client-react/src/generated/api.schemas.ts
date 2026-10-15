@@ -819,6 +819,11 @@ export interface MemberNotification {
   emailDeliveryStatus: MemberNotificationEmailDeliveryStatus;
 }
 
+export interface MemberNotificationPreferences {
+  waitlistEmailEnabled: boolean;
+  email: string;
+}
+
 export interface MemberNotificationUnreadCount {
   /** @minimum 0 */
   count: number;
@@ -1125,3 +1130,7 @@ unreadOnly?: boolean;
 search?: string;
 };
 
+
+export interface MemberNotificationPreferencesUpdate {
+  waitlistEmailEnabled: boolean;
+}
