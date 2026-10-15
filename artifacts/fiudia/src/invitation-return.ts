@@ -25,6 +25,18 @@ export function afterAuthInviteUrl(storage: InviteStorage, basePath: string): st
   return path ? `${basePath}${path}` : undefined;
 }
 
+export function invitationReturnDestination(
+  storage: InviteStorage,
+  path: string,
+  isLoaded: boolean,
+  isSignedIn: boolean | undefined,
+): string | null {
+  // Do not interrupt Clerk's email verification / OAuth callback subroutes.
+  // A directly opened invitation takes precedence over an older pending one.
+  if (!isLoaded || !isSignedIn || /^\/(?:sign-in|sign-up|invite)(?:\/|$)/.test(path)) return null;
+  return pendingInvitationPath(storage);
+}
+
 export async function acceptStaffInvitation(
   storage: InviteStorage,
   token: string,

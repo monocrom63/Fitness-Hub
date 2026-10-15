@@ -12,25 +12,31 @@ import roomAssetsRouter from "./room-assets";
 import trainerAbsencesRouter from "./trainer-absences";
 import { requireModule } from "../lib/module-access";
 
-const router: IRouter = Router();
+export function createApiRouter(team: IRouter = teamRouter): IRouter {
+  const router: IRouter = Router();
 
-router.use(healthRouter);
-router.use(modulesRouter);
-router.use("/members", requireModule("members"));
-router.use("/check-ins", requireModule("members"));
-router.use("/courses/:id/bookings", requireModule("members"));
-router.use("/courses", requireModule("courses"));
-router.use("/trainer-absences", requireModule("courses"));
-router.use("/pulse", requireModule("pulse"));
-router.use("/team", requireModule("team"));
-router.use(roomAssetsRouter);
-router.use(trainerAbsencesRouter);
-router.use(portalRouter);
-router.use(courseBookingsRouter);
-router.use(courseEditsRouter);
-router.use(pulseRouter);
-router.use(teamRouter);
-router.use(memberAppRouter);
-router.use(memberInvitationsRouter);
+  router.use(healthRouter);
+  router.use(modulesRouter);
+  // Invitees do not have a staff organization yet. Acceptance authenticates and
+  // verifies the token/email itself; team administration remains module-gated.
+  router.post("/team/invitations/:token/accept", team);
+  router.use("/members", requireModule("members"));
+  router.use("/check-ins", requireModule("members"));
+  router.use("/courses/:id/bookings", requireModule("members"));
+  router.use("/courses", requireModule("courses"));
+  router.use("/trainer-absences", requireModule("courses"));
+  router.use("/pulse", requireModule("pulse"));
+  router.use("/team", requireModule("team"));
+  router.use(roomAssetsRouter);
+  router.use(trainerAbsencesRouter);
+  router.use(portalRouter);
+  router.use(courseBookingsRouter);
+  router.use(courseEditsRouter);
+  router.use(pulseRouter);
+  router.use(team);
+  router.use(memberAppRouter);
+  router.use(memberInvitationsRouter);
+  return router;
+}
 
-export default router;
+export default createApiRouter();

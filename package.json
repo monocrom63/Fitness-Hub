@@ -7,7 +7,8 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "test:pulse-archive": "pnpm --filter @workspace/api-server exec tsx --test ../fiudia/src/PulseArchiveQuery.test.ts"
+    "test:pulse-archive": "pnpm --filter @workspace/api-server exec tsx --test ../fiudia/src/PulseArchiveQuery.test.ts",
+    "test:invitations": "pnpm --filter @workspace/fiudia run test:invitation-return && pnpm --filter @workspace/fiudia-members run test:invitation-return && pnpm --filter @workspace/api-server run test:invitations"
   },
   "private": true,
   "dependencies": {

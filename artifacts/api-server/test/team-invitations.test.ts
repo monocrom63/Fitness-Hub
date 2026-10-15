@@ -5,6 +5,7 @@ import { after, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import express from "express";
+import { clerkMiddleware } from "@clerk/express";
 import {
   db,
   invitationsTable,
@@ -14,6 +15,7 @@ import {
   studiosTable,
 } from "@workspace/db";
 import { createTeamRouter } from "../src/routes/team";
+import { createApiRouter } from "../src/routes";
 
 after(async () => {
   await pool.end();
@@ -462,5 +464,80 @@ test("parallel acceptance of one invitation grants only one team access", async 
     if (organizationId !== undefined) {
       await db.delete(organizationsTable).where(eq(organizationsTable.id, organizationId));
     }
+  }
+});
+
+test("the real API mount allows a verified new invitee through without bypassing team administration", async () => {
+  try {
+    await db.transaction(async tx => {
+      const run = randomUUID();
+      const guest = `mount-guest-${run}`;
+      const email = `mount-${run}@example.com`;
+      const token = randomUUID();
+      const [org] = await tx.insert(organizationsTable).values({ name: `Invitation mount ${run}` }).returning();
+      const [, target] = await tx.insert(studiosTable).values([
+        { organizationId: org.id, name: "Not the destination", city: "Berlin" },
+        { organizationId: org.id, name: "Invited destination", city: "Hamburg" },
+      ]).returning();
+      const [manager] = await tx.insert(staffTable).values({
+        clerkUserId: `mount-manager-${run}`, organizationId: org.id, studioId: target.id,
+        fullName: "Manager", email: `manager-${email}`, role: "studio_manager",
+      }).returning();
+      const [invitation] = await tx.insert(invitationsTable).values({
+        organizationId: org.id, studioId: target.id, invitedByStaffId: manager.id,
+        email, role: "studio_employee", tokenHash: createHash("sha256").update(token).digest("hex"),
+        expiresAt: new Date(Date.now() + 60_000),
+      }).returning();
+      const app = express();
+      app.use(express.json());
+      // The production module guard reads Clerk's signed-out auth object.
+      // The invitation handler alone uses the injected fixture identity below.
+      app.use(clerkMiddleware());
+      app.use("/api", createApiRouter(createTeamRouter({
+        database: tx as unknown as typeof db,
+        userIdFromRequest: req => req.get("x-test-user") ?? null,
+        identityForUser: async userId => ({
+          userId, email, fullName: "New invitee",
+          emailVerified: userId !== "unverified",
+        }),
+      })));
+      const server = app.listen(0, "127.0.0.1");
+      await new Promise<void>(resolve => server.once("listening", resolve));
+      const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+      const acceptUrl = `${origin}/team/invitations/${token}/accept`;
+      try {
+        assert.equal((await fetch(acceptUrl, { method: "POST" })).status, 401);
+        assert.equal((await fetch(acceptUrl, {
+          method: "POST", headers: { "x-test-user": "unverified" },
+        })).status, 403);
+        const [pending] = await tx.select({ status: invitationsTable.status })
+          .from(invitationsTable).where(eq(invitationsTable.id, invitation.id));
+        assert.equal(pending.status, "pending");
+        assert.deepEqual(await tx.select({ id: staffTable.id }).from(staffTable)
+          .where(eq(staffTable.clerkUserId, guest)), []);
+
+        // The narrow exception must not open listing, creation, or other verbs.
+        for (const [path, method] of [
+          ["/team/invitations", "GET"], ["/team/invitations", "POST"],
+          [`/team/invitations/${token}/accept`, "GET"],
+        ]) {
+          assert.equal((await fetch(`${origin}${path}`, { method })).status, 401);
+        }
+        const accepted = await fetch(acceptUrl, { method: "POST", headers: { "x-test-user": guest } });
+        assert.equal(accepted.status, 200);
+        const body = await accepted.json() as { studioId: number; organizationId: number; role: string };
+        assert.equal(body.studioId, target.id);
+        assert.equal(body.organizationId, org.id);
+        assert.equal(body.role, "studio_employee");
+        const [staff] = await tx.select().from(staffTable).where(eq(staffTable.clerkUserId, guest));
+        assert.equal(staff.studioId, target.id);
+        assert.equal((await fetch(acceptUrl, { method: "POST", headers: { "x-test-user": guest } })).status, 409);
+      } finally {
+        await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+      }
+      throw rollback;
+    });
+  } catch (error) {
+    if (error !== rollback) throw error;
   }
 });

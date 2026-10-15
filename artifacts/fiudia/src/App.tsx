@@ -32,7 +32,7 @@ import CourseCsvImport from './CourseCsvImport';
 import MemberCsvImport from './MemberCsvImport';
 import { berlinDateTimeInput, berlinDateTimeIso } from './course-time';
 import { courseQueryScope } from './course-studio-scope';
-import { acceptStaffInvitation, afterAuthInviteUrl, clearInvite, enterInvitation, pendingInvitationPath } from './invitation-return';
+import { acceptStaffInvitation, afterAuthInviteUrl, clearInvite, enterInvitation, invitationReturnDestination } from './invitation-return';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
@@ -733,9 +733,6 @@ function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
 }
 
 function ProtectedRoute({ page }: { page: ProtectedPage }) {
-  const { isSignedIn } = useAuth();
-  const pending = isSignedIn ? pendingInvitationPath(sessionStorage) : null;
-  if (pending) return <Redirect to={pending} />;
   return <AuthenticatedData>{(me, modules, retryModules, modulesError) =>
     <ProtectedContent page={page} me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />
   }</AuthenticatedData>;
@@ -746,6 +743,10 @@ function NotFoundPage() {
 }
 
 function Router() {
+  const [location] = useLocation();
+  const { isLoaded, isSignedIn } = useAuth();
+  const pending = invitationReturnDestination(sessionStorage, location, isLoaded, isSignedIn);
+  if (pending) return <Redirect to={pending} />;
   return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team/absences"><ProtectedRoute page="trainer-absences" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route component={NotFoundPage} /></Switch>;
 }
 

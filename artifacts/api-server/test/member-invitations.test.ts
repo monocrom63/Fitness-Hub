@@ -39,6 +39,7 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
     concurrent: `member-concurrent-${run}`,
     moved: `member-moved-${run}`,
     wrong: `member-wrong-${run}`,
+    unverified: `member-unverified-${run}`,
     replay: `member-replay-${run}`,
   };
   const email = `member-${run}@example.com`;
@@ -91,6 +92,7 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
       [users.concurrent, { userId: users.concurrent, fullName: "Concurrent user", email, emailVerified: true }],
       [users.moved, { userId: users.moved, fullName: "Moved user", email: `moved-${run}@example.com`, emailVerified: true }],
       [users.wrong, { userId: users.wrong, fullName: "Wrong user", email: `wrong-${run}@example.com`, emailVerified: true }],
+      [users.unverified, { userId: users.unverified, fullName: "Unverified user", email, emailVerified: false }],
       [users.replay, { userId: users.replay, fullName: "Replay user", email, emailVerified: true }],
     ]);
     const app = express();
@@ -173,6 +175,11 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
 
     const wrongEmail = await api(users.wrong, "/member/invitations/accept", { token: oldToken });
     assert.equal(wrongEmail.status, 403);
+    const unverified = await api(users.unverified, "/member/invitations/accept", { token: oldToken });
+    assert.equal(unverified.status, 403);
+    const [unlinked] = await db.select({ clerkUserId: membersTable.clerkUserId })
+      .from(membersTable).where(eq(membersTable.id, member.id));
+    assert.equal(unlinked.clerkUserId, null, "wrong or unverified email must never link the membership");
     const [stillPending] = await db.select({ status: memberInvitationsTable.status })
       .from(memberInvitationsTable).where(eq(memberInvitationsTable.id, stored.id));
     assert.equal(stillPending.status, "pending");

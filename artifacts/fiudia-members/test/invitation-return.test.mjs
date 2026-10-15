@@ -55,3 +55,27 @@ test('invite entry, both auth routes, protected redirect and acceptance share th
   assert.equal(pendingInvitationPath(tab), null);
   assert.equal(afterAuthPath(tab, '/fiudia-members', '/connect'), '/fiudia-members/connect');
 });
+
+test('root and prefixed deployment returns preserve the invitation until explicit acceptance', () => {
+  for (const base of ['', '/fiudia-members']) {
+    const tab = tabStorage();
+    assert.equal(enterInvitation(tab, 'studio-B', undefined), '/sign-in');
+    for (const fallback of ['/', '/connect']) {
+      assert.equal(afterAuthPath(tab, base, fallback), `${base}/invite/studio-B`);
+    }
+    // Restored identity after OAuth/email confirmation must not consume the token.
+    assert.equal(enterInvitation(tab, 'studio-B', true), null);
+    assert.equal(pendingInvitationPath(tab), '/invite/studio-B');
+    clearInvite(tab);
+    assert.equal(pendingInvitationPath(tab), null);
+  }
+});
+
+test('member and staff invitation storage cannot overwrite or clear each other', async () => {
+  const tab = tabStorage();
+  tab.setItem('fiudia-staff-pending-invite', 'staff-studio');
+  enterInvitation(tab, 'member-studio', false);
+  await acceptInvitation(tab, 'member-studio', async () => {});
+  assert.equal(pendingInvite(tab), null);
+  assert.equal(tab.getItem('fiudia-staff-pending-invite'), 'staff-studio');
+});
