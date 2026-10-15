@@ -439,8 +439,6 @@ export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
   retractedAt: timestamp("retracted_at", { withTimezone: true }),
 }, (table) => [
   index("fiudia_pulse_messages_org_id_idx").on(table.organizationId, table.id),
-  index("fiudia_pulse_messages_title_trgm_idx").using("gin", table.title.op("gin_trgm_ops")),
-  index("fiudia_pulse_messages_body_trgm_idx").using("gin", table.body.op("gin_trgm_ops")),
 ]);
 
 export const pulseCorrectionsTable = pgTable("fiudia_pulse_corrections", {
