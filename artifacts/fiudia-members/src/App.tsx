@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEmailPreference, useGetMemberHome, useGetMemberCourse, useInvitationAcceptance, useListMemberCheckIns, useListMemberCourses, useMemberActions, useMemberNotificationUnreadCount, useNotificationRead, useOwnMemberProfile } from '@/hooks/use-member';
-import { courseDisplayState, courseFilterHref, readCourseLocation, type CourseFilter } from './course-target';
+import { courseDisplayState, courseFilterHref, courseQueryParams, readCourseLocation, type CourseFilter } from './course-target';
 import { memberNotificationArchiveQueryOptions } from './notification-history';
 import courseBrowsePhoto from './assets/course-cable-pulldown.webp';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
@@ -214,7 +214,7 @@ function CoursesPage() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const { targetId, filter } = readCourseLocation(search);
-  const courses = useListMemberCourses(targetId !== null ? { courseId: targetId } : undefined);
+  const courses = useListMemberCourses(courseQueryParams(search));
   const setFilter = (next: CourseFilter) => navigate(courseFilterHref(search, next));
   const { visible, targetVisible, targetExists } = courseDisplayState(courses.data || [], filter, targetId);
   useEffect(() => {

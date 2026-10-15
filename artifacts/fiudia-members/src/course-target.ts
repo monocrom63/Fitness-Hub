@@ -75,6 +75,11 @@ export function readCourseLocation(search: string): { targetId: number | null; f
   };
 }
 
+export function courseQueryParams(search: string): { courseId: number } | undefined {
+  const { targetId } = readCourseLocation(search);
+  return targetId === null ? undefined : { courseId: targetId };
+}
+
 export function courseFilterHref(search: string, filter: CourseFilter): string {
   const params = new URLSearchParams(search);
   if (filter === 'mine') params.set('filter', 'mine');

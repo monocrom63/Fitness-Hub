@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CoursePushClickRouter, courseDisplayState, courseFilterHref, parseCoursePushPayload, readCourseLocation } from '../src/course-target.ts';
+import { CoursePushClickRouter, courseDisplayState, courseFilterHref, courseQueryParams, parseCoursePushPayload, readCourseLocation } from '../src/course-target.ts';
 
 const courses = [
   { id: 42, startsAt: '2026-10-02T10:00:00Z', bookingStatus: null },
@@ -12,16 +12,19 @@ test('a course linked from a notice stays selected across filters and reloads', 
   const initial = '?courseId=41';
   const first = readCourseLocation(initial);
   assert.deepEqual(first, { targetId: 41, filter: 'all' });
+  assert.deepEqual(courseQueryParams(initial), { courseId: 41 });
   assert.deepEqual(courseDisplayState(courses, first.filter, first.targetId).visible.map(course => course.id), [41, 42, 43]);
 
   const switched = courseFilterHref(initial, 'mine');
   assert.equal(switched, '/courses?courseId=41&filter=mine');
   const reloaded = readCourseLocation(new URL(switched, 'https://example.invalid').search);
   assert.deepEqual(reloaded, { targetId: 41, filter: 'mine' });
+  assert.deepEqual(courseQueryParams(new URL(switched, 'https://example.invalid').search), { courseId: 41 });
   assert.deepEqual(courseDisplayState(courses, reloaded.filter, reloaded.targetId), {
     visible: [courses[1], courses[2]], targetExists: true, targetVisible: true,
   });
   assert.equal(courseFilterHref(new URL(switched, 'https://example.invalid').search, 'all'), '/courses?courseId=41');
+  assert.equal(courseQueryParams('?filter=mine'), undefined);
 });
 
 test('filtered and unavailable targets do not point at a different course', () => {
