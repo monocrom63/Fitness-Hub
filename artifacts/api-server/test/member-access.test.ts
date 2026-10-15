@@ -170,6 +170,9 @@ test("member records remain inside the caller's studio and organization", async 
     await t.test("a stale cross-organization staff assignment cannot create a member", async () => {
       const email = `stale-assignment-${run}@example.com`;
       const input = { ...draft(studioB.id), email };
+      const before = await db.select({ id: membersTable.id })
+        .from(membersTable).where(inArray(membersTable.studioId, [studioA1.id, studioA2.id, studioB.id]))
+        .orderBy(membersTable.id);
       const foreignStudio = await api(mismatchedManager.clerkUserId, "POST", "/members", input);
       assert.equal(foreignStudio.status, 403);
       assert.equal(JSON.stringify(foreignStudio.body).includes(email), false);
@@ -182,6 +185,13 @@ test("member records remain inside the caller's studio and organization", async 
       const rows = await db.select({ id: membersTable.id, studioId: membersTable.studioId })
         .from(membersTable).where(eq(membersTable.email, email));
       assert.deepEqual(rows, []);
+      assert.deepEqual(
+        await db.select({ id: membersTable.id })
+          .from(membersTable).where(inArray(membersTable.studioId, [studioA1.id, studioA2.id, studioB.id]))
+          .orderBy(membersTable.id),
+        before,
+        "denied creates must leave all fixture studios' member records unchanged",
+      );
 
       const legitimate = await api<MemberView>(managerB.clerkUserId, "POST", "/members", input);
       assert.equal(legitimate.status, 201);
@@ -190,6 +200,20 @@ test("member records remain inside the caller's studio and organization", async 
         await db.select({ studioId: membersTable.studioId }).from(membersTable).where(eq(membersTable.email, email)),
         [{ studioId: studioB.id }],
       );
+    });
+
+    await t.test("a stale cross-organization staff assignment cannot create a check-in", async () => {
+      for (const member of [memberB, memberA1, memberA2]) {
+        const response = await api(mismatchedManager.clerkUserId, "POST", "/check-ins", {
+          memberId: member.id,
+          studioId: member.studioId,
+        });
+        assert.equal(response.status, 403, `must not check in member ${member.id}`);
+        assert.equal(JSON.stringify(response.body).includes(member.email), false);
+      }
+      const checkIns = await db.select({ id: checkInsTable.id })
+        .from(checkInsTable).where(inArray(checkInsTable.studioId, [studioA1.id, studioA2.id, studioB.id]));
+      assert.deepEqual(checkIns, [], "denied check-ins must not persist in any fixture studio");
     });
 
     await t.test("a foreign member ID cannot be edited or returned", async () => {
