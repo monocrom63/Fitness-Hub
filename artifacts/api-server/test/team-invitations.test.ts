@@ -467,6 +467,110 @@ test("parallel acceptance of one invitation grants only one team access", async 
   }
 });
 
+test("parallel invitations cannot grant the same account access to two organizations", async () => {
+  const run = randomUUID();
+  const email = `team-account-race-${run}@example.com`;
+  const userId = `team-account-race-user-${run}`;
+  const tokenA = randomUUID();
+  const tokenB = randomUUID();
+  const organizationIds: number[] = [];
+  let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+  let releaseA: (() => void) | undefined;
+  let releaseB: (() => void) | undefined;
+
+  try {
+    const [organizationA, organizationB] = await db.insert(organizationsTable).values([
+      { name: `Account race A ${run}` },
+      { name: `Account race B ${run}` },
+    ]).returning();
+    organizationIds.push(organizationA.id, organizationB.id);
+    const [studioA, studioB] = await db.insert(studiosTable).values([
+      { organizationId: organizationA.id, name: "Race studio A", city: "Berlin" },
+      { organizationId: organizationB.id, name: "Race studio B", city: "Hamburg" },
+    ]).returning();
+    const [managerA, managerB] = await db.insert(staffTable).values([
+      {
+        clerkUserId: `team-account-race-manager-a-${run}`,
+        organizationId: organizationA.id, studioId: studioA.id,
+        fullName: "Manager A", email: `manager-a-${run}@example.com`, role: "studio_manager",
+      },
+      {
+        clerkUserId: `team-account-race-manager-b-${run}`,
+        organizationId: organizationB.id, studioId: studioB.id,
+        fullName: "Manager B", email: `manager-b-${run}@example.com`, role: "studio_manager",
+      },
+    ]).returning();
+    const [invitationA, invitationB] = await db.insert(invitationsTable).values([
+      {
+        organizationId: organizationA.id, studioId: studioA.id, invitedByStaffId: managerA.id,
+        email, role: "studio_employee",
+        tokenHash: createHash("sha256").update(tokenA).digest("hex"),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      {
+        organizationId: organizationB.id, studioId: studioB.id, invitedByStaffId: managerB.id,
+        email, role: "studio_employee",
+        tokenHash: createHash("sha256").update(tokenB).digest("hex"),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    ]).returning();
+
+    const connectionA = await pool.connect();
+    releaseA = () => connectionA.release();
+    const connectionB = await pool.connect();
+    releaseB = () => connectionB.release();
+    let arrivals = 0;
+    let release!: () => void;
+    const bothArrived = new Promise<void>(resolve => { release = resolve; });
+    const identityForUser = async (requestedUserId: string) => {
+      assert.equal(requestedUserId, userId);
+      if (++arrivals === 2) release();
+      await bothArrived;
+      return { userId, fullName: "Same account", email, emailVerified: true };
+    };
+    const routerA = createTeamRouter({
+      database: drizzle(connectionA) as unknown as typeof db,
+      userIdFromRequest: (req: express.Request) => req.get("x-test-user") ?? null,
+      identityForUser,
+    });
+    const routerB = createTeamRouter({
+      database: drizzle(connectionB) as unknown as typeof db,
+      userIdFromRequest: (req: express.Request) => req.get("x-test-user") ?? null,
+      identityForUser,
+    });
+    const app = express();
+    app.use(express.json());
+    app.use("/api", (req, res, next) => {
+      (req.originalUrl.includes(tokenA) ? routerA : routerB)(req, res, next);
+    });
+    server = app.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => server!.once("listening", resolve));
+    const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/team/invitations`;
+    const responses = await Promise.all([tokenA, tokenB].map(async token => {
+      const response = await fetch(`${baseUrl}/${token}/accept`, {
+        method: "POST", headers: { "x-test-user": userId },
+      });
+      return response.status;
+    }));
+
+    assert.deepEqual(responses.sort(), [200, 409]);
+    assert.equal((await db.select({ id: staffTable.id }).from(staffTable)
+      .where(eq(staffTable.clerkUserId, userId))).length, 1);
+    const invitationStates = await db.select({ status: invitationsTable.status })
+      .from(invitationsTable)
+      .where(inArray(invitationsTable.id, [invitationA.id, invitationB.id]));
+    assert.deepEqual(invitationStates.map(row => row.status).sort(), ["accepted", "pending"]);
+  } finally {
+    if (server?.listening) await new Promise<void>((resolve, reject) =>
+      server!.close(error => error ? reject(error) : resolve()));
+    releaseA?.();
+    releaseB?.();
+    if (organizationIds.length) {
+      await db.delete(organizationsTable).where(inArray(organizationsTable.id, organizationIds));
+    }
+  }
+});
+
 test("the real API mount allows a verified new invitee through without bypassing team administration", async () => {
   try {
     await db.transaction(async tx => {

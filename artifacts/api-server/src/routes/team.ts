@@ -30,6 +30,12 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: string; cause?: { code?: string } };
+  return candidate.code === "23505" || candidate.cause?.code === "23505";
+}
+
 function invitationStatus(status: string, expiresAt: Date) {
   if (status === "pending" && expiresAt <= new Date()) return "expired";
   return status;
@@ -250,57 +256,68 @@ router.post(
     }
 
     const role = invitation.role as FiudiaRole;
+    let uniqueConflict = false;
     const created = await database.transaction(async (tx) => {
-      // Never consume an invitation if its studio no longer belongs to its organization.
-      const [targetStudio] = await tx
-        .select({ id: studiosTable.id })
-        .from(studiosTable)
-        .where(
-          and(
-            eq(studiosTable.id, invitation.studioId),
-            eq(studiosTable.organizationId, invitation.organizationId),
-          ),
-        )
-        .limit(1);
-      if (!targetStudio) return null;
-      const [accepted] = await tx
-        .update(invitationsTable)
-        .set({ status: "accepted" })
-        .where(
-          and(
-            eq(invitationsTable.id, invitation.id),
-            eq(invitationsTable.status, "pending"),
-            gt(invitationsTable.expiresAt, new Date()),
-          ),
-        )
-        .returning({ id: invitationsTable.id });
-      if (!accepted) return null;
+        // Never consume an invitation if its studio no longer belongs to its organization.
+        const [targetStudio] = await tx
+          .select({ id: studiosTable.id })
+          .from(studiosTable)
+          .where(
+            and(
+              eq(studiosTable.id, invitation.studioId),
+              eq(studiosTable.organizationId, invitation.organizationId),
+            ),
+          )
+          .limit(1);
+        if (!targetStudio) return null;
+        const [accepted] = await tx
+          .update(invitationsTable)
+          .set({ status: "accepted" })
+          .where(
+            and(
+              eq(invitationsTable.id, invitation.id),
+              eq(invitationsTable.status, "pending"),
+              gt(invitationsTable.expiresAt, new Date()),
+            ),
+          )
+          .returning({ id: invitationsTable.id });
+        if (!accepted) return null;
 
-      const [member] = await tx
-        .insert(staffTable)
-        .values({
-          clerkUserId: userId,
-          organizationId: invitation.organizationId,
-          studioId: invitation.studioId,
-          fullName: identity.fullName,
-          email: identity.email,
-          role,
-        })
-        .returning();
-      const [studio] = await tx
-        .select({
-          studioName: studiosTable.name,
-          organizationName: organizationsTable.name,
-        })
-        .from(studiosTable)
-        .innerJoin(
-          organizationsTable,
-          eq(studiosTable.organizationId, organizationsTable.id),
-        )
-        .where(eq(studiosTable.id, invitation.studioId))
-        .limit(1);
+        const [member] = await tx
+          .insert(staffTable)
+          .values({
+            clerkUserId: userId,
+            organizationId: invitation.organizationId,
+            studioId: invitation.studioId,
+            fullName: identity.fullName,
+            email: identity.email,
+            role,
+          })
+          .returning();
+        const [studio] = await tx
+          .select({
+            studioName: studiosTable.name,
+            organizationName: organizationsTable.name,
+          })
+          .from(studiosTable)
+          .innerJoin(
+            organizationsTable,
+            eq(studiosTable.organizationId, organizationsTable.id),
+          )
+          .where(eq(studiosTable.id, invitation.studioId))
+          .limit(1);
       return { member, studio };
+    }).catch((error) => {
+      // A second invite can race for the same Clerk identity. The unique
+      // identity constraint rolls back that transaction, including its invite.
+      if (!isUniqueViolation(error)) throw error;
+      uniqueConflict = true;
+      return null;
     });
+    if (uniqueConflict) {
+      res.status(409).json({ error: "Für dieses Konto besteht bereits ein Fiudia-Zugang." });
+      return;
+    }
     if (!created) {
       res.status(404).json({ error: "Die Einladung ist abgelaufen oder wurde bereits verwendet." });
       return;
