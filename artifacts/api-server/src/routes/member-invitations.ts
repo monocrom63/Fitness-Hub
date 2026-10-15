@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import {
   AcceptMemberInvitationBody,
@@ -45,6 +45,46 @@ class MemberInvitationError extends Error {
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function tokenKey(): Buffer {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new MemberInvitationError(503, "Einladungen sind derzeit nicht verfügbar.");
+  return createHash("sha256").update(secret).digest();
+}
+
+function encryptToken(token: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", tokenKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+  return [iv, cipher.getAuthTag(), encrypted].map(part => part.toString("base64url")).join(".");
+}
+
+function decryptToken(value: string | null): string {
+  if (!value) throw new MemberInvitationError(409, "Diese Einladung kann nicht erneut versendet werden. Erzeuge eine neue Einladung.");
+  const [iv, tag, encrypted] = value.split(".").map(part => Buffer.from(part, "base64url"));
+  if (!iv || !tag || !encrypted) throw new MemberInvitationError(409, "Der gespeicherte Einladungslink ist ungültig.");
+  const decipher = createDecipheriv("aes-256-gcm", tokenKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+}
+
+function invitationUrls(req: Request, token: string) {
+  const relative = `/fiudia-members/invite/${token}`;
+  const origin = req.get("origin");
+  const host = req.get("host");
+  if (!origin || !host) return { relative, absolute: null };
+  try {
+    const parsed = new URL(origin);
+    const localHttp = parsed.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsed.hostname);
+    return {
+      relative,
+      absolute: parsed.host.toLowerCase() === host.toLowerCase() &&
+        (parsed.protocol === "https:" || localHttp) ? new URL(relative, parsed.origin).toString() : null,
+    };
+  } catch {
+    return { relative, absolute: null };
+  }
 }
 
 function isRealEmail(email: string): boolean {
@@ -132,7 +172,7 @@ export function createMemberInvitationsRouter(
         }
 
         await tx.update(memberInvitationsTable)
-          .set({ status: "revoked" })
+          .set({ status: "revoked", tokenCiphertext: null })
           .where(and(
             eq(memberInvitationsTable.memberId, member.id),
             eq(memberInvitationsTable.status, "pending"),
@@ -143,44 +183,36 @@ export function createMemberInvitationsRouter(
           studioId: member.studioId,
           email: memberEmail,
           tokenHash: hashToken(rawToken),
+          tokenCiphertext: encryptToken(rawToken),
           expiresAt,
+          emailStatus: "pending",
         }).returning({ id: memberInvitationsTable.id });
         return { id: createdInvitation.id, fullName: member.fullName, email: memberEmail };
       });
 
-      const inviteUrl = `/fiudia-members/invite/${rawToken}`;
-      const origin = req.get("origin");
-      const host = req.get("host");
-      let absoluteInviteUrl: string | null = null;
-      if (origin && host) {
-        try {
-          const parsedOrigin = new URL(origin);
-          const localHttp = parsedOrigin.protocol === "http:" &&
-            ["localhost", "127.0.0.1"].includes(parsedOrigin.hostname);
-          if (parsedOrigin.host.toLowerCase() === host.toLowerCase() &&
-              (parsedOrigin.protocol === "https:" || localHttp)) {
-            absoluteInviteUrl = new URL(inviteUrl, parsedOrigin.origin).toString();
-          }
-        } catch {
-          // Without a trustworthy browser origin, keep the one-time link available
-          // in the UI but do not mail a URL derived from an untrusted host.
-        }
-      }
+      const urls = invitationUrls(req, rawToken);
 
-      const delivery = absoluteInviteUrl
+      const delivery = urls.absolute
         ? await sendMemberInvitationEmail({
             invitationId: invitation.id,
             memberName: invitation.fullName,
             memberEmail: invitation.email,
-            inviteUrl: absoluteInviteUrl,
+            inviteUrl: urls.absolute,
           }, { request: emailRequest, sender: emailSender })
         : { sent: false, reason: "The invitation URL could not be verified for email delivery." };
+      await database.update(memberInvitationsTable).set({
+        emailStatus: delivery.sent ? "sent" : "failed",
+        emailAttemptCount: 1,
+        emailSentAt: delivery.sent ? new Date() : null,
+        emailProviderId: delivery.providerId ?? null,
+        emailFailureReason: delivery.sent ? null : delivery.reason ?? "Email delivery failed.",
+      }).where(eq(memberInvitationsTable.id, invitation.id));
       if (!delivery.sent) {
         req.log?.warn({ memberId: params.data.id, reason: delivery.reason }, "Member invitation email was not sent");
       }
 
       res.status(201).json(CreateMemberInvitationResponse.parse({
-        inviteUrl,
+        inviteUrl: urls.relative,
         expiresAt,
         memberName: invitation.fullName,
         memberEmail: invitation.email,
@@ -193,6 +225,68 @@ export function createMemberInvitationsRouter(
       }
       throw error;
     }
+  });
+
+  router.post("/members/:id/invite/resend", async (req, res): Promise<void> => {
+    const staff = await requireManager(req, res);
+    if (!staff) return;
+    const params = CreateMemberInvitationParams.safeParse(req.params);
+    if (!params.success) { res.status(400).json({ error: "Ungültiges Mitglied." }); return; }
+    const [member] = await database.select().from(membersTable)
+      .where(eq(membersTable.id, params.data.id)).limit(1);
+    if (!member) { res.status(404).json({ error: "Mitglied nicht gefunden." }); return; }
+    if (!(await canAccessStudio(staff, member.studioId, database))) {
+      res.status(403).json({ error: "Kein Zugriff auf dieses Studio." }); return;
+    }
+    if (member.status !== "active" || member.clerkUserId !== null) {
+      res.status(409).json({ error: "Dieses Mitglied kann keine offene Einladung erhalten." }); return;
+    }
+    const [invitation] = await database.select().from(memberInvitationsTable)
+      .where(and(eq(memberInvitationsTable.memberId, member.id), eq(memberInvitationsTable.status, "pending")))
+      .orderBy(desc(memberInvitationsTable.createdAt)).limit(1);
+    if (!invitation || invitation.expiresAt <= new Date()) {
+      res.status(404).json({ error: "Keine gültige offene Einladung gefunden." }); return;
+    }
+    if (invitation.studioId !== member.studioId || invitation.email !== member.email.trim().toLowerCase()) {
+      res.status(409).json({ error: "Die Mitgliedsdaten haben sich geändert. Erzeuge eine neue Einladung." }); return;
+    }
+    if (invitation.emailStatus !== "failed") {
+      res.status(409).json({ error: "Nur fehlgeschlagene Einladungsmails können erneut gesendet werden." }); return;
+    }
+    let token: string;
+    try { token = decryptToken(invitation.tokenCiphertext); }
+    catch (error) {
+      if (error instanceof MemberInvitationError) { res.status(error.status).json({ error: error.message }); return; }
+      res.status(409).json({ error: "Der gespeicherte Einladungslink kann nicht wiederhergestellt werden." }); return;
+    }
+    const urls = invitationUrls(req, token);
+    if (!urls.absolute) { res.status(400).json({ error: "Die sichere Rücksprungadresse fehlt." }); return; }
+    const attempt = invitation.emailAttemptCount + 1;
+    const delivery = await sendMemberInvitationEmail({
+      invitationId: invitation.id,
+      attempt,
+      memberName: member.fullName,
+      memberEmail: invitation.email,
+      inviteUrl: urls.absolute,
+    }, { request: emailRequest, sender: emailSender });
+    await database.update(memberInvitationsTable).set({
+      emailStatus: delivery.sent ? "sent" : "failed",
+      emailAttemptCount: attempt,
+      emailSentAt: delivery.sent ? new Date() : invitation.emailSentAt,
+      emailProviderId: delivery.providerId ?? invitation.emailProviderId,
+      emailFailureReason: delivery.sent ? null : delivery.reason ?? "Email delivery failed.",
+    }).where(and(
+      eq(memberInvitationsTable.id, invitation.id),
+      eq(memberInvitationsTable.status, "pending"),
+    ));
+    if (!delivery.sent) req.log?.warn({ memberId: member.id, invitationId: invitation.id }, "Member invitation email retry failed");
+    res.json(CreateMemberInvitationResponse.parse({
+      inviteUrl: urls.relative,
+      expiresAt: invitation.expiresAt,
+      memberName: member.fullName,
+      memberEmail: invitation.email,
+      emailSent: delivery.sent,
+    }));
   });
 
   router.post("/member/invitations/accept", async (req, res): Promise<void> => {
@@ -290,7 +384,7 @@ export function createMemberInvitationsRouter(
         }
 
         const [consumed] = await tx.update(memberInvitationsTable)
-          .set({ status: "accepted" })
+          .set({ status: "accepted", tokenCiphertext: null })
           .where(and(
             eq(memberInvitationsTable.id, invitation.id),
             eq(memberInvitationsTable.status, "pending"),

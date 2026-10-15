@@ -203,7 +203,9 @@ export const ListMembersResponseItem = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 })
 export const ListMembersResponse = zod.array(ListMembersResponseItem)
 
@@ -266,7 +268,9 @@ export const CreateMemberResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 })
 
 
@@ -331,7 +335,9 @@ export const UpdateMemberResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 })
 
 
@@ -1125,6 +1131,22 @@ export const CreateMemberInvitationResponse = zod.object({
 
 
 /**
+ * @summary Retry a failed member invitation email using the existing link
+ */
+export const ResendMemberInvitationParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ResendMemberInvitationResponse = zod.object({
+  "inviteUrl": zod.string(),
+  "expiresAt": zod.coerce.date(),
+  "memberName": zod.string(),
+  "memberEmail": zod.string().email(),
+  "emailSent": zod.boolean()
+})
+
+
+/**
  * @summary List organization modules for navigation and permissions
  */
 export const ListModulesResponseItem = zod.object({
@@ -1182,7 +1204,9 @@ export const GetMemberHomeResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 }),zod.null()]),
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
@@ -1252,7 +1276,9 @@ export const UpdateOwnMemberProfileResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 }),zod.null()]),
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
@@ -1341,7 +1367,9 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 }),zod.null()]),
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
@@ -1423,7 +1451,9 @@ export const ClaimMembershipResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 }),zod.null()]),
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),
@@ -1484,7 +1514,9 @@ export const AcceptMemberInvitationResponse = zod.object({
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
-  "lastCheckIn": zod.coerce.date().nullable()
+  "lastCheckIn": zod.coerce.date().nullable(),
+  "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
+  "invitationEmailStatus": zod.union([zod.literal('unknown'),zod.literal('pending'),zod.literal('sent'),zod.literal('failed'),zod.literal(null)]).nullish()
 }),zod.null()]),
   "checkInCount": zod.number().int(),
   "coursesEnabled": zod.boolean(),

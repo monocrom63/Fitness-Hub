@@ -46,6 +46,7 @@ import {
   coursesTable,
   db,
   membersTable,
+  memberInvitationsTable,
   organizationsTable,
   pulseMessagesTable,
   roomClosuresTable,
@@ -624,6 +625,19 @@ router.get("/members", async (req, res): Promise<void> => {
     .limit(200);
 
   const memberIds = rows.map((row) => row.id);
+  const invitations = memberIds.length && staff.role !== "studio_employee"
+    ? await db.select({
+      memberId: memberInvitationsTable.memberId,
+      status: memberInvitationsTable.status,
+      expiresAt: memberInvitationsTable.expiresAt,
+      email: memberInvitationsTable.email,
+      emailStatus: memberInvitationsTable.emailStatus,
+    }).from(memberInvitationsTable)
+      .where(inArray(memberInvitationsTable.memberId, memberIds))
+      .orderBy(desc(memberInvitationsTable.createdAt))
+    : [];
+  const latestInvitation = new Map<number, typeof invitations[number]>();
+  for (const invite of invitations) if (!latestInvitation.has(invite.memberId)) latestInvitation.set(invite.memberId, invite);
   const recentCheckIns = memberIds.length
     ? await db
         .select({
@@ -645,6 +659,15 @@ router.get("/members", async (req, res): Promise<void> => {
     ListMembersResponse.parse(
       rows.map((member) => ({
         ...member,
+        invitationStatus: staff.role === "studio_employee" ? null : (() => {
+          const invitation = latestInvitation.get(member.id);
+          if (!invitation) return null;
+          if (invitation.email !== member.email?.trim().toLowerCase()) return "revoked";
+          return invitation.status === "pending" && invitation.expiresAt <= new Date()
+            ? "expired" : invitation.status;
+        })(),
+        invitationEmailStatus: staff.role === "studio_employee"
+          ? null : latestInvitation.get(member.id)?.emailStatus ?? null,
         ...(staff.role === "studio_employee"
           ? { email: null, phone: null, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
           : {}),

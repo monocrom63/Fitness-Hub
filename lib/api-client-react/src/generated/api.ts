@@ -3434,6 +3434,80 @@ export const useCreateMemberInvitation = <TError = ErrorType<void>,
       return useMutation(getCreateMemberInvitationMutationOptions(options));
     }
 
+export const getResendMemberInvitationUrl = (id: number,) => {
+
+
+
+
+  return `/api/members/${id}/invite/resend`
+}
+
+/**
+ * @summary Retry a failed member invitation email using the existing link
+ */
+export const resendMemberInvitation = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<MemberInvitationLink> => {
+
+  return customFetch<MemberInvitationLink>(getResendMemberInvitationUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResendMemberInvitationMutationKey = () => ['resendMemberInvitation'] as const;
+
+export const getResendMemberInvitationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendMemberInvitation>>, TError,ResendMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resendMemberInvitation>>, TError,ResendMemberInvitationMutationVariables, TContext> => {
+
+const mutationKey = getResendMemberInvitationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resendMemberInvitation>>, ResendMemberInvitationMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  resendMemberInvitation(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResendMemberInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof resendMemberInvitation>>>
+
+    export type ResendMemberInvitationMutationError = ErrorType<void>
+    export type ResendMemberInvitationMutationVariables = {id: number}
+
+    /**
+ * @summary Retry a failed member invitation email using the existing link
+ */
+export const useResendMemberInvitation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendMemberInvitation>>, TError,ResendMemberInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resendMemberInvitation>>,
+        TError,
+        ResendMemberInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResendMemberInvitationMutationOptions(options));
+    }
+
 export const getListModulesUrl = () => {
 
 

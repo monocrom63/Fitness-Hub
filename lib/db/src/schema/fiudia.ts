@@ -124,7 +124,13 @@ export const memberInvitationsTable = pgTable("fiudia_member_invitations", {
     .notNull()
     .references(() => staffTable.id, { onDelete: "cascade" }),
   tokenHash: text("token_hash").notNull().unique(),
+  tokenCiphertext: text("token_ciphertext"),
   status: text("status").notNull().default("pending"),
+  emailStatus: text("email_status").notNull().default("unknown"),
+  emailAttemptCount: integer("email_attempt_count").notNull().default(0),
+  emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+  emailProviderId: text("email_provider_id"),
+  emailFailureReason: text("email_failure_reason"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

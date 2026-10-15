@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardQueryKey,
@@ -178,6 +178,9 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   const [duplicateCheckError, setDuplicateCheckError] = useState('');
   const [duplicatesCheckedFor, setDuplicatesCheckedFor] = useState('');
   const [duplicateCheckAttempt, setDuplicateCheckAttempt] = useState(0);
+  const importCancelled = useRef(false);
+
+  useEffect(() => () => { importCancelled.current = true; }, []);
 
   useEffect(() => {
     if (!activeStudioId) return;
@@ -311,12 +314,14 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
 
   async function runImport() {
     if (!ready || busy) return;
+    importCancelled.current = false;
     setBusy(true);
     const created = new Set(createdLines);
     const skipped = new Set(skippedLines);
     const failures = new Map(results.map(result => [result.line, result]));
     let createdThisRun = false;
     for (let index = 0; index < parsed.rows.length; index++) {
+      if (importCancelled.current) return;
       const row = parsed.rows[index];
       if (created.has(row.line) || skipped.has(row.line)) {
         setProgress(index + 1);
@@ -349,6 +354,7 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
           failures.set(row.line, { line: row.line, message: body.data?.error || body.message || 'Kurs konnte nicht angelegt werden.' });
         }
       }
+      if (importCancelled.current) return;
       setProgress(index + 1);
       const currentFailures = [...failures.values()];
       setCreatedLines(new Set(created));
@@ -365,6 +371,7 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
         await new Promise(resolve => window.setTimeout(resolve, 0));
       }
     }
+    if (importCancelled.current) return;
     if (createdThisRun) onImported();
     const finalFailures = [...failures.values()];
     setCreatedLines(created);

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BillingInterval } from './billingInterval';
+import type { MemberInvitationEmailStatus } from './memberInvitationEmailStatus';
+import type { MemberInvitationStatus } from './memberInvitationStatus';
 import type { MemberStatus } from './memberStatus';
 
 export interface Member {
@@ -44,4 +46,8 @@ export interface Member {
   joinedAt: Date;
   /** @nullable */
   lastCheckIn: Date | null;
+  /** @nullable */
+  invitationStatus?: MemberInvitationStatus;
+  /** @nullable */
+  invitationEmailStatus?: MemberInvitationEmailStatus;
 }

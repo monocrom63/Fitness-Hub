@@ -157,6 +157,32 @@ export interface Dashboard {
   courses: Course[];
 }
 
+/**
+ * @nullable
+ */
+export type MemberInvitationStatus = typeof MemberInvitationStatus[keyof typeof MemberInvitationStatus] | null;
+
+
+export const MemberInvitationStatus = {
+  pending: 'pending',
+  accepted: 'accepted',
+  expired: 'expired',
+  revoked: 'revoked',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MemberInvitationEmailStatus = typeof MemberInvitationEmailStatus[keyof typeof MemberInvitationEmailStatus] | null;
+
+
+export const MemberInvitationEmailStatus = {
+  unknown: 'unknown',
+  pending: 'pending',
+  sent: 'sent',
+  failed: 'failed',
+} as const;
+
 export interface Member {
   id: number;
   fullName: string;
@@ -193,6 +219,10 @@ export interface Member {
   joinedAt: string;
   /** @nullable */
   lastCheckIn: string | null;
+  /** @nullable */
+  invitationStatus?: MemberInvitationStatus;
+  /** @nullable */
+  invitationEmailStatus?: MemberInvitationEmailStatus;
 }
 
 export interface MemberInput {

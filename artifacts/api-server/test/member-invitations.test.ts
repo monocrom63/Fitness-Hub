@@ -161,7 +161,7 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
     assert.deepEqual(sentInvitation.body.to, [email]);
     assert.equal(sentInvitation.body.subject, "Dein Studio lädt dich zu Fiudia ein");
     assert.match(String(sentInvitation.body.text), new RegExp(`${appOrigin}/fiudia-members/invite/[a-f0-9]{64}`));
-    assert.match(sentInvitation.idempotencyKey ?? "", /^fiudia-member-invitation-\d+$/);
+    assert.match(sentInvitation.idempotencyKey ?? "", /^fiudia-member-invitation-\d+-attempt-1$/);
     const oldToken = inviteUrl.split("/").at(-1)!;
     let token = oldToken;
     const [stored] = await db.select().from(memberInvitationsTable)
@@ -208,11 +208,21 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
     assert.equal((await api(users.correct, "/member/invitations/accept", { token: expiredToken })).status, 404);
 
     failEmailDelivery = true;
+    const firstRetryEmailIndex = sentEmails.length;
     const emailFailure = await api(users.managerA1, `/members/${emailFailureMember.id}/invite`);
     assert.equal(emailFailure.status, 201);
     assert.equal(emailFailure.body.emailSent, false);
     assert.match(emailFailure.body.inviteUrl as string, /^\/fiudia-members\/invite\/[a-f0-9]{64}$/);
     failEmailDelivery = false;
+    const retry = await api(users.managerA1, `/members/${emailFailureMember.id}/invite/resend`);
+    assert.equal(retry.status, 200);
+    assert.equal(retry.body.emailSent, true);
+    assert.equal(retry.body.inviteUrl, emailFailure.body.inviteUrl, "retry preserves the original bearer link");
+    assert.notEqual(sentEmails[firstRetryEmailIndex].idempotencyKey, sentEmails[firstRetryEmailIndex + 1].idempotencyKey);
+    const [retryStored] = await db.select().from(memberInvitationsTable)
+      .where(eq(memberInvitationsTable.memberId, emailFailureMember.id));
+    assert.equal(retryStored.emailStatus, "sent");
+    assert.equal(retryStored.emailAttemptCount, 2);
 
     const movedLink = await api(users.districtA, `/members/${movedMember.id}/invite`);
     assert.equal(movedLink.status, 201);

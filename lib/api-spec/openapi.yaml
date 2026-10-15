@@ -875,6 +875,25 @@ paths:
         "403": { description: Manager access required }
         "404": { description: Member not found }
         "409": { description: Member is already linked or inactive }
+  /members/{id}/invite/resend:
+    post:
+      operationId: resendMemberInvitation
+      tags: [portal]
+      summary: Retry a failed member invitation email using the existing link
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Existing invitation link and updated email attempt status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberInvitationLink" }
+        "403": { description: Manager access required }
+        "404": { description: Member or active invitation not found }
+        "409": { description: Invitation is not eligible for retry }
   /modules:
     get:
       operationId: listModules
@@ -1544,6 +1563,8 @@ components:
         studioName: { type: string }
         joinedAt: { type: string, format: date-time }
         lastCheckIn: { type: ["string", "null"], format: date-time }
+        invitationStatus: { type: ["string", "null"], enum: [pending, accepted, expired, revoked, null] }
+        invitationEmailStatus: { type: ["string", "null"], enum: [unknown, pending, sent, failed, null] }
     MemberInput:
       type: object
       required: [fullName, email, membershipType, studioId]

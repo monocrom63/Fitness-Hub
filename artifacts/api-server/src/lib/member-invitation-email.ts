@@ -3,6 +3,7 @@ import { resendRequest, type ResendRequest } from "./resend-client";
 
 export type MemberInvitationEmail = {
   invitationId: number;
+  attempt?: number;
   memberName: string;
   memberEmail: string;
   inviteUrl: string;
@@ -21,7 +22,7 @@ function escapeHtml(value: string): string {
 export async function sendMemberInvitationEmail(
   invitation: MemberInvitationEmail,
   options: { request?: ResendRequest; sender?: string } = {},
-): Promise<{ sent: boolean; reason?: string }> {
+): Promise<{ sent: boolean; providerId?: string; reason?: string }> {
   const request = options.request ?? resendRequest;
   const sender = options.sender ?? closureEmailSender();
   const readinessError = await closureEmailReadiness(request, sender);
@@ -46,7 +47,7 @@ export async function sendMemberInvitationEmail(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": `fiudia-member-invitation-${invitation.invitationId}`,
+        "Idempotency-Key": `fiudia-member-invitation-${invitation.invitationId}-attempt-${invitation.attempt ?? 1}`,
       },
       body: JSON.stringify({
         from: sender,
@@ -61,7 +62,7 @@ export async function sendMemberInvitationEmail(
     if (!response.ok || !result.id) {
       return { sent: false, reason: result.message ?? `Resend returned HTTP ${response.status}.` };
     }
-    return { sent: true };
+    return { sent: true, providerId: result.id };
   } catch (error) {
     return { sent: false, reason: error instanceof Error ? error.message : "Email delivery failed." };
   }
