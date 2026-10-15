@@ -5,11 +5,13 @@ import {
   getListCoursesQueryKey,
   getListStudioRoomsQueryKey,
   useCreateCourse,
+  useListCourses,
   useListStudioRooms,
 } from '@workspace/api-client-react';
 import type { RoomAsset } from '@workspace/api-client-react';
 import { Upload } from 'lucide-react';
 import { berlinDateTimeIso } from './course-time';
+import { findDuplicateCourseLines } from './course-import-dedup';
 import './CourseCsvImport.css';
 
 type CourseRow = {
@@ -157,6 +159,10 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
 }) {
   const client = useQueryClient();
   const create = useCreateCourse();
+  const courseParams = activeStudioId ? { studioId: activeStudioId } : undefined;
+  const existingCourses = useListCourses(courseParams, {
+    query: { queryKey: getListCoursesQueryKey(courseParams), enabled: !!activeStudioId },
+  });
   const [fileName, setFileName] = useState('');
   const [parsed, setParsed] = useState<ParsedCsv>({ rows: [], error: '', invalidRows: [], ignoredRows: 0 });
   const [duration, setDuration] = useState('60');
@@ -167,13 +173,20 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   const [results, setResults] = useState<ImportResult[]>([]);
 
   const sourceCategories = [...new Map(parsed.rows.map(row => [keyOf(row.title), row.title])).entries()];
+  const duplicateLines = findDuplicateCourseLines(
+    parsed.rows.flatMap(row => {
+      const startsAt = berlinDateTimeIso(`${row.date}T${row.time}`);
+      return startsAt ? [{ line: row.line, title: row.title, instructor: row.instructor, startsAt }] : [];
+    }),
+    existingCourses.data ?? [],
+  );
   const roomsComplete = sourceCategories.length > 0 && sourceCategories.every(([categoryKey]) => !!roomMap[categoryKey]);
   const durationValue = Number(duration);
   const capacityValue = Number(capacity);
   const ready = !!parsed.rows.length && !!activeStudioId && !!activeStudioName && !parsed.error && !parsed.invalidRows.length && roomsComplete &&
     Number.isInteger(durationValue) && durationValue > 0 && durationValue <= 480 &&
     Number.isInteger(capacityValue) && capacityValue >= 1 && capacityValue <= 200 &&
-    !studiosLoading && !studiosError;
+     !studiosLoading && !studiosError && !existingCourses.isLoading && !existingCourses.isError;
 
   async function chooseFile(file?: File) {
     setFileName(file?.name ?? '');
@@ -213,6 +226,8 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
       const endsAt = courseDateTime(row, durationValue);
       if (!startsAt || !endsAt) {
         failures.push({ line: row.line, message: 'Berliner Zeit ist wegen einer Zeitumstellung nicht eindeutig oder existiert nicht.' });
+      } else if (duplicateLines.has(row.line)) {
+        // Existing schedule matches and repeated rows are counted as skipped below.
       } else {
         try {
           await create.mutateAsync({
@@ -272,12 +287,14 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
       <div className="course-csv-preview">
         <strong>{parsed.rows.length} Termine erkannt</strong>
          <span>{activeStudioName} · {parsed.rows[0].date} bis {parsed.rows[parsed.rows.length - 1].date}</span>
+         {existingCourses.isError && <span role="alert">Bestehende Kurse konnten nicht geprüft werden. <button type="button" className="text-link" onClick={() => void existingCourses.refetch()}>Erneut versuchen</button></span>}
+         {!!duplicateLines.size && <span role="status">{duplicateLines.size} bereits vorhandene oder doppelte Kurse werden übersprungen.</span>}
         <ul>{parsed.rows.slice(0, 5).map(row => <li key={row.line}>{row.date} {row.time} · {row.title} · {row.instructor} · {row.studioName}</li>)}</ul>
         {parsed.rows.length > 5 && <span>und {parsed.rows.length - 5} weitere Termine</span>}
       </div>
     </>}
     {busy && <div className="course-csv-progress" role="status">Import läuft: {progress} von {parsed.rows.length} geprüft …</div>}
-    {!busy && progress > 0 && <p className="course-csv-progress" role="status">{progress - results.length} Kurse angelegt, {results.length} fehlgeschlagen.</p>}
+    {!busy && progress > 0 && <p className="course-csv-progress" role="status">{progress - results.length - duplicateLines.size} Kurse angelegt, {duplicateLines.size} Dubletten übersprungen, {results.length} fehlgeschlagen.</p>}
     {!!results.length && <div className="course-csv-errors" role="alert"><strong>Fehlgeschlagene Zeilen</strong><ul>{results.map(result => <li key={`${result.line}-${result.message}`}>Zeile {result.line}: {result.message}</li>)}</ul></div>}
     {!!progress && !busy && !results.length && <p className="course-csv-success" role="status">Alle {progress} Kurse wurden angelegt.</p>}
     <div className="course-csv-actions">
