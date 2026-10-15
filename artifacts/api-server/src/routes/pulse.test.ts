@@ -364,6 +364,43 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
           assert.equal((await call(null, `/pulse?${search}`)).status, 401);
         });
 
+        await t.test("loads every withdrawn notice across older pages and never mixes active notices", async () => {
+          const withdrawn = await tx.insert(pulseMessagesTable).values(
+            Array.from({ length: 65 }, (_, index) => ({
+              organizationId: orgA.id,
+              studioId: studioA1.id,
+              authorStaffId: authorA.id,
+              audience: "all",
+              title: `Withdrawn page ${index}`,
+              body: "Retained for the manager archive",
+              priority: "info" as const,
+              retractedAt: new Date(),
+            })),
+          ).returning();
+          const page = async (beforeId?: number) => {
+            const result = await call<Array<{ id: number; retractedAt: string | null }>>(
+              users.managerA1,
+              `/pulse?retractedOnly=true${beforeId ? `&beforeId=${beforeId}` : ""}`,
+            );
+            assert.equal(result.status, 200);
+            assert.ok(result.data.length <= 30);
+            assert.ok(result.data.every(message => message.retractedAt !== null));
+            return result.data;
+          };
+          const all: Array<{ id: number; retractedAt: string | null }> = [];
+          let beforeId: number | undefined;
+          do {
+            const batch = await page(beforeId);
+            all.push(...batch);
+            beforeId = batch.length === 30 ? batch.at(-1)!.id : undefined;
+          } while (beforeId);
+          assert.ok(all.length >= 65);
+          assert.equal(new Set(all.map(message => message.id)).size, all.length);
+          assert.ok(withdrawn.every(message => all.some(row => row.id === message.id)));
+          const normalFeed = await call<Array<{ id: number }>>(users.managerA1, "/pulse");
+          assert.ok(withdrawn.every(message => !normalFeed.data.some(row => row.id === message.id)));
+        });
+
         await t.test("returns the editor and exact before-and-after values for visible corrections", async () => {
           const created = await call<{ id: number; revision: number }>(
             users.districtA, "/pulse", "POST", draft(null),

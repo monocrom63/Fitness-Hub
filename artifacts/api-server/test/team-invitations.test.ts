@@ -201,9 +201,17 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
             .from(invitationsTable).where(eq(invitationsTable.id, a1.id));
           assert.equal(pending.status, "pending");
 
+          // A newly registered account can hit this route before Clerk has
+          // confirmed its email. The same account must still be able to accept
+          // the invitation after completing email verification.
+          identities.set(users.unverified, {
+            fullName: "New A1 after verification",
+            email: emails.a1,
+            emailVerified: true,
+          });
           const acceptedA1 = await api<{
             organizationId: number; studioId: number; role: string; email: string;
-          }>(users.guestA1, "POST", acceptA1, {
+          }>(users.unverified, "POST", acceptA1, {
             organizationId: orgB.id, studioId: studioB.id, role: "district_manager",
           });
           assert.equal(acceptedA1.status, 200);
@@ -211,7 +219,7 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
           assert.equal(acceptedA1.body.studioId, studioA1.id);
           assert.equal(acceptedA1.body.role, "studio_employee");
           assert.equal(acceptedA1.body.email, emails.a1);
-          assert.equal((await api(users.guestA1, "POST", acceptA1)).status, 409);
+          assert.equal((await api(users.unverified, "POST", acceptA1)).status, 409);
           assert.equal((await api(users.guestA1Replay, "POST", acceptA1)).status, 404);
 
           const acceptedA2 = await api<{ organizationId: number; studioId: number; role: string }>(
@@ -237,7 +245,7 @@ test("team invitations cannot be sent to or accepted for the wrong studio", asyn
             users.wrongEmail, users.unverified, users.foreignStudio,
           ]));
           assert.deepEqual(joined, [
-            { clerkUserId: users.guestA1, organizationId: orgA.id, studioId: studioA1.id, role: "studio_employee" },
+            { clerkUserId: users.unverified, organizationId: orgA.id, studioId: studioA1.id, role: "studio_employee" },
             { clerkUserId: users.guestA2, organizationId: orgA.id, studioId: studioA2.id, role: "studio_manager" },
             { clerkUserId: users.guestB, organizationId: orgB.id, studioId: studioB.id, role: "studio_employee" },
           ]);
