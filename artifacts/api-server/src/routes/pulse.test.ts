@@ -362,6 +362,39 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
           assert.equal((await call(users.employeeA1, `/pulse?search=${"a".repeat(121)}`)).status, 400);
           assert.equal((await call(null, `/pulse?${search}`)).status, 401);
         });
+
+        await t.test("returns the editor and exact before-and-after values for visible corrections", async () => {
+          const created = await call<{ id: number; revision: number }>(
+            users.districtA, "/pulse", "POST", draft(null),
+          );
+          assert.equal(created.status, 201);
+          const messageId = created.data.id;
+          const corrected = await call<{ revision: number }>(users.districtA, `/pulse/${messageId}`, "PATCH", {
+            title: "Korrigierte Nachricht",
+            body: "Aktualisierter Hinweis",
+            priority: "urgent",
+            revision: created.data.revision,
+          });
+          assert.equal(corrected.status, 200);
+          assert.equal(corrected.data.revision, created.data.revision + 1);
+
+          const history = await call<Array<{
+            editorName: string;
+            changes: Array<{ field: string; before: string; after: string }>;
+          }>>(users.employeeA1, `/pulse/${messageId}/history`);
+          assert.equal(history.status, 200);
+          assert.equal(history.data.length, 1);
+          assert.equal(history.data[0].editorName, "districtA");
+          assert.deepEqual(history.data[0].changes, [
+            { field: "title", before: "Neue Nachricht", after: "Korrigierte Nachricht" },
+            { field: "body", before: "Hinweis für das Team", after: "Aktualisierter Hinweis" },
+            { field: "priority", before: "important", after: "urgent" },
+          ]);
+          assert.equal(
+            (await call(users.districtB, `/pulse/${messageId}/history`)).status,
+            404,
+          );
+        });
       } finally {
         await new Promise<void>((resolve, reject) => {
           server.close((error) => error ? reject(error) : resolve());
