@@ -26,6 +26,8 @@ export interface PulseMessage {
   createdAt: Date;
   /** @nullable */
   editedAt: Date | null;
+  /** @nullable */
+  retractedAt?: Date | null;
   isRead: boolean;
   readCount: number;
   canManage: boolean;

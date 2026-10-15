@@ -430,6 +430,7 @@ export const pulseMessagesTable = pgTable("fiudia_pulse_messages", {
 
 export const pulseCorrectionsTable = pgTable("fiudia_pulse_corrections", {
   id: serial("id").primaryKey(),
+  action: text("action").notNull().default("correction"),
   messageId: integer("message_id")
     .notNull()
     .references(() => pulseMessagesTable.id, { onDelete: "cascade" }),

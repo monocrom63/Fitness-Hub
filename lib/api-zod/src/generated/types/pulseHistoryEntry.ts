@@ -6,10 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PulseHistoryChange } from './pulseHistoryChange';
+import type { PulseHistoryEntryAction } from './pulseHistoryEntryAction';
+import type { PulseHistoryEntryPrevious } from './pulseHistoryEntryPrevious';
 
 export interface PulseHistoryEntry {
   id: number;
+  action: PulseHistoryEntryAction;
+  editorStaffId: number;
   editorName: string;
   editedAt: Date;
+  previous: PulseHistoryEntryPrevious;
   changes: PulseHistoryChange[];
 }

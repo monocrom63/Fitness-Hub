@@ -88,6 +88,8 @@ export * from './pulseCorrection';
 export * from './pulseHistoryChange';
 export * from './pulseHistoryChangeField';
 export * from './pulseHistoryEntry';
+export * from './pulseHistoryEntryAction';
+export * from './pulseHistoryEntryPrevious';
 export * from './pulseInput';
 export * from './pulseMessage';
 export * from './pulsePriority';

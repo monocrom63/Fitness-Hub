@@ -252,14 +252,18 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal(corrected?.canManage, false);
       const historyUrl = `/pulse/${studioAAll}/history`;
       assert.equal((await api(null, "GET", historyUrl)).status, 401);
-      assert.equal((await api(user(employeeA), "GET", "/pulse/nope/history")).status, 400);
+      assert.equal((await api(user(managerA), "GET", "/pulse/nope/history")).status, 400);
       assert.equal((await api(user(managerB), "GET", historyUrl)).status, 404);
-      assert.equal((await api(user(employeeB), "GET", historyUrl)).status, 404);
+      assert.equal((await api(user(employeeB), "GET", historyUrl)).status, 403);
       assert.equal((await api(user(otherDistrict), "GET", historyUrl)).status, 404);
-      const firstHistory = await api(user(employeeA), "GET", historyUrl);
+      assert.equal((await api(user(employeeA), "GET", historyUrl)).status, 403);
+      const firstHistory = await api(user(managerA), "GET", historyUrl);
       assert.equal(firstHistory.status, 200);
       assert.equal(firstHistory.body.length, 1);
       assert.equal(firstHistory.body[0].editorName, "District A");
+      assert.equal(firstHistory.body[0].editorStaffId, district.id);
+      assert.equal(firstHistory.body[0].action, "correction");
+      assert.deepEqual(firstHistory.body[0].previous, { title: "Studio A all", body: "A scoped message", priority: "info" });
       assert.ok(firstHistory.body[0].editedAt);
       assert.deepEqual(firstHistory.body[0].changes, [
         { field: "title", before: "Studio A all", after: correction.title },
@@ -271,7 +275,7 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       const second = await api(user(managerA), "PATCH", `/pulse/${studioAAll}`, { ...correction, body: "Noch ein Hinweis", revision: 2 });
       assert.equal(second.status, 200);
       assert.equal(second.body.revision, 3);
-      const history = await api(user(employeeA), "GET", historyUrl);
+      const history = await api(user(managerA), "GET", historyUrl);
       assert.equal(history.status, 200);
       assert.equal(history.body.length, 2);
       assert.equal(history.body[1].editorName, "Manager A");
@@ -279,7 +283,27 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
         { field: "body", before: correction.body, after: "Noch ein Hinweis" },
       ]);
       assert.equal((await api(user(district), "DELETE", `/pulse/${studioAAll}`)).status, 204);
-      assert.equal((await api(user(employeeA), "GET", historyUrl)).status, 404);
+      assert.equal((await api(user(employeeA), "GET", historyUrl)).status, 403);
+      const withdrawnHistory = await api(user(managerA), "GET", historyUrl);
+      assert.equal(withdrawnHistory.status, 200);
+      assert.equal(withdrawnHistory.body.length, 3);
+      assert.equal(withdrawnHistory.body[2].action, "retraction");
+      assert.equal(withdrawnHistory.body[2].editorStaffId, district.id);
+      assert.equal(withdrawnHistory.body[2].editorName, "District A");
+      assert.deepEqual(withdrawnHistory.body[2].previous, { title: correction.title, body: "Noch ein Hinweis", priority: "important" });
+      assert.deepEqual(withdrawnHistory.body[2].changes, []);
+      assert.equal((await api(user(managerB), "GET", historyUrl)).status, 404);
+      assert.equal((await api(user(otherDistrict), "GET", historyUrl)).status, 404);
+      const archive = await api(user(managerA), "GET", "/pulse?retractedOnly=true");
+      assert.equal(archive.status, 200);
+      assert.deepEqual(archive.body.map((m: { id: number }) => m.id), [studioAAll]);
+      assert.ok(archive.body[0].retractedAt);
+      assert.equal(archive.body[0].canManage, false);
+      assert.equal((await api(user(employeeA), "GET", "/pulse?retractedOnly=true")).status, 403);
+      assert.equal((await api(null, "GET", "/pulse?retractedOnly=true")).status, 401);
+      assert.deepEqual((await api(user(managerB), "GET", "/pulse?retractedOnly=true")).body, []);
+      assert.deepEqual((await api(user(otherDistrict), "GET", "/pulse?retractedOnly=true")).body, []);
+      assert.equal((await api(user(managerA), "GET", "/pulse?retractedOnly=maybe")).status, 400);
       assert.equal((await api(user(managerA), "DELETE", `/pulse/${studioAAll}`)).status, 404);
       assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`)).status, 404);
       assert.ok(!(await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`)).body.some((message: { id: number }) => message.id === studioAAll));
@@ -313,14 +337,14 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       const winner = outcomes.find(outcome => outcome.status === 200)!.body;
       assert.equal(winner.revision, 2);
       assert.equal((await api(user(employeeA), "GET", "/pulse")).body.find((message: { id: number }) => message.id === id)?.title, winner.title);
-      const history = await api(user(employeeA), "GET", `${url}/history`);
+      const history = await api(user(managerA), "GET", `${url}/history`);
       assert.equal(history.status, 200);
       assert.equal(history.body.length, 1);
       const reads = await db.select().from(pulseReadsTable).where(eq(pulseReadsTable.messageId, id));
       assert.equal(reads.length, 1);
       const stale = await api(user(district), "PATCH", url, { ...first, revision: 1 });
       assert.equal(stale.status, 409);
-      assert.equal((await api(user(employeeA), "GET", `${url}/history`)).body.length, 1);
+      assert.equal((await api(user(managerA), "GET", `${url}/history`)).body.length, 1);
       const retry = await api(user(district), "PATCH", url, { ...(winner.title === first.title ? second : first), revision: winner.revision });
       assert.equal(retry.status, 200);
       assert.equal(retry.body.revision, 3);

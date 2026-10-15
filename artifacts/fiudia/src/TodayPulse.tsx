@@ -10,6 +10,7 @@ import type { Me, ModuleKey, ModuleSetting, PulseAudience, PulseMessage, PulsePr
 import { pulseArchiveQueryOptions } from './PulseArchiveQuery';
 import { pulseArchiveHref, readPulseArchiveLocation } from './PulseArchiveLocation';
 import { PulseHistory } from './PulseHistory';
+import { PulseWithdrawn } from './PulseWithdrawn';
 import { useStudioScope } from './StudioScope';
 import dashboardPhoto from './assets/today-dashboard-pushup.jpg';
 
@@ -157,7 +158,7 @@ export function PulsePage({ me }: { me: Me }) {
   const read = (message: PulseMessage) => markRead.mutate({ id: message.id }, { onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }) });
   const remove = (message: PulseMessage) => {
     if (!window.confirm(`„${message.title}“ für alle Empfänger zurückziehen? Die Nachricht kann danach nicht wiederhergestellt werden.`)) return;
-    retract.mutate({ id: message.id }, { onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }) });
+    retract.mutate({ id: message.id }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListPulseQueryKey() }); client.invalidateQueries({ queryKey: getListPulseHistoryQueryKey(message.id) }); } });
   };
   return <div className="pulse-page"><div className="pulse-intro"><div><div className="eyebrow">Fiudia / Zusammenarbeit</div><h1>Pulse.</h1><p>Was dein Team wissen sollte. Nur Nachrichten für deinen Arbeitsbereich.</p></div>{me.role !== 'studio_employee' && <button className="button button-dark" onClick={() => { create.reset(); setEditing(null); setForm(emptyForm()); setOpen(true); }} data-testid="button-create-pulse"><Plus size={17} /> Nachricht verfassen</button>}</div>
     <form className="pulse-search" role="search" onSubmit={event => { event.preventDefault(); applySearch(searchInput); }}>
@@ -171,12 +172,13 @@ export function PulsePage({ me }: { me: Me }) {
         <h2>{message.title}</h2><p>{message.body}</p>
         {(me.role === 'studio_manager' || me.role === 'district_manager') && message.roomClosureId != null && <Link href={`/rooms?closure=${message.roomClosureId}${me.role === 'district_manager' && message.studioId != null ? `&studio=${message.studioId}` : ''}`} className="button button-outline" style={{ marginBottom: 14 }} data-testid={`link-pulse-closure-${message.id}`}>Betroffene Kurse bearbeiten <ArrowRight size={15} /></Link>}
         <div className="pulse-card-foot"><span className="pulse-meta">{message.authorName} · {dateTime(message.createdAt)}{message.editedAt ? ` · Korrigiert ${dateTime(message.editedAt)}` : ''} · {message.readCount} {message.readCount === 1 ? 'Lesebestätigung' : 'Lesebestätigungen'}</span>{message.canManage && <span className="pulse-actions"><button type="button" onClick={() => startEdit(message)} aria-label={`Nachricht ${message.title} bearbeiten`}><Pencil size={14} /> Bearbeiten</button><button type="button" onClick={() => remove(message)} disabled={retract.isPending} aria-label={`Nachricht ${message.title} zurückziehen`}><Trash2 size={14} /> Zurückziehen</button></span>}{message.isRead ? <span className="pulse-meta"><Check size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Gelesen</span> : <button className="pulse-read-button" onClick={() => read(message)} disabled={markRead.isPending} data-testid={`button-mark-pulse-read-${message.id}`}><Check size={14} /> Als gelesen markieren</button>}</div>
-        {message.editedAt && <><button className="pulse-history-toggle" type="button" aria-expanded={historyOpenId === message.id} onClick={() => setHistoryOpenId(historyOpenId === message.id ? null : message.id)} data-testid={`button-pulse-history-${message.id}`}>{historyOpenId === message.id ? 'Korrekturverlauf schließen' : 'Korrekturverlauf ansehen'}</button>{historyOpenId === message.id && <PulseHistory messageId={message.id} />}</>}
+        {me.role !== 'studio_employee' && message.editedAt && <><button className="pulse-history-toggle" type="button" aria-expanded={historyOpenId === message.id} onClick={() => setHistoryOpenId(historyOpenId === message.id ? null : message.id)} data-testid={`button-pulse-history-${message.id}`}>{historyOpenId === message.id ? 'Korrekturverlauf schließen' : 'Korrekturverlauf ansehen'}</button>{historyOpenId === message.id && <PulseHistory messageId={message.id} />}</>}
       </article>)}</div> : <div className="empty-state"><div className="empty-icon"><Bell size={22} /></div><h3>{searchTerm ? 'Keine Treffer' : filter === 'unread' ? 'Alles gelesen' : 'Noch keine Nachrichten'}</h3><p>{searchTerm ? `Für „${searchTerm}“ gibt es ${filter === 'unread' ? 'keine ungelesenen' : 'keine'} Nachrichten in deinem Arbeitsbereich.` : filter === 'unread' ? 'Du bist auf dem aktuellen Stand.' : 'Neue Nachrichten für deinen Arbeitsbereich erscheinen hier.'}</p>{!searchTerm && filter === 'unread' && <button className="button button-outline" onClick={() => setFilter('all')}>Alle Nachrichten ansehen</button>}</div>}
     {query.hasNextPage && <div className="pulse-more"><button className="button button-outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage ? 'Wird geladen …' : 'Ältere Nachrichten laden'}</button></div>}
     {query.isFetchNextPageError && <p className="pulse-form-error" role="alert">Ältere Nachrichten konnten nicht geladen werden. <button onClick={() => query.fetchNextPage()}>Erneut versuchen</button></p>}
     {markRead.isError && <p className="pulse-form-error" role="alert">Lesebestätigung fehlgeschlagen. Bitte versuche es erneut.</p>}
     {retract.isError && <p className="pulse-form-error" role="alert">Nachricht konnte nicht zurückgezogen werden. Bitte versuche es erneut.</p>}
+    {me.role !== 'studio_employee' && <PulseWithdrawn />}
     {open && <div className="modal-backdrop" role="presentation">
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="pulse-compose-title">
         <div className="modal-head"><div><div className="eyebrow">Pulse / {editing ? 'Korrektur' : 'Neue Nachricht'}</div><h2 id="pulse-compose-title">{editing ? 'Nachricht korrigieren' : 'Team informieren'}</h2></div><button className="icon-button" onClick={close} aria-label="Schließen" data-testid="button-close-pulse"><X size={18} /></button></div>

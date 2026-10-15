@@ -1,4 +1,4 @@
-import { useListPulseHistory } from '@workspace/api-client-react';
+import { getListPulseHistoryQueryKey, useListPulseHistory } from '@workspace/api-client-react';
 
 const fieldNames = { title: 'Titel', body: 'Nachrichtentext', priority: 'Priorität' };
 const priorities: Record<string, string> = { info: 'Info', important: 'Wichtig', urgent: 'Dringend' };
@@ -11,15 +11,16 @@ function dateTime(value: string) {
 }
 
 export function PulseHistory({ messageId }: { messageId: number }) {
-  const history = useListPulseHistory(messageId);
+  const history = useListPulseHistory(messageId, { query: { queryKey: getListPulseHistoryQueryKey(messageId), refetchInterval: 60000 } });
 
-  return <section className="pulse-history" aria-label="Korrekturverlauf" data-testid={`pulse-history-${messageId}`}>
-    <h3>Korrekturverlauf</h3>
-    {history.isLoading ? <p role="status">Korrekturen werden geladen …</p>
-      : history.isError ? <p role="alert">Der Korrekturverlauf konnte nicht geladen werden. <button type="button" onClick={() => history.refetch()}>Erneut versuchen</button></p>
-      : !history.data?.length ? <p>Für frühere Korrekturen liegen keine Details vor.</p>
+  return <section className="pulse-history" aria-label="Änderungsverlauf" data-testid={`pulse-history-${messageId}`}>
+    <h3>Änderungsverlauf</h3>
+    {history.isLoading ? <p role="status">Änderungen werden geladen …</p>
+      : history.isError ? <p role="alert">Der Änderungsverlauf konnte nicht geladen werden. <button type="button" onClick={() => history.refetch()}>Erneut versuchen</button></p>
+      : !history.data?.length ? <p>Für frühere Änderungen liegen keine Details vor.</p>
       : <ol>{history.data.map(entry => <li key={entry.id}>
-        <strong>{entry.editorName} · {dateTime(entry.editedAt)}</strong>
+        <strong>{entry.action === 'retraction' ? 'Zurückgezogen' : 'Korrigiert'} von {entry.editorName} · {dateTime(entry.editedAt)}</strong>
+        <details><summary>Vollständige vorherige Fassung</summary><h4>{entry.previous.title}</h4><p>{entry.previous.body}</p><p>Priorität: {priorities[entry.previous.priority]}</p></details>
         <ul>{entry.changes.map(change => <li key={change.field}>
           <span>{fieldNames[change.field]}</span>
           <div className="pulse-history-diff">

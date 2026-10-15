@@ -83,7 +83,7 @@ function servePulse(
   return requests;
 }
 
-function renderPulse() {
+function renderPulse(role: Me['role'] = 'studio_employee') {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: Infinity },
@@ -94,7 +94,7 @@ function renderPulse() {
   const location = memoryLocation({ path: '/pulse' });
   const me: Me = {
     userId: 'staff-1', email: 'staff@example.test', userName: 'Test Team', isOnboarded: true,
-    role: 'studio_employee', studioId: 1, organizationId: 1,
+    role, studioId: 1, organizationId: 1,
   };
   render(
     <QueryClientProvider client={client}>
@@ -115,6 +115,52 @@ function allDisplayOrder(rows: PulseMessage[]) {
   return [...rows].sort((a, b) => Number(a.isRead) - Number(b.isRead) || b.id - a.id)
     .map(row => row.id);
 }
+
+test('ordinary readers see corrected content without history or withdrawn archive controls', async () => {
+  const rows = notices().slice(0, 1);
+  rows[0].editedAt = '2026-01-02T10:00:00Z';
+  const requests = servePulse(rows);
+  renderPulse();
+  await screen.findByText(rows[0].title);
+  expect(screen.queryByText('Korrekturverlauf ansehen')).toBeNull();
+  expect(screen.queryByText('Zurückgezogene Meldungen prüfen')).toBeNull();
+  expect(requests.some(request => request.path.endsWith('/history'))).toBe(false);
+});
+
+test('managers can review correction differences and the previous version of withdrawn messages', async () => {
+  const rows = notices().slice(0, 1);
+  rows[0].editedAt = '2026-01-02T10:00:00Z';
+  const requested: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), 'http://localhost');
+    requested.push(url.toString());
+    if (url.pathname.endsWith('/history')) {
+      const retraction = url.pathname.includes('/99/');
+      return Response.json([{
+        id: 1, action: retraction ? 'retraction' : 'correction',
+        editorStaffId: 7, editorName: 'Bezirksleitung Test', editedAt: '2026-01-02T10:00:00Z',
+        previous: { title: 'Alter Titel', body: 'Ursprünglicher Text', priority: 'info' },
+        changes: retraction ? [] : [{ field: 'title', before: 'Alter Titel', after: rows[0].title }],
+      }]);
+    }
+    return Response.json(url.searchParams.get('retractedOnly') === 'true'
+      ? [{ ...rows[0], id: 99, title: 'Zurückgezogener Hinweis', retractedAt: '2026-01-02T10:00:00Z' }]
+      : rows);
+  }));
+  const { user } = renderPulse('studio_manager');
+  await user.click(await screen.findByText('Korrekturverlauf ansehen'));
+  expect(await screen.findByText(/Korrigiert von Bezirksleitung Test/)).toBeTruthy();
+  expect(screen.getByText('Vorher')).toBeTruthy();
+  expect(screen.getByText('Nachher')).toBeTruthy();
+  await user.click(screen.getByText('Zurückgezogene Meldungen prüfen'));
+  expect(await screen.findByText('Zurückgezogener Hinweis')).toBeTruthy();
+  await user.click(screen.getByText('Änderungsverlauf ansehen'));
+  expect(await screen.findByText(/Zurückgezogen von Bezirksleitung Test/)).toBeTruthy();
+  const previous = screen.getAllByText('Vollständige vorherige Fassung').at(-1)!;
+  await user.click(previous);
+  expect(within(previous.parentElement!).getByText('Ursprünglicher Text')).toBeTruthy();
+  expect(requested.some(url => url.includes('retractedOnly=true'))).toBe(true);
+});
 
 test('loads older pages per filter and refreshes an older read receipt across All and Unread', async () => {
   const rows = notices();

@@ -1155,6 +1155,10 @@ paths:
       tags: [pulse]
       summary: List Pulse messages visible to the signed-in staff member
       parameters:
+        - name: retractedOnly
+          in: query
+          description: Manager-only archive of withdrawn messages within the same visibility boundaries; never includes active messages.
+          schema: { type: boolean }
         - name: beforeId
           in: query
           description: Load messages older than this message ID
@@ -1276,7 +1280,7 @@ paths:
     get:
       operationId: listPulseHistory
       tags: [pulse]
-      summary: Show the correction history of a visible Pulse message
+      summary: Manager-only correction and retraction history within the caller's message visibility
       parameters:
         - name: id
           in: path
@@ -1284,7 +1288,7 @@ paths:
           schema: { type: integer, minimum: 1 }
       responses:
         "200":
-          description: Corrections from oldest to newest, with changed fields only
+          description: Revisions from oldest to newest, including full previous content and changed fields
           content:
             application/json:
               schema:
@@ -1292,8 +1296,8 @@ paths:
                 items: { $ref: "#/components/schemas/PulseHistoryEntry" }
         "400": { description: Invalid message ID }
         "401": { description: Sign-in required }
-        "403": { description: No staff access }
-        "404": { description: Message not visible or retracted }
+        "403": { description: Manager access required }
+        "404": { description: Message not visible }
   /team/invitations:
     get:
       operationId: listInvitations
@@ -1970,6 +1974,7 @@ components:
         authorName: { type: string }
         createdAt: { type: string, format: date-time }
         editedAt: { type: ["string", "null"], format: date-time }
+        retractedAt: { type: ["string", "null"], format: date-time }
         isRead: { type: boolean }
         readCount: { type: integer }
         canManage: { type: boolean }
@@ -1999,11 +2004,20 @@ components:
         after: { type: string }
     PulseHistoryEntry:
       type: object
-      required: [id, editorName, editedAt, changes]
+      required: [id, action, editorStaffId, editorName, editedAt, previous, changes]
       properties:
         id: { type: integer }
+        action: { type: string, enum: [correction, retraction] }
+        editorStaffId: { type: integer }
         editorName: { type: string }
         editedAt: { type: string, format: date-time }
+        previous:
+          type: object
+          required: [title, body, priority]
+          properties:
+            title: { type: string }
+            body: { type: string }
+            priority: { $ref: "#/components/schemas/PulsePriority" }
         changes:
           type: array
           items: { $ref: "#/components/schemas/PulseHistoryChange" }

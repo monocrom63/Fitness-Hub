@@ -5149,7 +5149,7 @@ export const getListPulseHistoryUrl = (id: number,) => {
 }
 
 /**
- * @summary Show the correction history of a visible Pulse message
+ * @summary Manager-only correction and retraction history within the caller's message visibility
  */
 export const listPulseHistory = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PulseHistoryEntry[]> => {
 
@@ -5196,7 +5196,7 @@ export type ListPulseHistoryQueryError = ErrorType<void>
 
 
 /**
- * @summary Show the correction history of a visible Pulse message
+ * @summary Manager-only correction and retraction history within the caller's message visibility
  */
 
 export function useListPulseHistory<TData = Awaited<ReturnType<typeof listPulseHistory>>, TError = ErrorType<void>>(

@@ -1588,6 +1588,7 @@ export const listPulseQuerySearchMax = 120;
 
 
 export const ListPulseQueryParams = zod.object({
+  "retractedOnly": zod.coerce.boolean().optional().describe('Manager-only archive of withdrawn messages within the same visibility boundaries; never includes active messages.'),
   "beforeId": zod.coerce.number().int().min(1).optional().describe('Load messages older than this message ID'),
   "unreadOnly": zod.coerce.boolean().optional().describe('Show only messages not yet read by the signed-in staff member'),
   "search": zod.coerce.string().min(1).max(listPulseQuerySearchMax).optional().describe('Case-insensitive literal substring search in the current title or body, including older messages. Leading and trailing whitespace is trimmed; whitespace-only searches are invalid. SQL wildcard characters are treated literally. Search combines with beforeId and unreadOnly and never expands organization, studio, audience, or retraction visibility.')
@@ -1609,6 +1610,7 @@ export const ListPulseResponseItem = zod.object({
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
   "editedAt": zod.coerce.date().nullable(),
+  "retractedAt": zod.coerce.date().nullish(),
   "isRead": zod.boolean(),
   "readCount": zod.number().int(),
   "canManage": zod.boolean()
@@ -1650,6 +1652,7 @@ export const CreatePulseMessageResponse = zod.object({
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
   "editedAt": zod.coerce.date().nullable(),
+  "retractedAt": zod.coerce.date().nullish(),
   "isRead": zod.boolean(),
   "readCount": zod.number().int(),
   "canManage": zod.boolean()
@@ -1695,6 +1698,7 @@ export const UpdatePulseMessageResponse = zod.object({
   "authorName": zod.string(),
   "createdAt": zod.coerce.date(),
   "editedAt": zod.coerce.date().nullable(),
+  "retractedAt": zod.coerce.date().nullish(),
   "isRead": zod.boolean(),
   "readCount": zod.number().int(),
   "canManage": zod.boolean()
@@ -1725,7 +1729,7 @@ export const MarkPulseReadResponse = zod.object({
 
 
 /**
- * @summary Show the correction history of a visible Pulse message
+ * @summary Manager-only correction and retraction history within the caller's message visibility
  */
 
 
@@ -1736,8 +1740,15 @@ export const ListPulseHistoryParams = zod.object({
 
 export const ListPulseHistoryResponseItem = zod.object({
   "id": zod.number().int(),
+  "action": zod.enum(['correction', 'retraction']),
+  "editorStaffId": zod.number().int(),
   "editorName": zod.string(),
   "editedAt": zod.coerce.date(),
+  "previous": zod.object({
+  "title": zod.string(),
+  "body": zod.string(),
+  "priority": zod.enum(['info', 'important', 'urgent'])
+}),
   "changes": zod.array(zod.object({
   "field": zod.enum(['title', 'body', 'priority']),
   "before": zod.string(),

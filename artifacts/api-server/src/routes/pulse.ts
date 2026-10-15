@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, inArray, isNull, lt, notExists, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNull, isNotNull, lt, notExists, or, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   CreatePulseMessageBody,
@@ -114,8 +114,14 @@ router.get("/pulse", async (req, res): Promise<void> => {
   if (!params.success || (req.query.search !== undefined &&
       (typeof req.query.search !== "string" || !params.data.search?.trim())) ||
       (req.query.unreadOnly !== undefined &&
-      req.query.unreadOnly !== "true" && req.query.unreadOnly !== "false")) {
+      req.query.unreadOnly !== "true" && req.query.unreadOnly !== "false") ||
+      (req.query.retractedOnly !== undefined &&
+      req.query.retractedOnly !== "true" && req.query.retractedOnly !== "false")) {
     res.status(400).json({ error: "Ungültiger Nachrichtenfilter oder Cursor." });
+    return;
+  }
+  if (req.query.retractedOnly === "true" && !canManageTeam(staff)) {
+    res.status(403).json({ error: "Nur Leitungen können zurückgezogene Meldungen prüfen." });
     return;
   }
 
@@ -137,13 +143,14 @@ router.get("/pulse", async (req, res): Promise<void> => {
       authorName: staffTable.fullName,
       createdAt: pulseMessagesTable.createdAt,
       editedAt: pulseMessagesTable.editedAt,
+      retractedAt: pulseMessagesTable.retractedAt,
     })
     .from(pulseMessagesTable)
     .innerJoin(staffTable, eq(pulseMessagesTable.authorStaffId, staffTable.id))
     .leftJoin(studiosTable, eq(pulseMessagesTable.studioId, studiosTable.id))
     .where(and(
       visibleMessages(staff, studioIds),
-      isNull(pulseMessagesTable.retractedAt),
+      req.query.retractedOnly === "true" ? isNotNull(pulseMessagesTable.retractedAt) : isNull(pulseMessagesTable.retractedAt),
       searchPattern ? or(
         ilike(pulseMessagesTable.title, `%${searchPattern}%`),
         ilike(pulseMessagesTable.body, `%${searchPattern}%`),
@@ -190,7 +197,8 @@ router.get("/pulse", async (req, res): Promise<void> => {
         ...message,
         createdAt: message.createdAt.toISOString(),
         editedAt: message.editedAt?.toISOString() ?? null,
-        canManage: canManageTeam(staff) && (staff.role === "district_manager" || message.authorStaffId === staff.id) &&
+        retractedAt: message.retractedAt?.toISOString() ?? null,
+        canManage: !message.retractedAt && canManageTeam(staff) && (staff.role === "district_manager" || message.authorStaffId === staff.id) &&
           (message.studioId !== null || staff.role === "district_manager"),
         isRead: readIds.has(message.id),
         readCount: totals.get(message.id) ?? 0,
@@ -202,6 +210,10 @@ router.get("/pulse", async (req, res): Promise<void> => {
 router.get("/pulse/:id/history", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
+  if (!canManageTeam(staff)) {
+    res.status(403).json({ error: "Nur Leitungen können den Änderungsverlauf prüfen." });
+    return;
+  }
   const params = ListPulseHistoryParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Ungültige Meldungs-ID." });
@@ -213,7 +225,6 @@ router.get("/pulse/:id/history", async (req, res): Promise<void> => {
     .from(pulseMessagesTable)
     .where(and(
       eq(pulseMessagesTable.id, params.data.id),
-      isNull(pulseMessagesTable.retractedAt),
       visibleMessages(staff, studioIds),
     )).limit(1);
   if (!visible) {
@@ -226,8 +237,11 @@ router.get("/pulse/:id/history", async (req, res): Promise<void> => {
     .orderBy(pulseCorrectionsTable.id);
   res.json(ListPulseHistoryResponse.parse(corrections.map(correction => ({
     id: correction.id,
+    action: correction.action,
+    editorStaffId: correction.editorStaffId,
     editorName: correction.editorName,
     editedAt: correction.editedAt.toISOString(),
+    previous: { title: correction.oldTitle, body: correction.oldBody, priority: correction.oldPriority },
     changes: ([
       ["title", correction.oldTitle, correction.newTitle],
       ["body", correction.oldBody, correction.newBody],
@@ -406,10 +420,25 @@ router.delete("/pulse/:id", async (req, res): Promise<void> => {
   }
   const original = await requireEditableMessage(staff, params.data.id, res);
   if (!original) return;
-  const [retracted] = await database.update(pulseMessagesTable)
-    .set({ retractedAt: new Date() })
-    .where(and(eq(pulseMessagesTable.id, original.id), isNull(pulseMessagesTable.retractedAt)))
-    .returning({ id: pulseMessagesTable.id });
+  const retracted = await database.transaction(async (tx) => {
+    const [previous] = await tx.select().from(pulseMessagesTable).where(and(
+      eq(pulseMessagesTable.id, original.id),
+      eq(pulseMessagesTable.organizationId, staff.organizationId),
+      isNull(pulseMessagesTable.retractedAt),
+    )).for("update").limit(1);
+    if (!previous) return null;
+    const editedAt = new Date();
+    await tx.update(pulseMessagesTable).set({ retractedAt: editedAt })
+      .where(eq(pulseMessagesTable.id, previous.id));
+    await tx.insert(pulseCorrectionsTable).values({
+      messageId: previous.id, action: "retraction",
+      editorStaffId: staff.id, editorName: staff.fullName, editedAt,
+      oldTitle: previous.title, newTitle: previous.title,
+      oldBody: previous.body, newBody: previous.body,
+      oldPriority: previous.priority, newPriority: previous.priority,
+    });
+    return previous;
+  });
   if (!retracted) {
     res.status(404).json({ error: "Meldung nicht gefunden." });
     return;

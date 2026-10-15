@@ -1000,6 +1000,8 @@ export interface PulseMessage {
   createdAt: string;
   /** @nullable */
   editedAt: string | null;
+  /** @nullable */
+  retractedAt?: string | null;
   isRead: boolean;
   readCount: number;
   canManage: boolean;
@@ -1053,10 +1055,27 @@ export interface PulseHistoryChange {
   after: string;
 }
 
+export type PulseHistoryEntryAction = typeof PulseHistoryEntryAction[keyof typeof PulseHistoryEntryAction];
+
+
+export const PulseHistoryEntryAction = {
+  correction: 'correction',
+  retraction: 'retraction',
+} as const;
+
+export type PulseHistoryEntryPrevious = {
+  title: string;
+  body: string;
+  priority: PulsePriority;
+};
+
 export interface PulseHistoryEntry {
   id: number;
+  action: PulseHistoryEntryAction;
+  editorStaffId: number;
   editorName: string;
   editedAt: string;
+  previous: PulseHistoryEntryPrevious;
   changes: PulseHistoryChange[];
 }
 
@@ -1113,6 +1132,10 @@ courseId?: number;
 };
 
 export type ListPulseParams = {
+/**
+ * Manager-only archive of withdrawn messages within the same visibility boundaries; never includes active messages.
+ */
+retractedOnly?: boolean;
 /**
  * Load messages older than this message ID
  * @minimum 1

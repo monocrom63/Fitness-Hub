@@ -8,6 +8,10 @@
 
 export type ListPulseParams = {
 /**
+ * Manager-only archive of withdrawn messages within the same visibility boundaries; never includes active messages.
+ */
+retractedOnly?: boolean;
+/**
  * Load messages older than this message ID
  * @minimum 1
  */
