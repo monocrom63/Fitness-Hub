@@ -360,6 +360,7 @@ test("parallel acceptance of one invitation grants only one team access", async 
   let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
   let releaseA: (() => void) | undefined;
   let releaseB: (() => void) | undefined;
+  let barrierTimeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
     const [organization] = await db.insert(organizationsTable)
@@ -390,23 +391,45 @@ test("parallel acceptance of one invitation grants only one team access", async 
     const databaseA = drizzle(connectionA) as unknown as typeof db;
     const databaseB = drizzle(connectionB) as unknown as typeof db;
 
-    // Hold both HTTP requests at identity lookup so neither can complete before
-    // the other starts; each router is permanently bound to its own DB session.
+    // A rollback fixture shares one connection and cannot exercise competing
+    // commits. These committed fixtures are deleted in finally instead.
+    // Hold both requests after they read the pending invitation, immediately
+    // before their independent transactions. An identity-lookup barrier alone
+    // could pass even if one request consumed the token before the other read it.
     let arrivals = 0;
     let release!: () => void;
-    const bothArrived = new Promise<void>(resolve => { release = resolve; });
+    const bothArrived = new Promise<void>((resolve, reject) => {
+      release = resolve;
+      barrierTimeout = setTimeout(() => reject(new Error(
+        "Both acceptance requests must reach the transaction with a pending invitation",
+      )), 5_000);
+      barrierTimeout.unref();
+    });
     const app = express();
     app.use(express.json());
-    const dependencies = (database: typeof db) => ({
-      database,
-      userIdFromRequest: (req: express.Request) => req.get("x-test-user") ?? null,
-      identityForUser: async (userId: string) => {
-        if (userId !== userA && userId !== userB) throw new Error("Unexpected test identity");
-        if (++arrivals === 2) release();
+    const dependencies = (database: typeof db) => {
+      const transaction = database.transaction.bind(database);
+      type Transaction = Parameters<Parameters<typeof database.transaction>[0]>[0];
+      database.transaction = async <T>(
+        callback: (tx: Transaction) => Promise<T>,
+        config?: Parameters<typeof database.transaction>[1],
+      ) => {
+        if (++arrivals === 2) {
+          clearTimeout(barrierTimeout);
+          release();
+        }
         await bothArrived;
-        return { userId, fullName: userId, email, emailVerified: true };
-      },
-    });
+        return transaction(callback, config);
+      };
+      return {
+        database,
+        userIdFromRequest: (req: express.Request) => req.get("x-test-user") ?? null,
+        identityForUser: async (userId: string) => {
+          if (userId !== userA && userId !== userB) throw new Error("Unexpected test identity");
+          return { userId, fullName: userId, email, emailVerified: true };
+        },
+      };
+    };
     const routerA = createTeamRouter(dependencies(databaseA));
     const routerB = createTeamRouter(dependencies(databaseB));
     app.use("/api", (req, res, next) => {
@@ -423,12 +446,15 @@ test("parallel acceptance of one invitation grants only one team access", async 
     await new Promise<void>(resolve => server!.once("listening", resolve));
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/team/invitations/${token}/accept`;
     const responses = await Promise.all([userA, userB].map(async userId => {
-      const response = await fetch(url, { method: "POST", headers: { "x-test-user": userId } });
+      const response = await fetch(url, {
+        method: "POST", headers: { "x-test-user": userId },
+        signal: AbortSignal.timeout(10_000),
+      });
       return { status: response.status, body: await response.json() as { userId?: string } };
     }));
 
-    assert.equal(responses.filter(response => response.status === 200).length, 1);
-    assert.ok([404, 409].includes(responses.find(response => response.status !== 200)!.status));
+    assert.equal(arrivals, 2, "both requests must read the pending token before either consumes it");
+    assert.deepEqual(responses.map(response => response.status).sort(), [200, 404]);
     const winner = responses.find(response => response.status === 200)!.body.userId;
     assert.ok(winner === userA || winner === userB);
     const staff = await db.select({
@@ -457,6 +483,7 @@ test("parallel acceptance of one invitation grants only one team access", async 
       .from(invitationsTable).where(eq(invitationsTable.id, invitation.id));
     assert.equal(stillAccepted.status, "accepted");
   } finally {
+    clearTimeout(barrierTimeout);
     if (server?.listening) await new Promise<void>((resolve, reject) =>
       server!.close(error => error ? reject(error) : resolve()));
     releaseA?.();
