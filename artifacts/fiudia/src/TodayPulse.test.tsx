@@ -43,8 +43,11 @@ function servePulse(
   hold?: (request: RequestLog) => Promise<void> | undefined,
   history: Array<{
     id: number;
+    action: 'correction' | 'retraction';
+    editorStaffId: number;
     editorName: string;
     editedAt: string;
+    previous: { title: string; body: string; priority: 'info' | 'important' | 'urgent' };
     changes: Array<{ field: 'title' | 'body' | 'priority'; before: string; after: string }>;
   }> = [],
 ) {
@@ -262,15 +265,18 @@ test('shows who corrected a Pulse message and the before-and-after values', asyn
   rows[0].editedAt = '2026-01-02T10:00:00Z';
   servePulse(rows, undefined, [{
     id: 1,
+    action: 'correction',
+    editorStaffId: 2,
     editorName: 'Lea Leitung',
     editedAt: '2026-01-02T10:00:00Z',
+    previous: { title: 'Hinweis 100', body: 'Alter Text', priority: 'important' },
     changes: [
       { field: 'title', before: 'Hinweis 100', after: 'Aktualisierter Hinweis' },
       { field: 'body', before: 'Alter Text', after: 'Neuer Text' },
       { field: 'priority', before: 'important', after: 'urgent' },
     ],
   }]);
-  const { user } = renderPulse();
+  const { user } = renderPulse('studio_manager');
 
   await screen.findByText('30 Nachrichten angezeigt · weitere laden');
   await user.click(within(screen.getByTestId('pulse-message-100'))
@@ -279,9 +285,9 @@ test('shows who corrected a Pulse message and the before-and-after values', asyn
   const history = await screen.findByTestId('pulse-history-100');
   expect(within(history).getByText(/Lea Leitung/)).toBeTruthy();
   expect(within(history).getByText('Titel')).toBeTruthy();
-  expect(within(history).getByText('Hinweis 100')).toBeTruthy();
+  expect(within(history).getAllByText('Hinweis 100')).toHaveLength(2);
   expect(within(history).getByText('Aktualisierter Hinweis')).toBeTruthy();
-  expect(within(history).getByText('Alter Text')).toBeTruthy();
+  expect(within(history).getAllByText('Alter Text')).toHaveLength(2);
   expect(within(history).getByText('Neuer Text')).toBeTruthy();
   expect(within(history).getByText('Wichtig')).toBeTruthy();
   expect(within(history).getByText('Dringend')).toBeTruthy();
@@ -291,14 +297,14 @@ test('does not invent details for older corrections without saved history', asyn
   const rows = notices();
   rows[0].editedAt = '2026-01-02T10:00:00Z';
   servePulse(rows);
-  const { user } = renderPulse();
+  const { user } = renderPulse('studio_manager');
 
   await screen.findByText('30 Nachrichten angezeigt · weitere laden');
   await user.click(within(screen.getByTestId('pulse-message-100'))
     .getByRole('button', { name: 'Korrekturverlauf ansehen' }));
 
   const history = await screen.findByTestId('pulse-history-100');
-  expect(within(history).getByText('Für frühere Korrekturen liegen keine Details vor.')).toBeTruthy();
+  expect(within(history).getByText('Für frühere Änderungen liegen keine Details vor.')).toBeTruthy();
   expect(within(history).queryByText(/Lea Leitung/)).toBeNull();
   expect(within(history).queryByText('Alter Titel')).toBeNull();
 });

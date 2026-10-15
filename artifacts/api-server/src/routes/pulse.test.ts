@@ -381,7 +381,7 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
           const history = await call<Array<{
             editorName: string;
             changes: Array<{ field: string; before: string; after: string }>;
-          }>>(users.employeeA1, `/pulse/${messageId}/history`);
+          }>>(users.managerA1, `/pulse/${messageId}/history`);
           assert.equal(history.status, 200);
           assert.equal(history.data.length, 1);
           assert.equal(history.data[0].editorName, "districtA");
