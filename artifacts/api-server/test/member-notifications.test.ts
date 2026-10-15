@@ -18,7 +18,7 @@ test("waitlist email draft has the intended sender and no HTML or provider side 
   assert.deepEqual(draft, {
     from: "mail@fiudia.com",
     to: "member@example.invalid",
-    subject: "Fiudia: Dein Kursplatz ist bestätigt",
+    subject: "Fiudia | Dein Kursplatz ist bestätigt",
     text: `${notice.body}\n\nDein Fiudia-Team`,
   });
   assert.match(draft.text, /Testkurs.*2026.*Uhr/);

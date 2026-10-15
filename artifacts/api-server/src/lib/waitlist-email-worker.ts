@@ -5,6 +5,7 @@ import {
   waitlistEmailDeliveriesTable,
 } from "@workspace/db";
 import { closureEmailSender } from "./closure-email";
+import { renderFiudiaEmailFromText } from "./fiudia-email";
 import { resendRequest, type ResendRequest } from "./resend-client";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
@@ -219,13 +220,14 @@ async function deliverOne(delivery: ClaimedDelivery, options: Required<WorkerOpt
   }
 
   try {
+    const email = renderFiudiaEmailFromText(delivery.subject, delivery.text);
     const response = await request("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Idempotency-Key": `fiudia-waitlist-delivery-${delivery.id}`,
       },
-      body: JSON.stringify({ from: sender, to: [delivery.email], subject: delivery.subject, text: delivery.text }),
+      body: JSON.stringify({ from: sender, to: [delivery.email], subject: delivery.subject, ...email }),
       signal: AbortSignal.timeout(60_000),
     });
     const result = await response.json().catch(() => ({})) as { id?: string; message?: string };

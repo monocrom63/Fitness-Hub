@@ -286,6 +286,7 @@ export const waitlistEmailDeliveriesTable = pgTable(
   },
   (table) => [
     unique("fiudia_waitlist_email_notification").on(table.notificationId),
+    unique("fiudia_waitlist_email_booking").on(table.bookingId),
   ],
 );
 

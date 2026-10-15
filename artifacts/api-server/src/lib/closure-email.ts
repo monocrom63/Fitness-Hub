@@ -7,6 +7,7 @@ import {
   db,
 } from "@workspace/db";
 import { resendRequest, type ResendRequest } from "./resend-client";
+import { renderFiudiaEmailFromText } from "./fiudia-email";
 import { WAITLIST_EMAIL_SENDER } from "./waitlist-email";
 
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
@@ -117,12 +118,13 @@ async function sendOne(
   if (!course) return { status: "failed" as const, detail: "Resolved course no longer exists." };
 
   const subject = resolution.action === "cancel"
-    ? "Dein Kurs wurde storniert"
-    : "Der Kursraum wurde geändert";
+    ? "Fiudia | Dein Kurs wurde storniert"
+    : "Fiudia | Der Kursraum wurde geändert";
   const text = resolution.action === "cancel"
     ? `Der Kurs „${course.title}“ wurde wegen einer Raumschließung abgesagt.`
     : `Der Kurs „${course.title}“ findet wegen einer Raumschließung nun in ${resolution.targetRoom} statt.`;
   try {
+    const email = renderFiudiaEmailFromText(subject, text);
     const response = await request("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -131,7 +133,7 @@ async function sendOne(
         // outcomes idempotent at Resend.
         "Idempotency-Key": `fiudia-closure-delivery-${delivery.id}`,
       },
-      body: JSON.stringify({ from: sender, to: [delivery.email], subject, text }),
+      body: JSON.stringify({ from: sender, to: [delivery.email], subject, ...email }),
       signal: AbortSignal.timeout(60_000),
     });
     const result = await response.json().catch(() => ({})) as { id?: string; message?: string };

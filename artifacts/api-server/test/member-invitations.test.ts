@@ -159,7 +159,7 @@ test("member onboarding invitations are scoped, verified, expiring and one-use",
     assert.match(inviteUrl, /^\/fiudia-members\/invite\/[a-f0-9]{64}$/);
     const sentInvitation = sentEmails[0];
     assert.deepEqual(sentInvitation.body.to, [email]);
-    assert.equal(sentInvitation.body.subject, "Dein Studio lädt dich zu Fiudia ein");
+    assert.equal(sentInvitation.body.subject, "Fiudia | Einladung von deinem Studio");
     assert.match(String(sentInvitation.body.text), new RegExp(`${appOrigin}/fiudia-members/invite/[a-f0-9]{64}`));
     assert.match(sentInvitation.idempotencyKey ?? "", /^fiudia-member-invitation-\d+-attempt-1$/);
     const oldToken = inviteUrl.split("/").at(-1)!;

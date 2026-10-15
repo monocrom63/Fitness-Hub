@@ -375,7 +375,8 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
         const body = JSON.parse(String(init.body));
         assert.equal(body.from, "mail@fiudia.com");
         assert.deepEqual(body.to, [member.email]);
-        assert.equal(body.subject, "Dein Kurs wurde storniert");
+        assert.equal(body.subject, "Fiudia | Dein Kurs wurde storniert");
+        assert.match(String(body.html), /FIUDIA/);
         return new Response(JSON.stringify({ id: "closure-email-provider-id" }), { status: 200 });
       },
     });

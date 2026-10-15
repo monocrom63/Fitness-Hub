@@ -1,17 +1,37 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   courseBookingsTable, coursesTable, db, memberNotificationsTable, membersTable,
   organizationsTable, pool, studiosTable, waitlistEmailDeliveriesTable,
 } from "@workspace/db";
 import { cancelCourseBooking } from "../src/lib/course-bookings";
+import { renderFiudiaEmail, renderFiudiaEmailFromText } from "../src/lib/fiudia-email";
 import {
   processWaitlistEmailDeliveries,
   runWaitlistEmailSchedulerTick,
   waitlistEmailReadiness,
 } from "../src/lib/waitlist-email-worker";
+
+test("Fiudia transactional emails share branded HTML while preserving plain text", () => {
+  const invitation = renderFiudiaEmail({
+    title: "Dein Studio lädt dich zu Fiudia ein",
+    paragraphs: ["Hallo <Mitglied>", "Verbinde dein Konto."],
+    action: { label: "Mitgliedschaft verbinden", url: "https://example.invalid/invite?token=a&b" },
+  });
+  assert.match(invitation.html, /FIUDIA/);
+  assert.match(invitation.html, /Mitgliedschaft verbinden/);
+  assert.match(invitation.html, /&lt;Mitglied&gt;/);
+  assert.match(invitation.html, /token=a&amp;b/);
+  assert.match(invitation.text, /Dein Fiudia-Team/);
+
+  const existingBody = "Du bist nachgerückt.\n\nDein Fiudia-Team";
+  const rendered = renderFiudiaEmailFromText("Fiudia | Platz bestätigt", existingBody);
+  assert.equal(rendered.text, existingBody);
+  assert.match(rendered.html, /Fiudia \| Platz bestätigt/);
+  assert.equal((rendered.html.match(/Dein Fiudia-Team/g) ?? []).length, 1);
+});
 
 test("waitlist email readiness checks the sender domain through the authenticated Resend connection", async () => {
   let url = "";
@@ -109,6 +129,46 @@ test("promotion email outbox respects opt-in, retries idempotently, and skips in
     assert.deepEqual(requestBodies[1].to, [eligible.waitingMember.email]);
     assert.equal(requestBodies[1].subject, eligible.delivery.subject);
     assert.equal(requestBodies[1].text, eligible.delivery.text);
+
+    const [raceOrganization] = await db.insert(organizationsTable).values({ name: `concurrent ${suffix}` }).returning();
+    organizationIds.push(raceOrganization.id);
+    const [raceStudio] = await db.insert(studiosTable).values({
+      organizationId: raceOrganization.id, name: "Concurrent studio", city: "Berlin",
+    }).returning();
+    const raceMembers = await db.insert(membersTable).values([
+      { studioId: raceStudio.id, fullName: "Confirmed A", email: `race-a-${suffix}@example.invalid`, membershipType: "Basic" },
+      { studioId: raceStudio.id, fullName: "Confirmed B", email: `race-b-${suffix}@example.invalid`, membershipType: "Basic" },
+      { studioId: raceStudio.id, fullName: "Waiting A", email: `race-w1-${suffix}@example.invalid`, membershipType: "Basic", waitlistEmailEnabled: 1 },
+      { studioId: raceStudio.id, fullName: "Waiting B", email: `race-w2-${suffix}@example.invalid`, membershipType: "Basic", waitlistEmailEnabled: 1 },
+    ]).returning();
+    const [raceCourse] = await db.insert(coursesTable).values({
+      studioId: raceStudio.id, title: "Concurrent course", instructor: "Trainer",
+      startsAt: new Date(Date.now() + 86400000), endsAt: new Date(Date.now() + 90000000),
+      capacity: 2, enrolled: 2, status: "full", room: "A",
+    }).returning();
+    const raceBookings = await db.insert(courseBookingsTable).values(raceMembers.map((member, index) => ({
+      courseId: raceCourse.id,
+      memberId: member.id,
+      status: index < 2 ? "confirmed" as const : "waitlisted" as const,
+    }))).returning();
+    await Promise.all([
+      cancelCourseBooking(raceCourse.id, raceMembers[0].id),
+      cancelCourseBooking(raceCourse.id, raceMembers[1].id),
+    ]);
+    const waitingBookingIds = raceBookings.slice(2).map(booking => booking.id);
+    const raceDeliveries = await db.select().from(waitlistEmailDeliveriesTable)
+      .where(inArray(waitlistEmailDeliveriesTable.bookingId, waitingBookingIds));
+    assert.equal(raceDeliveries.length, 2);
+    assert.equal(new Set(raceDeliveries.map(delivery => delivery.bookingId)).size, 2);
+    const beforeConcurrentDelivery = calls;
+    await Promise.all([
+      processWaitlistEmailDeliveries({ request }),
+      processWaitlistEmailDeliveries({ request }),
+    ]);
+    assert.equal(calls - beforeConcurrentDelivery, 2, "parallel workers deliver each promoted booking exactly once");
+    const raceDeliveryResults = await db.select().from(waitlistEmailDeliveriesTable)
+      .where(inArray(waitlistEmailDeliveriesTable.bookingId, waitingBookingIds));
+    assert.ok(raceDeliveryResults.every(delivery => delivery.status === "sent"));
 
     const optedOut = await promotedFixture("opted-out", false);
     assert.equal(optedOut.delivery, undefined, "non-opted-in promotions do not enter the outbox");

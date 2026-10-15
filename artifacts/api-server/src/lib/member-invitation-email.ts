@@ -1,4 +1,5 @@
 import { closureEmailReadiness, closureEmailSender } from "./closure-email";
+import { renderFiudiaEmail } from "./fiudia-email";
 import { resendRequest, type ResendRequest } from "./resend-client";
 
 export type MemberInvitationEmail = {
@@ -9,16 +10,6 @@ export type MemberInvitationEmail = {
   inviteUrl: string;
 };
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, character => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character]!);
-}
-
 export async function sendMemberInvitationEmail(
   invitation: MemberInvitationEmail,
   options: { request?: ResendRequest; sender?: string } = {},
@@ -28,19 +19,15 @@ export async function sendMemberInvitationEmail(
   const readinessError = await closureEmailReadiness(request, sender);
   if (readinessError) return { sent: false, reason: readinessError };
 
-  const name = escapeHtml(invitation.memberName);
-  const url = escapeHtml(invitation.inviteUrl);
-  const text = [
-    `Hallo ${invitation.memberName},`,
-    "",
-    "dein Studio hat dich zu Fiudia eingeladen. Öffne den persönlichen Link, um dein Konto mit deiner Mitgliedschaft zu verbinden:",
-    invitation.inviteUrl,
-    "",
-    "Der Link ist einmalig und sieben Tage gültig. Verwende dafür das Fiudia-Konto mit dieser E-Mail-Adresse.",
-    "",
-    "Dein Fiudia-Team",
-  ].join("\n");
-  const html = `<p>Hallo ${name},</p><p>dein Studio hat dich zu Fiudia eingeladen. Öffne den persönlichen Link, um dein Konto mit deiner Mitgliedschaft zu verbinden:</p><p><a href="${url}">Mitgliedschaft verbinden</a></p><p>Der Link ist einmalig und sieben Tage gültig. Verwende dafür das Fiudia-Konto mit dieser E-Mail-Adresse.</p><p>Dein Fiudia-Team</p>`;
+  const email = renderFiudiaEmail({
+    title: "Dein Studio lädt dich zu Fiudia ein",
+    paragraphs: [
+      `Hallo ${invitation.memberName},`,
+      "dein Studio hat dich eingeladen. Verbinde dein Konto mit deiner Mitgliedschaft über den persönlichen Link.",
+      "Der Link ist einmalig und sieben Tage gültig. Verwende dafür das Fiudia-Konto mit dieser E-Mail-Adresse.",
+    ],
+    action: { label: "Mitgliedschaft verbinden", url: invitation.inviteUrl },
+  });
 
   try {
     const response = await request("https://api.resend.com/emails", {
@@ -52,9 +39,8 @@ export async function sendMemberInvitationEmail(
       body: JSON.stringify({
         from: sender,
         to: [invitation.memberEmail],
-        subject: "Dein Studio lädt dich zu Fiudia ein",
-        text,
-        html,
+        subject: "Fiudia | Einladung von deinem Studio",
+        ...email,
       }),
       signal: AbortSignal.timeout(60_000),
     });

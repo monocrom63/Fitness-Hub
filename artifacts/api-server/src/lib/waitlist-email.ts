@@ -28,7 +28,7 @@ export function waitlistEmailDraft(recipient: string, notice: ReturnType<typeof 
   return {
     from: WAITLIST_EMAIL_SENDER,
     to: recipient,
-    subject: `Fiudia: ${notice.title}`,
+    subject: `Fiudia | ${notice.title}`,
     text: `${notice.body}\n\nDein Fiudia-Team`,
   };
 }
