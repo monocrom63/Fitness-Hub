@@ -210,7 +210,7 @@ function CourseDetailPage() {
       </> : null}
   </div>;
 }
-function CoursesPage() {
+export function CoursesPage() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const { targetId, filter } = readCourseLocation(search);
