@@ -4,8 +4,8 @@ import {
   getGetDashboardQueryKey,
   getListCoursesQueryKey,
   getListStudioRoomsQueryKey,
+  useCheckCourseImportDuplicates,
   useCreateCourse,
-  useListCourses,
   useListStudioRooms,
 } from '@workspace/api-client-react';
 import type { RoomAsset } from '@workspace/api-client-react';
@@ -160,10 +160,7 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
 }) {
   const client = useQueryClient();
   const create = useCreateCourse();
-  const courseParams = activeStudioId ? { studioId: activeStudioId } : undefined;
-  const existingCourses = useListCourses(courseParams, {
-    query: { queryKey: getListCoursesQueryKey(courseParams), enabled: !!activeStudioId },
-  });
+  const checkDuplicates = useCheckCourseImportDuplicates();
   const [fileName, setFileName] = useState('');
   const [parsed, setParsed] = useState<ParsedCsv>({ rows: [], error: '', invalidRows: [], ignoredRows: 0 });
   const [duration, setDuration] = useState('60');
@@ -176,6 +173,11 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   const [skippedLines, setSkippedLines] = useState<Set<number>>(() => new Set());
   const [restoredStudioId, setRestoredStudioId] = useState<number | null>(null);
   const [resumeStorageUnavailable, setResumeStorageUnavailable] = useState(false);
+  const [databaseDuplicateLines, setDatabaseDuplicateLines] = useState<Set<number>>(() => new Set());
+  const [duplicateCheckPending, setDuplicateCheckPending] = useState(false);
+  const [duplicateCheckError, setDuplicateCheckError] = useState('');
+  const [duplicatesCheckedFor, setDuplicatesCheckedFor] = useState('');
+  const [duplicateCheckAttempt, setDuplicateCheckAttempt] = useState(0);
 
   useEffect(() => {
     if (!activeStudioId) return;
@@ -204,6 +206,54 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
     setRestoredStudioId(activeStudioId);
   }, [activeStudioId]);
 
+  const duplicateCandidates = parsed.rows.flatMap(row => {
+    const startsAt = berlinDateTimeIso(`${row.date}T${row.time}`);
+    return startsAt ? [{ line: row.line, title: row.title, instructor: row.instructor, startsAt }] : [];
+  });
+  const duplicateCheckKey = JSON.stringify([activeStudioId, duplicateCandidates]);
+
+  useEffect(() => {
+    if (!activeStudioId || restoredStudioId !== activeStudioId || !parsed.rows.length ||
+      parsed.error || parsed.invalidRows.length) {
+      setDuplicateCheckPending(false);
+      return;
+    }
+    if (!duplicateCandidates.length) {
+      setDatabaseDuplicateLines(new Set());
+      setDuplicateCheckError('');
+      setDuplicatesCheckedFor(duplicateCheckKey);
+      setDuplicateCheckPending(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDatabaseDuplicateLines(new Set());
+    setDuplicateCheckError('');
+    setDuplicatesCheckedFor('');
+    setDuplicateCheckPending(true);
+    void (async () => {
+      const duplicateLines = new Set<number>();
+      for (let offset = 0; offset < duplicateCandidates.length; offset += 200) {
+        const result = await checkDuplicates.mutateAsync({
+          data: {
+            studioId: activeStudioId,
+            rows: duplicateCandidates.slice(offset, offset + 200),
+          },
+        });
+        result.duplicateLines.forEach(line => duplicateLines.add(line));
+      }
+      if (!cancelled) {
+        setDatabaseDuplicateLines(duplicateLines);
+        setDuplicatesCheckedFor(duplicateCheckKey);
+      }
+    })().catch(() => {
+      if (!cancelled) setDuplicateCheckError('Bestehende Kurse konnten nicht vollständig geprüft werden. Bitte versuche es erneut.');
+    }).finally(() => {
+      if (!cancelled) setDuplicateCheckPending(false);
+    });
+    return () => { cancelled = true; };
+  }, [activeStudioId, restoredStudioId, duplicateCheckKey, duplicateCheckAttempt]);
+
   useEffect(() => {
     if (!activeStudioId || restoredStudioId !== activeStudioId || busy || !parsed.rows.length || !fileName) return;
     if (progress > 0 && results.length === 0 && createdLines.size + skippedLines.size >= parsed.rows.length) return;
@@ -215,26 +265,25 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   }, [activeStudioId, restoredStudioId, busy, fileName, parsed, duration, capacity, roomMap, progress, createdLines, skippedLines, results]);
 
   const sourceCategories = [...new Map(parsed.rows.map(row => [keyOf(row.title), row.title])).entries()];
-  const duplicateLines = findDuplicateCourseLines(
-    parsed.rows.flatMap(row => {
-      const startsAt = berlinDateTimeIso(`${row.date}T${row.time}`);
-      return startsAt ? [{ line: row.line, title: row.title, instructor: row.instructor, startsAt }] : [];
-    }),
-    existingCourses.data ?? [],
-  );
+  const duplicateLines = findDuplicateCourseLines(duplicateCandidates, []);
+  if (duplicatesCheckedFor === duplicateCheckKey) {
+    databaseDuplicateLines.forEach(line => duplicateLines.add(line));
+  }
   const roomsComplete = sourceCategories.length > 0 && sourceCategories.every(([categoryKey]) => !!roomMap[categoryKey]);
   const durationValue = Number(duration);
   const capacityValue = Number(capacity);
   const ready = !!parsed.rows.length && !!activeStudioId && !!activeStudioName && !parsed.error && !parsed.invalidRows.length && roomsComplete &&
     Number.isInteger(durationValue) && durationValue > 0 && durationValue <= 480 &&
     Number.isInteger(capacityValue) && capacityValue >= 1 && capacityValue <= 200 &&
-     restoredStudioId === activeStudioId && !studiosLoading && !studiosError && !existingCourses.isLoading && !existingCourses.isError;
+     restoredStudioId === activeStudioId && !studiosLoading && !studiosError &&
+     !duplicateCheckPending && !duplicateCheckError && duplicatesCheckedFor === duplicateCheckKey;
 
   async function chooseFile(file?: File) {
     if (progress > 0 && (results.length > 0 || remainingRows > 0) &&
       !window.confirm('Den unterbrochenen Import verwerfen und eine andere CSV beginnen?')) return;
     if (activeStudioId) clearCourseImportSession(activeStudioId);
     setFileName(file?.name ?? '');
+    setParsed({ rows: [], error: '', invalidRows: [], ignoredRows: 0 });
     setResults([]);
     setProgress(0);
     setCreatedLines(new Set());
@@ -365,7 +414,8 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
       <div className="course-csv-preview">
         <strong>{parsed.rows.length} Termine erkannt</strong>
          <span>{activeStudioName} · {parsed.rows[0].date} bis {parsed.rows[parsed.rows.length - 1].date}</span>
-         {existingCourses.isError && <span role="alert">Bestehende Kurse konnten nicht geprüft werden. <button type="button" className="text-link" onClick={() => void existingCourses.refetch()}>Erneut versuchen</button></span>}
+          {duplicateCheckPending && <span role="status">Bestehende Kurse werden auf Dubletten geprüft …</span>}
+          {duplicateCheckError && <span role="alert">{duplicateCheckError} <button type="button" className="text-link" onClick={() => setDuplicateCheckAttempt(value => value + 1)}>Erneut versuchen</button></span>}
          {!!duplicateLines.size && <span role="status">{duplicateLines.size} bereits vorhandene oder doppelte Kurse werden übersprungen.</span>}
         <ul>{parsed.rows.slice(0, 5).map(row => <li key={row.line}>{row.date} {row.time} · {row.title} · {row.instructor} · {row.studioName}</li>)}</ul>
         {parsed.rows.length > 5 && <span>und {parsed.rows.length - 5} weitere Termine</span>}

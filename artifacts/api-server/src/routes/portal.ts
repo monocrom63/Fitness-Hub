@@ -22,6 +22,8 @@ import {
   CreateMemberResponse,
   CreateStudioBody,
   CreateStudioResponse,
+  CheckCourseImportDuplicatesBody,
+  CheckCourseImportDuplicatesResponse,
   CompleteOnboardingBody,
   CompleteOnboardingResponse,
   GetDashboardQueryParams,
@@ -65,6 +67,16 @@ import { isTrainerAbsentForCourse, trainerLockKey } from "../lib/trainer-schedul
 
 const router: IRouter = Router();
 const CHECK_IN_MILESTONES = new Set([10, 25, 50, 100, 250, 500]);
+
+function courseImportIdentityKey(course: { title: string; instructor: string; startsAt: Date | string }) {
+  const normalize = (value: string) => value.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de-DE");
+  return JSON.stringify([
+    normalize(course.title),
+    normalize(course.instructor),
+    new Date(course.startsAt).toISOString(),
+  ]);
+}
 
 async function requireStaff(
   req: Request,
@@ -813,6 +825,46 @@ router.get("/courses", async (req, res): Promise<void> => {
     : [];
 
   res.json(ListCoursesResponse.parse(rows.map(serializeCourse)));
+});
+
+router.post("/courses/import-duplicates", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  if (!canManageCourses(staff)) {
+    res.status(403).json({ error: "Nur Studio- und Bezirksleitungen können Kursimporte prüfen." });
+    return;
+  }
+  const body = CheckCourseImportDuplicatesBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  if (!(await canAccessStudio(staff, body.data.studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+
+  const rows = body.data.rows;
+  const startTimes = [...new Set(rows.map((row) => new Date(row.startsAt).toISOString()))]
+    .map((value) => new Date(value));
+  const existing = await db.select({
+    title: coursesTable.title,
+    instructor: coursesTable.instructor,
+    startsAt: coursesTable.startsAt,
+  }).from(coursesTable).where(and(
+    eq(coursesTable.studioId, body.data.studioId),
+    inArray(coursesTable.status, ["scheduled", "full"]),
+    inArray(coursesTable.startsAt, startTimes),
+  ));
+
+  const seen = new Set(existing.map(courseImportIdentityKey));
+  const duplicateLines: number[] = [];
+  for (const row of rows) {
+    const key = courseImportIdentityKey(row);
+    if (seen.has(key)) duplicateLines.push(row.line);
+    else seen.add(key);
+  }
+  res.json(CheckCourseImportDuplicatesResponse.parse({ duplicateLines }));
 });
 
 router.post("/courses", async (req, res): Promise<void> => {

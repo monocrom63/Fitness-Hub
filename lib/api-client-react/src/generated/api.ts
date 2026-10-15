@@ -34,6 +34,8 @@ import type {
   CourseClosureResolutionInput,
   CourseEditPushHistoryEntry,
   CourseEditPushReport,
+  CourseImportDuplicateCheck,
+  CourseImportDuplicateCheckResult,
   CourseInput,
   CourseRosterBooking,
   CourseUpdate,
@@ -1130,6 +1132,94 @@ export const useCreateCourse = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateCourseMutationOptions(options));
+    }
+
+export const getCheckCourseImportDuplicatesUrl = () => {
+
+
+
+
+  return `/api/courses/import-duplicates`
+}
+
+/**
+ * @summary Find matching scheduled courses before a CSV import
+ */
+export const checkCourseImportDuplicates = async (courseImportDuplicateCheck: CourseImportDuplicateCheck, options?: Parameters<typeof customFetch>[1]): Promise<CourseImportDuplicateCheckResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CourseImportDuplicateCheckResult>(getCheckCourseImportDuplicatesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(courseImportDuplicateCheck)
+  }
+);}
+
+
+
+
+
+export const getCheckCourseImportDuplicatesMutationKey = () => ['checkCourseImportDuplicates'] as const;
+
+export const getCheckCourseImportDuplicatesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkCourseImportDuplicates>>, TError,CheckCourseImportDuplicatesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkCourseImportDuplicates>>, TError,CheckCourseImportDuplicatesMutationVariables, TContext> => {
+
+const mutationKey = getCheckCourseImportDuplicatesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkCourseImportDuplicates>>, CheckCourseImportDuplicatesMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkCourseImportDuplicates(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckCourseImportDuplicatesMutationResult = NonNullable<Awaited<ReturnType<typeof checkCourseImportDuplicates>>>
+    export type CheckCourseImportDuplicatesMutationBody = BodyType<CourseImportDuplicateCheck>
+    export type CheckCourseImportDuplicatesMutationError = ErrorType<void>
+    export type CheckCourseImportDuplicatesMutationVariables = {data: BodyType<CourseImportDuplicateCheck>}
+
+    /**
+ * @summary Find matching scheduled courses before a CSV import
+ */
+export const useCheckCourseImportDuplicates = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkCourseImportDuplicates>>, TError,CheckCourseImportDuplicatesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkCourseImportDuplicates>>,
+        TError,
+        CheckCourseImportDuplicatesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCheckCourseImportDuplicatesMutationOptions(options));
     }
 
 export const getUpdateCourseUrl = (id: number,) => {

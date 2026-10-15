@@ -407,6 +407,39 @@ export const CreateCourseResponse = zod.object({
 
 
 /**
+ * @summary Find matching scheduled courses before a CSV import
+ */
+
+
+export const checkCourseImportDuplicatesBodyRowsItemTitleMin = 2;
+export const checkCourseImportDuplicatesBodyRowsItemTitleMax = 120;
+
+export const checkCourseImportDuplicatesBodyRowsItemInstructorMin = 2;
+export const checkCourseImportDuplicatesBodyRowsItemInstructorMax = 120;
+
+export const checkCourseImportDuplicatesBodyRowsMax = 250;
+
+
+
+export const CheckCourseImportDuplicatesBody = zod.object({
+  "studioId": zod.number().int().min(1),
+  "rows": zod.array(zod.object({
+  "line": zod.number().int().min(1),
+  "title": zod.string().min(checkCourseImportDuplicatesBodyRowsItemTitleMin).max(checkCourseImportDuplicatesBodyRowsItemTitleMax),
+  "instructor": zod.string().min(checkCourseImportDuplicatesBodyRowsItemInstructorMin).max(checkCourseImportDuplicatesBodyRowsItemInstructorMax),
+  "startsAt": zod.coerce.date()
+})).min(1).max(checkCourseImportDuplicatesBodyRowsMax)
+})
+
+
+
+
+export const CheckCourseImportDuplicatesResponse = zod.object({
+  "duplicateLines": zod.array(zod.number().int().min(1))
+})
+
+
+/**
  * @summary Edit a future scheduled or full course and notify its booked members
  */
 export const UpdateCourseParams = zod.object({

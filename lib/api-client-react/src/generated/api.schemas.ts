@@ -279,6 +279,37 @@ export interface MemberUpdate {
   contractDurationMonths?: number | null;
 }
 
+export interface CourseImportDuplicateCandidate {
+  /** @minimum 1 */
+  line: number;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  title: string;
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  instructor: string;
+  startsAt: string;
+}
+
+export interface CourseImportDuplicateCheck {
+  /** @minimum 1 */
+  studioId: number;
+  /**
+     * @minItems 1
+     * @maxItems 250
+     */
+  rows: CourseImportDuplicateCandidate[];
+}
+
+export interface CourseImportDuplicateCheckResult {
+  /** @items.minimum 1 */
+  duplicateLines: number[];
+}
+
 export interface CourseUpdate {
   /**
      * @minLength 2

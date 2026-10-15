@@ -145,6 +145,46 @@ test("course reads and district course creation stay within explicitly targeted 
     assert.equal(districtCourses.status, 200);
     assert.ok(districtCourses.body.every((course: any) => course.studioId !== foreignStudio.id));
 
+    const duplicateStartsAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    await db.insert(coursesTable).values([
+      ...Array.from({ length: 101 }, (_, index) => {
+        const start = new Date(Date.now() + (10 + index) * 24 * 60 * 60 * 1000);
+        return {
+          studioId: studioA.id,
+          title: `Earlier imported course ${index} ${run}`,
+          instructor: `Trainer ${index} ${run}`,
+          startsAt: start,
+          endsAt: new Date(start.getTime() + 60 * 60 * 1000),
+          capacity: 10,
+          room: `Room ${index}`,
+        };
+      }),
+      {
+        studioId: studioA.id, title: "Yoga Flow", instructor: "Eva Muller",
+        startsAt: duplicateStartsAt, endsAt: new Date(duplicateStartsAt.getTime() + 60 * 60 * 1000),
+        capacity: 10, room: "Yoga",
+      },
+    ]);
+    const cappedCourses = await api(district.clerkUserId, "GET", `/courses?studioId=${studioA.id}`);
+    assert.equal(cappedCourses.body.length, 100);
+    assert.ok(cappedCourses.body.every((course: any) => course.title !== "Yoga Flow"),
+      "the duplicate fixture is beyond the normal course-list limit");
+    const duplicates = await api(district.clerkUserId, "POST", "/courses/import-duplicates", {
+      studioId: studioA.id,
+      rows: [
+        { line: 2, title: "Yóga  Flow", instructor: "Éva Müller", startsAt: duplicateStartsAt.toISOString() },
+        { line: 3, title: `New class ${run}`, instructor: `New coach ${run}`, startsAt: duplicateStartsAt.toISOString() },
+        { line: 4, title: "Yoga Flow", instructor: "Eva Muller", startsAt: duplicateStartsAt.toISOString() },
+      ],
+    });
+    assert.equal(duplicates.status, 200, JSON.stringify(duplicates.body));
+    assert.deepEqual(duplicates.body.duplicateLines, [2, 4],
+      "the complete database is checked and normalized repeated CSV rows are detected");
+    assert.equal((await api(managerA.clerkUserId, "POST", "/courses/import-duplicates", {
+      studioId: studioB.id,
+      rows: [{ line: 2, title: "Yoga Flow", instructor: "Trainer", startsAt: duplicateStartsAt.toISOString() }],
+    })).status, 403);
+
     const managerOwnStudio = await api(managerA.clerkUserId, "GET", `/courses?studioId=${studioA.id}`);
     assert.equal(managerOwnStudio.status, 200);
     assert.ok(managerOwnStudio.body.length > 0);

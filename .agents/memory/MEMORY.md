@@ -14,6 +14,7 @@
 - [Trainer absence policy](trainer-absence-policy.md) — managers report illness and record off-app trainer acceptance; members only receive neutral course-change notices.
 - [District course destination](district-course-destination.md) — course creation requires an explicit studio choice for district managers, not a silent first-studio default.
 - [Course CSV room mapping](course-import-category-room.md) — CSV “Kategorie” values represent course rooms and should map automatically to matching rooms within each studio.
+- [Course CSV duplicate detection](course-import-dedup.md) — check duplicates against the complete selected-studio schedule, not the capped course display list.
 - [District studio context](studio-switch-context.md) — studio switching narrows operational views; Pulse and team administration remain organization-wide.
 - [Staff invitation return](staff-invitation-return.md) — keep invitation return tab-scoped and refresh identity after acceptance before entering the workspace.
 - [Invitation verification](invitation-testing.md) — test the mounted API, not only its handler; programmatic Clerk login is not proof of real OAuth or live email verification.
