@@ -1256,13 +1256,19 @@ paths:
     post:
       operationId: markPulseRead
       tags: [pulse]
-      summary: Record that the signed-in staff member read a Pulse message
+      summary: Record that the signed-in staff member read the displayed Pulse revision
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PulseReadInput"
       responses:
         "200":
           description: Read receipt recorded
@@ -1270,6 +1276,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PulseRead"
+        "409":
+          description: The message has changed since the displayed revision
         "401":
           description: Sign-in required
         "403":
@@ -2027,4 +2035,9 @@ components:
       properties:
         messageId: { type: integer }
         readAt: { type: string, format: date-time }
+    PulseReadInput:
+      type: object
+      required: [revision]
+      properties:
+        revision: { type: integer, minimum: 1 }
 

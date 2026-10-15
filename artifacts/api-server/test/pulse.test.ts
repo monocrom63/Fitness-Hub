@@ -61,13 +61,14 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
     const port = (server.address() as AddressInfo).port;
 
     async function api(user: string | null, method: "GET" | "POST" | "PATCH" | "DELETE", path: string, data?: unknown): Promise<ApiResult> {
+      const requestData = data ?? (method === "POST" && path.endsWith("/read") ? { revision: 1 } : undefined);
       const response = await fetch(`http://127.0.0.1:${port}/api${path}`, {
         method,
         headers: {
           ...(user ? { "x-test-user": user } : {}),
-          ...(data ? { "content-type": "application/json" } : {}),
+          ...(requestData ? { "content-type": "application/json" } : {}),
         },
-        ...(data ? { body: JSON.stringify(data) } : {}),
+        ...(requestData ? { body: JSON.stringify(requestData) } : {}),
       });
       return { status: response.status, body: response.status === 204 ? null : await response.json() };
     }
@@ -245,11 +246,15 @@ test("Pulse HTTP permissions, visibility and receipts", async (t) => {
       assert.equal(updated.body.revision, 2);
       assert.ok(updated.body.editedAt);
       assert.equal(updated.body.readCount, 1);
+      assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`, { revision: 1 })).status, 409);
+      assert.equal((await db.select().from(pulseReadsTable)
+        .where(and(eq(pulseReadsTable.messageId, studioAAll), eq(pulseReadsTable.staffId, employeeA.id)))).length, 0);
       const employeePage = await api(user(employeeA), "GET", `/pulse?beforeId=${studioAAll + 1}`);
       const corrected = employeePage.body.find((message: { id: number }) => message.id === studioAAll);
       assert.equal(corrected?.title, correction.title);
       assert.equal(corrected?.isRead, false);
       assert.equal(corrected?.canManage, false);
+      assert.equal((await api(user(employeeA), "POST", `/pulse/${studioAAll}/read`, { revision: 2 })).status, 200);
       const historyUrl = `/pulse/${studioAAll}/history`;
       assert.equal((await api(null, "GET", historyUrl)).status, 401);
       assert.equal((await api(user(managerA), "GET", "/pulse/nope/history")).status, 400);

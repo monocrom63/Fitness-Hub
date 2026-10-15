@@ -94,6 +94,7 @@ export * from './pulseInput';
 export * from './pulseMessage';
 export * from './pulsePriority';
 export * from './pulseRead';
+export * from './pulseReadInput';
 export * from './pushSubscriptionInput';
 export * from './pushSubscriptionRegistration';
 export * from './role';

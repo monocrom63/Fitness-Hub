@@ -178,7 +178,15 @@ export function PulsePage({ me }: { me: Me }) {
     if (me.role === 'studio_employee' || (me.role === 'studio_manager' && !me.studioId) || (me.role === 'district_manager' && form.scope === 'studio' && (studios.isLoading || studios.isError || !selectedStudioValid))) return;
     create.mutate({ data: { title: form.title.trim(), body: form.body.trim(), priority: form.priority, audience: form.audience, studioId: studioId ?? null } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListPulseQueryKey() }); setForm({ title: '', body: '', priority: 'info', audience: 'all', scope: 'organization', studioId: '' }); close(); } });
   };
-  const read = (message: PulseMessage) => markRead.mutate({ id: message.id }, { onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }) });
+  const read = (message: PulseMessage) => markRead.mutate(
+    { id: message.id, data: { revision: message.revision } },
+    {
+      onSuccess: () => client.invalidateQueries({ queryKey: getListPulseQueryKey() }),
+      onError: error => {
+        if (error.status === 409) void client.invalidateQueries({ queryKey: getListPulseQueryKey() });
+      },
+    },
+  );
   const remove = (message: PulseMessage) => {
     if (!window.confirm(`„${message.title}“ für alle Empfänger zurückziehen? Die Nachricht kann danach nicht wiederhergestellt werden.`)) return;
     retract.mutate({ id: message.id }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListPulseQueryKey() }); client.invalidateQueries({ queryKey: getListPulseHistoryQueryKey(message.id) }); } });
@@ -199,7 +207,7 @@ export function PulsePage({ me }: { me: Me }) {
       </article>)}</div> : <div className="empty-state"><div className="empty-icon"><Bell size={22} /></div><h3>{searchTerm ? 'Keine Treffer' : filter === 'unread' ? 'Alles gelesen' : 'Noch keine Nachrichten'}</h3><p>{searchTerm ? `Für „${searchTerm}“ gibt es ${filter === 'unread' ? 'keine ungelesenen' : 'keine'} Nachrichten in deinem Arbeitsbereich.` : filter === 'unread' ? 'Du bist auf dem aktuellen Stand.' : 'Neue Nachrichten für deinen Arbeitsbereich erscheinen hier.'}</p>{!searchTerm && filter === 'unread' && <button className="button button-outline" onClick={() => setFilter('all')}>Alle Nachrichten ansehen</button>}</div>}
     {query.hasNextPage && <div className="pulse-more"><button className="button button-outline" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>{query.isFetchingNextPage ? 'Wird geladen …' : 'Ältere Nachrichten laden'}</button></div>}
     {query.isFetchNextPageError && <p className="pulse-form-error" role="alert">Ältere Nachrichten konnten nicht geladen werden. <button onClick={() => query.fetchNextPage()}>Erneut versuchen</button></p>}
-    {markRead.isError && <p className="pulse-form-error" role="alert">Lesebestätigung fehlgeschlagen. Bitte versuche es erneut.</p>}
+    {markRead.isError && <p className="pulse-form-error" role="alert">{markRead.error?.status === 409 ? 'Diese Nachricht wurde inzwischen korrigiert. Die aktuelle Fassung wurde geladen und ist wieder ungelesen.' : 'Lesebestätigung fehlgeschlagen. Bitte versuche es erneut.'}</p>}
     {retract.isError && <p className="pulse-form-error" role="alert">Nachricht konnte nicht zurückgezogen werden. Bitte versuche es erneut.</p>}
     {me.role !== 'studio_employee' && <PulseWithdrawn />}
     {open && <div className="modal-backdrop" role="presentation">

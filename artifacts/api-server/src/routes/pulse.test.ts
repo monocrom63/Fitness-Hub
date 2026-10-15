@@ -126,12 +126,13 @@ test("Pulse enforces role, organization, studio and read-receipt boundaries", as
         body?: unknown,
       ) {
         const headers: Record<string, string> = {};
+        const requestBody = body ?? (method === "POST" && path.endsWith("/read") ? { revision: 1 } : undefined);
         if (user) headers["x-test-user"] = user;
-        if (body !== undefined) headers["content-type"] = "application/json";
+        if (requestBody !== undefined) headers["content-type"] = "application/json";
         const response = await fetch(`${origin}${path}`, {
           method,
           headers,
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          ...(requestBody === undefined ? {} : { body: JSON.stringify(requestBody) }),
         });
         return { status: response.status, data: await response.json() as T };
       }

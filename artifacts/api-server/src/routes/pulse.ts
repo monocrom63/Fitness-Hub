@@ -7,6 +7,7 @@ import {
   ListPulseHistoryResponse,
   ListPulseQueryParams,
   ListPulseResponse,
+  MarkPulseReadBody,
   MarkPulseReadParams,
   MarkPulseReadResponse,
   RetractPulseMessageParams,
@@ -450,46 +451,63 @@ router.post("/pulse/:id/read", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
   const params = MarkPulseReadParams.safeParse(req.params);
+  const body = MarkPulseReadBody.safeParse(req.body);
   if (!params.success) {
     res.status(400).json({ error: "Ungültige Meldungs-ID." });
     return;
   }
-
-  const studioIds = await getAccessibleStudioIds(staff, database);
-  const [message] = await database
-    .select({ id: pulseMessagesTable.id })
-    .from(pulseMessagesTable)
-    .where(
-      and(
-        eq(pulseMessagesTable.id, params.data.id),
-        isNull(pulseMessagesTable.retractedAt),
-        visibleMessages(staff, studioIds),
-      ),
-    )
-    .limit(1);
-  if (!message) {
-    res.status(404).json({ error: "Meldung nicht gefunden." });
+  if (!body.success) {
+    res.status(400).json({ error: "Ungültige Nachrichten-Version." });
     return;
   }
 
-  await database
-    .insert(pulseReadsTable)
-    .values({ messageId: message.id, staffId: staff.id })
-    .onConflictDoNothing();
-  const [receipt] = await database
-    .select({ readAt: pulseReadsTable.readAt })
-    .from(pulseReadsTable)
-    .where(
-      and(
-        eq(pulseReadsTable.messageId, message.id),
-        eq(pulseReadsTable.staffId, staff.id),
-      ),
-    )
-    .limit(1);
+  const studioIds = await getAccessibleStudioIds(staff, database);
+  const result = await database.transaction(async (tx) => {
+    // Serialize read receipts with corrections so an old view cannot mark the
+    // newly corrected message as read after the correction cleared old receipts.
+    const [message] = await tx
+      .select({ id: pulseMessagesTable.id, revision: pulseMessagesTable.revision })
+      .from(pulseMessagesTable)
+      .where(
+        and(
+          eq(pulseMessagesTable.id, params.data.id),
+          isNull(pulseMessagesTable.retractedAt),
+          visibleMessages(staff, studioIds),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    if (!message) return { status: "missing" as const };
+    if (message.revision !== body.data.revision) return { status: "stale" as const };
+
+    await tx
+      .insert(pulseReadsTable)
+      .values({ messageId: message.id, staffId: staff.id })
+      .onConflictDoNothing();
+    const [receipt] = await tx
+      .select({ readAt: pulseReadsTable.readAt })
+      .from(pulseReadsTable)
+      .where(
+        and(
+          eq(pulseReadsTable.messageId, message.id),
+          eq(pulseReadsTable.staffId, staff.id),
+        ),
+      )
+      .limit(1);
+    return { status: "recorded" as const, messageId: message.id, readAt: receipt.readAt };
+  });
+  if (result.status === "missing") {
+    res.status(404).json({ error: "Meldung nicht gefunden." });
+    return;
+  }
+  if (result.status === "stale") {
+    res.status(409).json({ error: "Diese Nachricht wurde inzwischen korrigiert. Lade die aktuelle Fassung und lies sie erneut." });
+    return;
+  }
   res.json(
     MarkPulseReadResponse.parse({
-      messageId: message.id,
-      readAt: receipt.readAt.toISOString(),
+      messageId: result.messageId,
+      readAt: result.readAt.toISOString(),
     }),
   );
 });

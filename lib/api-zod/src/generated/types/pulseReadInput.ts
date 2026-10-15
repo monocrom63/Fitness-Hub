@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface MemberNotificationPreferencesUpdate {
-  waitlistEmailEnabled: boolean;
+export interface PulseReadInput {
+  /** @minimum 1 */
+  revision: number;
 }

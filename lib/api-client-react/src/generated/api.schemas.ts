@@ -819,11 +819,6 @@ export interface MemberNotification {
   emailDeliveryStatus: MemberNotificationEmailDeliveryStatus;
 }
 
-export interface MemberNotificationPreferences {
-  waitlistEmailEnabled: boolean;
-  email: string;
-}
-
 export interface MemberNotificationUnreadCount {
   /** @minimum 0 */
   count: number;
@@ -1084,6 +1079,11 @@ export interface PulseRead {
   readAt: string;
 }
 
+export interface PulseReadInput {
+  /** @minimum 1 */
+  revision: number;
+}
+
 export type GetDashboardParams = {
 studioId?: number;
 };
@@ -1153,7 +1153,3 @@ unreadOnly?: boolean;
 search?: string;
 };
 
-
-export interface MemberNotificationPreferencesUpdate {
-  waitlistEmailEnabled: boolean;
-}

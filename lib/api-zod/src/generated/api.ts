@@ -1455,15 +1455,6 @@ export const ListMemberNotificationsResponse = zod.array(ListMemberNotifications
 
 
 /**
- * @summary Read own optional waitlist email preference
- */
-export const GetMemberNotificationPreferencesResponse = zod.object({
-  "waitlistEmailEnabled": zod.boolean(),
-  "email": zod.string().email()
-})
-
-
-/**
  * @summary Count unread notifications belonging to the signed-in member
  */
 export const getMemberNotificationUnreadCountResponseCountMin = 0;
@@ -1716,10 +1707,17 @@ export const RetractPulseMessageResponse = zod.void()
 
 
 /**
- * @summary Record that the signed-in staff member read a Pulse message
+ * @summary Record that the signed-in staff member read the displayed Pulse revision
  */
 export const MarkPulseReadParams = zod.object({
   "id": zod.coerce.number().int()
+})
+
+
+
+
+export const MarkPulseReadBody = zod.object({
+  "revision": zod.number().int().min(1)
 })
 
 export const MarkPulseReadResponse = zod.object({
@@ -1819,14 +1817,3 @@ export const AcceptInvitationResponse = zod.object({
 })
 
 
-/**
- * @summary Explicitly opt in to or withdraw waitlist promotion emails
- */
-export const UpdateMemberNotificationPreferencesBody = zod.object({
-  "waitlistEmailEnabled": zod.boolean()
-})
-
-export const UpdateMemberNotificationPreferencesResponse = zod.object({
-  "waitlistEmailEnabled": zod.boolean(),
-  "email": zod.string().email()
-})

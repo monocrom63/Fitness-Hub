@@ -36,11 +36,11 @@ function notices(): PulseMessage[] {
   });
 }
 
-type RequestLog = { method: string; path: string; params: Record<string, string> };
+type RequestLog = { method: string; path: string; params: Record<string, string>; body?: unknown };
 
 function servePulse(
   rows: PulseMessage[],
-  hold?: (request: RequestLog) => Promise<void> | undefined,
+  hold?: (request: RequestLog) => void | Promise<void>,
   history: Array<{
     id: number;
     action: 'correction' | 'retraction';
@@ -59,6 +59,7 @@ function servePulse(
       method: init?.method ?? 'GET',
       path: url.pathname,
       params: Object.fromEntries(url.searchParams),
+      ...(init?.body ? { body: JSON.parse(String(init.body)) as unknown } : {}),
     };
     requests.push(request);
     await hold?.(request);
@@ -77,6 +78,9 @@ function servePulse(
     if (request.method === 'POST' && match) {
       const row = rows.find(row => row.id === Number(match[1]));
       if (!row) throw new Error(`Unknown notice: ${match[1]}`);
+      if ((request.body as { revision?: number } | undefined)?.revision !== row.revision) {
+        return Response.json({ error: 'The message has changed.' }, { status: 409 });
+      }
       row.isRead = true;
       row.readCount += 1;
       return Response.json({ messageId: row.id, readAt: '2026-01-02T09:00:00Z' });
@@ -266,7 +270,7 @@ test('loads older pages per filter and refreshes an older read receipt across Al
   expect(screen.queryByTestId('pulse-message-63')).toBeNull();
   expect(visibleIds()).toEqual(rows.filter(row => !row.isRead).map(row => row.id));
   expect(requests.filter(request => request.method === 'POST')).toEqual([
-    { method: 'POST', path: '/api/pulse/63/read', params: {} },
+    { method: 'POST', path: '/api/pulse/63/read', params: {}, body: { revision: 1 } },
   ]);
 
   await user.click(screen.getByRole('button', { name: 'Alle' }));
@@ -282,6 +286,34 @@ test('loads older pages per filter and refreshes an older read receipt across Al
   await screen.findByText('34 Nachrichten angezeigt');
   expect(screen.queryByTestId('pulse-message-63')).toBeNull();
   expect(visibleIds()).toEqual(rows.filter(row => !row.isRead).map(row => row.id));
+});
+
+test('a stale read confirmation refreshes the corrected message without marking it read', async () => {
+  const rows = notices().slice(1, 2);
+  let changed = false;
+  const requests = servePulse(rows, request => {
+    if (request.method === 'POST' && !changed) {
+      changed = true;
+      rows[0].revision = 2;
+      rows[0].title = 'Korrigierter Hinweis';
+    }
+  });
+  const { user } = renderPulse();
+
+  await screen.findByText('1 Nachricht angezeigt');
+  await user.click(screen.getByTestId('button-mark-pulse-read-99'));
+  expect((await screen.findByRole('alert')).textContent).toMatch(/inzwischen korrigiert/);
+  expect(await screen.findByRole('heading', { name: 'Korrigierter Hinweis' })).toBeTruthy();
+  expect(within(screen.getByTestId('pulse-message-99')).getByRole('button', { name: 'Als gelesen markieren' })).toBeTruthy();
+  expect(requests.filter(request => request.method === 'POST')).toEqual([
+    { method: 'POST', path: '/api/pulse/99/read', params: {}, body: { revision: 1 } },
+  ]);
+
+  await user.click(screen.getByTestId('button-mark-pulse-read-99'));
+  await waitFor(() => expect(within(screen.getByTestId('pulse-message-99')).getByText('Gelesen')).toBeTruthy());
+  expect(requests.filter(request => request.method === 'POST').map(request => request.body)).toEqual([
+    { revision: 1 }, { revision: 2 },
+  ]);
 });
 
 test('switching filters during an older-page request cannot leak old pages into Unread', async () => {
