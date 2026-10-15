@@ -6,12 +6,13 @@ import { build } from "esbuild";
 const cache = join(process.cwd(), "node_modules", ".cache");
 await mkdir(cache, { recursive: true });
 const directory = await mkdtemp(join(cache, "pulse-test-"));
-const output = join(directory, "pulse.test.cjs");
 
 try {
   await build({
-    entryPoints: ["src/routes/pulse.test.ts"],
-    outfile: output,
+    entryPoints: ["src/routes/pulse.test.ts", "test/pulse.test.ts"],
+    outbase: ".",
+    outdir: directory,
+    outExtension: { ".js": ".cjs" },
     bundle: true,
     platform: "node",
     target: "node24",
@@ -19,7 +20,7 @@ try {
   });
 
   const exitCode = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--test", output], {
+    const child = spawn(process.execPath, ["--test", join(directory, "src/routes/pulse.test.cjs"), join(directory, "test/pulse.test.cjs")], {
       stdio: "inherit",
     });
     child.once("error", reject);

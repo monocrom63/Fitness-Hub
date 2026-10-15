@@ -7,7 +7,7 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "test:pulse": "node ./test/run-pulse.mjs && tsx --test test/pulse.test.ts",
+    "test:pulse": "node ./test/run-pulse.mjs",
     "test:members": "tsx --test test/member-access.test.ts test/member-stale-staff-assignment.test.ts",
     "test:team": "tsx --test test/team-invitations.test.ts",
     "test:invitations": "node ./test/run-invitations.mjs",

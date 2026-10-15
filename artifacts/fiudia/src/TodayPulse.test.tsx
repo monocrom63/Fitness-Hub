@@ -130,6 +130,65 @@ test('ordinary readers see corrected content without history or withdrawn archiv
   expect(requests.some(request => request.path.endsWith('/history'))).toBe(false);
 });
 
+test.each(['network', 'missing'] as const)('conflicting corrections reload for review, preserving the draft on %s failure', async (failure) => {
+  const original = { ...notices()[0], canManage: true };
+  let current = original;
+  let reloadFails = true;
+  const patches: Array<{ revision: number; title: string; body: string; priority: string }> = [];
+  const reloadParams: Array<Record<string, string>> = [];
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://localhost');
+    if (init?.method === 'PATCH') {
+      const data = JSON.parse(String(init.body));
+      patches.push(data);
+      if (data.revision !== current.revision) {
+        return Response.json({ error: 'Meldung inzwischen korrigiert' }, { status: 409 });
+      }
+      current = { ...current, ...data, revision: current.revision + 1 };
+      return Response.json(current);
+    }
+    if (url.pathname !== '/api/pulse') throw new Error(`Unexpected request ${url}`);
+    if (url.searchParams.has('beforeId')) {
+      reloadParams.push(Object.fromEntries(url.searchParams));
+      if (reloadFails) {
+        return Response.json(failure === 'missing' ? [] : { error: 'Offline' }, { status: failure === 'missing' ? 200 : 503 });
+      }
+      return Response.json([current]);
+    }
+    return Response.json([current]);
+  }));
+  const { user } = renderPulse('studio_manager');
+  await user.click(await screen.findByRole('button', { name: 'Ungelesen' }));
+  await user.type(screen.getByTestId('input-pulse-search'), 'Hinweis');
+  await user.click(screen.getByTestId('button-pulse-search'));
+  await user.click(await screen.findByRole('button', { name: `Nachricht ${original.title} bearbeiten` }));
+  const body = screen.getByTestId('input-pulse-body') as HTMLTextAreaElement;
+  await user.clear(body);
+  await user.type(body, 'Mein Entwurf');
+  current = { ...original, title: 'Aktuelle Fassung', body: 'Korrektur einer anderen Leitung', priority: 'urgent', revision: 2 };
+  await user.click(screen.getByTestId('button-publish-pulse'));
+  expect(await screen.findByText(/Deine Änderungen wurden nicht gespeichert/)).toBeTruthy();
+  expect(patches[0].revision).toBe(1);
+  expect(body.value).toBe('Mein Entwurf');
+  expect((screen.getByTestId('button-publish-pulse') as HTMLButtonElement).disabled).toBe(true);
+  await user.click(screen.getByRole('button', { name: 'Änderungen verwerfen und aktuelle Fassung prüfen' }));
+  expect(await screen.findByText(/Dein Entwurf bleibt erhalten/)).toBeTruthy();
+  expect(body.value).toBe('Mein Entwurf');
+  reloadFails = false;
+  await user.click(screen.getByRole('button', { name: 'Änderungen verwerfen und aktuelle Fassung prüfen' }));
+  await waitFor(() => expect(body.value).toBe(current.body));
+  expect((screen.getByTestId('input-pulse-title') as HTMLInputElement).value).toBe(current.title);
+  expect((screen.getByTestId('select-pulse-priority') as HTMLSelectElement).value).toBe('urgent');
+  expect(screen.queryByText(/Deine Änderungen wurden nicht gespeichert/)).toBeNull();
+  expect(reloadParams).toEqual([{ beforeId: '101' }, { beforeId: '101' }]);
+  expect((screen.getByTestId('button-publish-pulse') as HTMLButtonElement).disabled).toBe(true);
+  await user.clear(body);
+  await user.type(body, 'Nach Prüfung ergänzt');
+  await user.click(screen.getByTestId('button-publish-pulse'));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(patches[1]).toMatchObject({ revision: 2, title: 'Aktuelle Fassung', body: 'Nach Prüfung ergänzt', priority: 'urgent' });
+});
+
 test('managers can review correction differences and the previous version of withdrawn messages', async () => {
   const rows = notices().slice(0, 1);
   rows[0].editedAt = '2026-01-02T10:00:00Z';
