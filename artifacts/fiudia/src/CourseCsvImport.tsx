@@ -12,6 +12,7 @@ import type { RoomAsset } from '@workspace/api-client-react';
 import { Upload } from 'lucide-react';
 import { berlinDateTimeIso } from './course-time';
 import { findDuplicateCourseLines } from './course-import-dedup';
+import { clearCourseImportSession, loadCourseImportSession, saveCourseImportSession } from './course-import-session';
 import './CourseCsvImport.css';
 
 type CourseRow = {
@@ -171,6 +172,47 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
+  const [createdLines, setCreatedLines] = useState<Set<number>>(() => new Set());
+  const [skippedLines, setSkippedLines] = useState<Set<number>>(() => new Set());
+  const [restoredStudioId, setRestoredStudioId] = useState<number | null>(null);
+  const [resumeStorageUnavailable, setResumeStorageUnavailable] = useState(false);
+
+  useEffect(() => {
+    if (!activeStudioId) return;
+    setFileName('');
+    setParsed({ rows: [], error: '', invalidRows: [], ignoredRows: 0 });
+    setDuration('60');
+    setCapacity('20');
+    setRoomMap({});
+    setProgress(0);
+    setResults([]);
+    setCreatedLines(new Set());
+    setSkippedLines(new Set());
+    const saved = loadCourseImportSession<ParsedCsv, ImportResult>(activeStudioId);
+    if (saved) {
+      setFileName(saved.fileName);
+      setParsed(saved.parsed);
+      setDuration(saved.duration);
+      setCapacity(saved.capacity);
+      setRoomMap(saved.roomMap);
+      setProgress(saved.progress);
+      setCreatedLines(new Set(saved.createdLines));
+      setSkippedLines(new Set(saved.skippedLines));
+      setResults(saved.results);
+    }
+    setResumeStorageUnavailable(false);
+    setRestoredStudioId(activeStudioId);
+  }, [activeStudioId]);
+
+  useEffect(() => {
+    if (!activeStudioId || restoredStudioId !== activeStudioId || busy || !parsed.rows.length || !fileName) return;
+    if (progress > 0 && results.length === 0 && createdLines.size + skippedLines.size >= parsed.rows.length) return;
+    const saved = saveCourseImportSession({
+      version: 1, studioId: activeStudioId, fileName, parsed, duration, capacity, roomMap, progress,
+      createdLines: [...createdLines], skippedLines: [...skippedLines], results,
+    });
+    setResumeStorageUnavailable(!saved);
+  }, [activeStudioId, restoredStudioId, busy, fileName, parsed, duration, capacity, roomMap, progress, createdLines, skippedLines, results]);
 
   const sourceCategories = [...new Map(parsed.rows.map(row => [keyOf(row.title), row.title])).entries()];
   const duplicateLines = findDuplicateCourseLines(
@@ -186,12 +228,17 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   const ready = !!parsed.rows.length && !!activeStudioId && !!activeStudioName && !parsed.error && !parsed.invalidRows.length && roomsComplete &&
     Number.isInteger(durationValue) && durationValue > 0 && durationValue <= 480 &&
     Number.isInteger(capacityValue) && capacityValue >= 1 && capacityValue <= 200 &&
-     !studiosLoading && !studiosError && !existingCourses.isLoading && !existingCourses.isError;
+     restoredStudioId === activeStudioId && !studiosLoading && !studiosError && !existingCourses.isLoading && !existingCourses.isError;
 
   async function chooseFile(file?: File) {
+    if (progress > 0 && (results.length > 0 || remainingRows > 0) &&
+      !window.confirm('Den unterbrochenen Import verwerfen und eine andere CSV beginnen?')) return;
+    if (activeStudioId) clearCourseImportSession(activeStudioId);
     setFileName(file?.name ?? '');
     setResults([]);
     setProgress(0);
+    setCreatedLines(new Set());
+    setSkippedLines(new Set());
     setRoomMap({});
     if (!file) { setParsed({ rows: [], error: '', invalidRows: [], ignoredRows: 0 }); return; }
     if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -216,18 +263,23 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
   async function runImport() {
     if (!ready || busy) return;
     setBusy(true);
-    setResults([]);
-    setProgress(0);
-    const failures: ImportResult[] = [];
-    let successes = 0;
+    const created = new Set(createdLines);
+    const skipped = new Set(skippedLines);
+    const failures = new Map(results.map(result => [result.line, result]));
+    let createdThisRun = false;
     for (let index = 0; index < parsed.rows.length; index++) {
       const row = parsed.rows[index];
+      if (created.has(row.line) || skipped.has(row.line)) {
+        setProgress(index + 1);
+        continue;
+      }
+      failures.delete(row.line);
       const startsAt = berlinDateTimeIso(`${row.date}T${row.time}`);
       const endsAt = courseDateTime(row, durationValue);
       if (!startsAt || !endsAt) {
-        failures.push({ line: row.line, message: 'Berliner Zeit ist wegen einer Zeitumstellung nicht eindeutig oder existiert nicht.' });
+        failures.set(row.line, { line: row.line, message: 'Berliner Zeit ist wegen einer Zeitumstellung nicht eindeutig oder existiert nicht.' });
       } else if (duplicateLines.has(row.line)) {
-        // Existing schedule matches and repeated rows are counted as skipped below.
+        skipped.add(row.line);
       } else {
         try {
           await create.mutateAsync({
@@ -241,24 +293,49 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
               room: roomMap[keyOf(row.title)],
             },
           });
-          successes++;
+          created.add(row.line);
+          createdThisRun = true;
         } catch (error) {
           const body = error && typeof error === 'object' ? (error as { data?: { error?: string }; message?: string }) : {};
-          failures.push({ line: row.line, message: body.data?.error || body.message || 'Kurs konnte nicht angelegt werden.' });
+          failures.set(row.line, { line: row.line, message: body.data?.error || body.message || 'Kurs konnte nicht angelegt werden.' });
         }
       }
       setProgress(index + 1);
+      const currentFailures = [...failures.values()];
+      setCreatedLines(new Set(created));
+      setSkippedLines(new Set(skipped));
+      setResults(currentFailures);
+      if (activeStudioId) {
+        const saved = saveCourseImportSession({
+          version: 1, studioId: activeStudioId, fileName, parsed, duration, capacity, roomMap, progress: index + 1,
+          createdLines: [...created], skippedLines: [...skipped], results: currentFailures,
+        });
+        setResumeStorageUnavailable(!saved);
+      }
       if (index % 8 === 7 || index === parsed.rows.length - 1) {
-        setResults([...failures]);
         await new Promise(resolve => window.setTimeout(resolve, 0));
       }
     }
-    if (successes) onImported();
-    setResults(failures);
+    if (createdThisRun) onImported();
+    const finalFailures = [...failures.values()];
+    setCreatedLines(created);
+    setSkippedLines(skipped);
+    setResults(finalFailures);
+    if (activeStudioId) {
+      if (finalFailures.length) {
+        const saved = saveCourseImportSession({
+          version: 1, studioId: activeStudioId, fileName, parsed, duration, capacity, roomMap, progress: parsed.rows.length,
+          createdLines: [...created], skippedLines: [...skipped], results: finalFailures,
+        });
+        setResumeStorageUnavailable(!saved);
+      }
+      else clearCourseImportSession(activeStudioId);
+    }
     setBusy(false);
   }
 
   const close = () => { if (!busy) onClose(); };
+  const remainingRows = parsed.rows.filter(row => !createdLines.has(row.line) && !skippedLines.has(row.line)).length;
   return <div className="course-csv-import">
     <p className="booking-hint">Es wird nur das aktive Studio <strong>{activeStudioName || '—'}</strong> importiert. Kurse aus anderen Studios in der CSV werden ignoriert. Dauer und Teilnehmerzahl legst du hier fest.</p>
     {parsed.ignoredRows > 0 && <p className="course-csv-notice" role="status">{parsed.ignoredRows} Zeilen aus anderen Studios wurden ignoriert.</p>}
@@ -269,17 +346,18 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
       <input type="file" accept=".csv,text/csv" onChange={event => void chooseFile(event.target.files?.[0])} disabled={busy} />
     </label>
     {parsed.error && <p className="form-error" role="alert">{parsed.error}</p>}
+    {resumeStorageUnavailable && <p className="form-error" role="alert">Der Importfortschritt kann in diesem Browser nicht gespeichert werden. Lass dieses Fenster geöffnet, bis der Import abgeschlossen ist.</p>}
     {!!parsed.invalidRows.length && <div className="course-csv-errors" role="alert"><strong>{parsed.invalidRows.length} ungültige CSV-Zeilen – bitte vor dem Import korrigieren</strong><ul>{parsed.invalidRows.slice(0, 20).map(message => <li key={message}>{message}</li>)}</ul>{parsed.invalidRows.length > 20 && <p>Weitere Fehler werden nach Zeile 20 nicht angezeigt.</p>}</div>}
     {!!parsed.rows.length && <>
       <div className="course-csv-settings">
-        <label className="field"><span>Kursdauer (Minuten)</span><input type="number" min="1" max="480" step="1" value={duration} onChange={event => setDuration(event.target.value)} disabled={busy} /></label>
-        <label className="field"><span>Teilnehmerzahl</span><input type="number" min="1" max="200" step="1" value={capacity} onChange={event => setCapacity(event.target.value)} disabled={busy} /></label>
+        <label className="field"><span>Kursdauer (Minuten)</span><input type="number" min="1" max="480" step="1" value={duration} onChange={event => setDuration(event.target.value)} disabled={busy || progress > 0} /></label>
+        <label className="field"><span>Teilnehmerzahl</span><input type="number" min="1" max="200" step="1" value={capacity} onChange={event => setCapacity(event.target.value)} disabled={busy || progress > 0} /></label>
       </div>
       <div className="course-csv-studios">
          <h3>Kursräume zuordnen · {activeStudioName}</h3>
          <p className="booking-hint">Fiudia ordnet jede Kategorie automatisch einem gleichnamigen Kursraum zu. Wenn kein passender Raumname existiert, wähle den Kursraum hier aus.</p>
          {activeStudioId && sourceCategories.map(([categoryKey, category]) =>
-           <RoomMapping key={categoryKey} studioId={activeStudioId} category={category} value={roomMap[categoryKey] ?? ''} disabled={busy} onChange={room => setRoomMap(current => ({ ...current, [categoryKey]: room }))} />
+            <RoomMapping key={categoryKey} studioId={activeStudioId} category={category} value={roomMap[categoryKey] ?? ''} disabled={busy || progress > 0} onChange={room => setRoomMap(current => ({ ...current, [categoryKey]: room }))} />
          )}
         {studiosLoading && <p className="booking-hint" role="status">Studios werden geladen …</p>}
         {studiosError && <p className="form-error" role="alert">Studios konnten nicht geladen werden. Bitte schließe den Importdialog und versuche es erneut.</p>}
@@ -293,14 +371,15 @@ export default function CourseCsvImport({ activeStudioId, activeStudioName, stud
         {parsed.rows.length > 5 && <span>und {parsed.rows.length - 5} weitere Termine</span>}
       </div>
     </>}
+    {progress > 0 && results.length > 0 && <p className="course-csv-notice" role="status">Der Import für {activeStudioName} wird fortgesetzt. Bereits angelegte Zeilen bleiben erhalten; fehlgeschlagene Zeilen werden erneut versucht.</p>}
     {busy && <div className="course-csv-progress" role="status">Import läuft: {progress} von {parsed.rows.length} geprüft …</div>}
-    {!busy && progress > 0 && <p className="course-csv-progress" role="status">{progress - results.length - duplicateLines.size} Kurse angelegt, {duplicateLines.size} Dubletten übersprungen, {results.length} fehlgeschlagen.</p>}
+    {!busy && progress > 0 && <p className="course-csv-progress" role="status">{createdLines.size} Kurse angelegt, {skippedLines.size} Dubletten übersprungen, {results.length} fehlgeschlagen.</p>}
     {!!results.length && <div className="course-csv-errors" role="alert"><strong>Fehlgeschlagene Zeilen</strong><ul>{results.map(result => <li key={`${result.line}-${result.message}`}>Zeile {result.line}: {result.message}</li>)}</ul></div>}
     {!!progress && !busy && !results.length && <p className="course-csv-success" role="status">Alle {progress} Kurse wurden angelegt.</p>}
     <div className="course-csv-actions">
       <button type="button" className="button button-outline" onClick={close} disabled={busy}>{progress && !busy ? 'Schließen' : 'Abbrechen'}</button>
-      {!progress && <button type="button" className="button button-dark" onClick={() => void runImport()} disabled={!ready || busy}>
-        {busy ? 'Import läuft …' : `${parsed.rows.length ? `${parsed.rows.length} Kurse anlegen` : 'Import starten'}`}
+      {!busy && remainingRows > 0 && <button type="button" className="button button-dark" onClick={() => void runImport()} disabled={!ready}>
+        {results.length ? `${remainingRows} Zeilen erneut versuchen` : progress ? `${remainingRows} Zeilen fortsetzen` : `${parsed.rows.length ? `${parsed.rows.length} Kurse anlegen` : 'Import starten'}`}
       </button>}
     </div>
   </div>;
