@@ -68,6 +68,10 @@ function servePulse(
       const page = rows
         .filter(row => !beforeId || row.id < beforeId)
         .filter(row => url.searchParams.get('unreadOnly') !== 'true' || !row.isRead)
+        .filter(row => {
+          const search = url.searchParams.get('search')?.toLocaleLowerCase();
+          return !search || `${row.title} ${row.body}`.toLocaleLowerCase().includes(search);
+        })
         .slice(0, 30);
       return Response.json(page);
     }
@@ -286,6 +290,38 @@ test('loads older pages per filter and refreshes an older read receipt across Al
   await screen.findByText('34 Nachrichten angezeigt');
   expect(screen.queryByTestId('pulse-message-63')).toBeNull();
   expect(visibleIds()).toEqual(rows.filter(row => !row.isRead).map(row => row.id));
+});
+
+test('search after loading older pages starts a clean archive and paginates matching results', async () => {
+  const rows = notices();
+  rows.slice(3).forEach(row => { row.title = `Search Match ${row.id}`; });
+  rows.slice(0, 3).forEach(row => { row.title = `Other notice ${row.id}`; });
+  const requests = servePulse(rows);
+  const { user } = renderPulse();
+
+  await screen.findByText('30 Nachrichten angezeigt · weitere laden');
+  await user.click(screen.getByRole('button', { name: 'Ältere Nachrichten laden' }));
+  await screen.findByText('38 Nachrichten angezeigt');
+  expect(visibleIds()).toHaveLength(38);
+
+  await user.type(screen.getByTestId('input-pulse-search'), 'Search Match');
+  await user.click(screen.getByTestId('button-pulse-search'));
+  await screen.findByText('30 Treffer angezeigt · weitere laden');
+  expect(visibleIds()).toHaveLength(30);
+  expect(visibleIds().every(id => rows.find(row => row.id === id)?.title.includes('Search Match'))).toBe(true);
+  expect(screen.queryByTestId('pulse-message-100')).toBeNull();
+
+  await user.click(screen.getByRole('button', { name: 'Ältere Nachrichten laden' }));
+  await screen.findByText('35 Treffer angezeigt');
+  expect(new Set(visibleIds())).toEqual(new Set(rows.slice(3).map(row => row.id)));
+  expect(requests.filter(request => request.method === 'GET' && request.path === '/api/pulse').map(request => request.params).slice(-2)).toEqual([
+    { search: 'Search Match' },
+    { search: 'Search Match', beforeId: '68' },
+  ]);
+
+  await user.click(screen.getByTestId('button-clear-pulse-search'));
+  await screen.findByText('38 Nachrichten angezeigt');
+  expect(new Set(visibleIds())).toEqual(new Set(rows.map(row => row.id)));
 });
 
 test('a stale read confirmation refreshes the corrected message without marking it read', async () => {
