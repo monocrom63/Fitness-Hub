@@ -1,10 +1,10 @@
 ---
 name: Authentik transition
-description: When to replace Fiudia's current sign-in with the planned Authentik OIDC and MFA.
+description: Full Fiudia migration from Clerk to Authentik across team app, member app, and API.
 ---
 
-Keep the current sign-in working while Authentik is only a product direction, not a configured service. Do not replace or weaken authentication based solely on the concept.
+The user wants Authentik to replace Clerk in both Fiudia apps and API. The issuer is `https://auth.parallelduck.site/application/o/member-platform-dev/`. Use OIDC Authorization Code with PKCE as a public client, so a client secret is not needed in browser code. Keep Clerk active until Authentik login is configured and verified; preserve existing records and never auto-select a membership when an identity matches multiple memberships.
 
-**Why:** A concept specifying Authentik does not establish a reachable issuer or a configured OIDC application. Switching before those exist would lock staff out.
+**Why:** The user explicitly expanded the original staff-only migration to a complete replacement. Safe rollout must avoid locking out existing users or linking the wrong membership.
 
-**How to apply:** When the Authentik work resumes, confirm the live issuer and OIDC application through the approved integration and secrets flows. Migrate authentication as its own change, preserve existing staff access, and verify sign-in before retiring the current provider.
+**How to apply:** Verify Authentik's public client ID and allowed callback URLs; map existing staff or member rows only on verified, unambiguous email matches, using the existing membership-connect flow for ambiguous member records. Remove Clerk dependencies and secrets only after both apps and API have passed real Authentik sign-in tests.
