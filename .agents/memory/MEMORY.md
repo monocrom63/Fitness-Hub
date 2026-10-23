@@ -22,3 +22,4 @@
 - [Resend credential validation](resend-credentials.md) — a connected integration or stored secret can still be rejected by Resend; verify via a non-sending provider request.
 - [OpenAPI request schemas](openapi-request-schemas.md) — use named component schemas for request bodies to avoid duplicate exports in generated Zod types.
 - [Pulse search indexes](pulse-search-indexes.md) — preserve literal substring search with trigram indexes; ensure the PostgreSQL extension exists before publishing indexes.
+- [Unpatched braces advisory](unpatched-braces.md) — when braces 3.x has no fix, trace all dependency paths and remove avoidable usages rather than hiding it with an override.

@@ -69,7 +69,7 @@ export function clerkProxyMiddleware(): RequestHandler {
     // Take over the response so it can be re-sent with a Content-Length (see
     // proxyRes); the deployment edge rejects chunked proxied responses.
     selfHandleResponse: true,
-  }) as RequestHandler;
+  });
 
   proxy.on('proxyReq', (proxyReq, req) => {
     const forwardedProto = req.headers['x-forwarded-proto'];
@@ -135,14 +135,13 @@ export function clerkProxyMiddleware(): RequestHandler {
     });
   });
 
-  return ((req: Request, res: Response, next) => {
+  return ((req: Request, res: Response) => {
     void proxy.web(req, res).catch(() => {
       if (res.destroyed) return;
       if (!res.headersSent) {
         res.writeHead(502, { 'content-length': '0' });
       }
       res.end();
-      next();
     });
   }) as RequestHandler;
 }
