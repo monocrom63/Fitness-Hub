@@ -76,6 +76,7 @@ import type {
   ModuleSetting,
   ModuleUpdate,
   OnboardingInput,
+  PublicContractTerms,
   PulseCorrection,
   PulseHistoryEntry,
   PulseInput,
@@ -6035,6 +6036,83 @@ export const useUpdateContractSettings = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateContractSettingsMutationOptions(options));
     }
+
+export const getGetPublicContractTermsUrl = () => {
+
+
+
+
+  return `/api/v1/public/contract-terms`
+}
+
+/**
+ * @summary Get the standard membership terms template for registration
+ */
+export const getPublicContractTerms = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicContractTerms> => {
+
+  return customFetch<PublicContractTerms>(getGetPublicContractTermsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicContractTermsQueryKey = () => {
+    return [
+    `/api/v1/public/contract-terms`
+    ] as const;
+    }
+
+
+export const getGetPublicContractTermsQueryOptions = <TData = Awaited<ReturnType<typeof getPublicContractTerms>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicContractTerms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicContractTermsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicContractTerms>>> = ({ signal }) => getPublicContractTerms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicContractTerms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicContractTermsQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicContractTerms>>>
+export type GetPublicContractTermsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the standard membership terms template for registration
+ */
+
+export function useGetPublicContractTerms<TData = Awaited<ReturnType<typeof getPublicContractTerms>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicContractTerms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicContractTermsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetCurrentMemberContractUrl = () => {
 

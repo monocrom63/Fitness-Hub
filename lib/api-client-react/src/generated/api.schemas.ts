@@ -5,6 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface PublicContractTerms {
+  title: string;
+  termsText: string;
+  termsVersion: number;
+  isTemplate: boolean;
+}
+
 export interface ContractPlan {
   id: number;
   name: string;

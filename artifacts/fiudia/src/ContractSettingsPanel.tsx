@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetContractSettingsQueryKey, getListMembersQueryKey, useGetContractSettings, useListMembers, useUpdateContractSettings, useUpdateMember } from "@workspace/api-client-react";
+import { getGetContractSettingsQueryKey, getGetPublicContractTermsQueryKey, getListMembersQueryKey, useGetContractSettings, useGetPublicContractTerms, useListMembers, useUpdateContractSettings, useUpdateMember } from "@workspace/api-client-react";
 
 type Plan = {
   id?: number | null;
@@ -23,6 +23,7 @@ const blank: FormState = {
 export default function ContractSettingsPanel({ studioId }: { studioId: number | null }) {
   const client = useQueryClient();
   const query = useGetContractSettings();
+  const standardTerms = useGetPublicContractTerms({ query: { queryKey: getGetPublicContractTermsQueryKey(), enabled: !query.data?.termsText } });
   const save = useUpdateContractSettings();
   const [form, setForm] = useState<FormState>(blank);
   const [saved, setSaved] = useState(false);
@@ -30,7 +31,7 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
     if (query.data) setForm({
       legalName: query.data.legalName, legalAddress: query.data.legalAddress,
       contactEmail: query.data.contactEmail, contactPhone: query.data.contactPhone,
-      termsText: query.data.termsText, enrollmentFeeCents: query.data.enrollmentFeeCents,
+      termsText: query.data.termsText || standardTerms.data?.termsText || "", enrollmentFeeCents: query.data.enrollmentFeeCents,
       membershipCardFeeCents: query.data.membershipCardFeeCents,
       paymentDueDay: query.data.paymentDueDay,
       plans: query.data.plans.length
@@ -40,7 +41,7 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
           { name: "Premium", durationMonths: 0, monthlyPriceCents: 4990, semiannualDiscountPercent: 5, annualDiscountPercent: 10 },
         ],
     });
-  }, [query.data]);
+  }, [query.data, standardTerms.data]);
   const set = (key: keyof Omit<FormState, "plans">, value: string | number) =>
     setForm(current => ({ ...current, [key]: value }));
   const updatePlan = (index: number, key: keyof Plan, value: string | number) =>
@@ -82,7 +83,8 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
           <label className="profile-field">Kartenpfand (€)<input className="field" type="number" min={0} step="0.01" value={(form.membershipCardFeeCents / 100).toFixed(2)} onChange={e => set("membershipCardFeeCents", Math.round(Number(e.target.value) * 100))} /></label>
           <label className="profile-field">Abbuchung am Monatstag<input className="field" type="number" min={1} max={28} value={form.paymentDueDay} onChange={e => set("paymentDueDay", Number(e.target.value))} /></label>
         </div>
-        <label className="profile-field">Fiudia-AGB<textarea className="field" required minLength={1} maxLength={50000} rows={12} value={form.termsText} onChange={e => set("termsText", e.target.value)} placeholder="Hier die freigegebenen Fiudia-AGB eintragen. Der Beispielvertrag wurde nicht übernommen." /></label>
+        <label className="profile-field">Fiudia-AGB<textarea className="field" required minLength={1} maxLength={50000} rows={12} value={form.termsText} onChange={e => set("termsText", e.target.value)} placeholder="Die Musterfassung wird geladen." /></label>
+        <p className="form-hint">Die Musterfassung ist ein Entwurf, kein Rechtsrat. Bitte Firmendaten ergänzen und vor der Verwendung rechtlich prüfen lassen.</p>
         {save.isError && <p className="form-error" role="alert">Vertragsdaten konnten nicht gespeichert werden.</p>}
         {saved && <p className="profile-success" role="status">Vertragsdaten gespeichert.</p>}
         <button className="button button-primary" type="submit" disabled={save.isPending}>{save.isPending ? "Wird gespeichert …" : "Vertragsdaten speichern"}</button>

@@ -2105,6 +2105,17 @@ export const UpdateContractSettingsResponse = zod.object({
 
 
 /**
+ * @summary Get the standard membership terms template for registration
+ */
+export const GetPublicContractTermsResponse = zod.object({
+  "title": zod.string(),
+  "termsText": zod.string(),
+  "termsVersion": zod.number().int(),
+  "isTemplate": zod.boolean()
+})
+
+
+/**
  * @summary Get or create the member's current unsigned contract
  */
 export const GetCurrentMemberContractResponse = zod.object({

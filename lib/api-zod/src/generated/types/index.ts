@@ -102,6 +102,7 @@ export * from './moduleKey';
 export * from './moduleSetting';
 export * from './moduleUpdate';
 export * from './onboardingInput';
+export * from './publicContractTerms';
 export * from './pulseAudience';
 export * from './pulseCorrection';
 export * from './pulseHistoryChange';

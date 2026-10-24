@@ -1491,6 +1491,17 @@ paths:
         "400": { description: Invalid contract settings }
         "401": { description: Sign-in required }
         "403": { description: Manager access required }
+  /v1/public/contract-terms:
+    get:
+      operationId: getPublicContractTerms
+      tags: [portal]
+      summary: Get the standard membership terms template for registration
+      responses:
+        "200":
+          description: Standard terms template
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicContractTerms" }
   /v1/member/contracts/current:
     get:
       operationId: getCurrentMemberContract
@@ -1551,6 +1562,14 @@ paths:
         "404": { description: Contract not found }
 components:
   schemas:
+    PublicContractTerms:
+      type: object
+      required: [title, termsText, termsVersion, isTemplate]
+      properties:
+        title: { type: string }
+        termsText: { type: string }
+        termsVersion: { type: integer }
+        isTemplate: { type: boolean }
     ContractPlan:
       type: object
       required: [id, name, durationMonths, monthlyPriceCents, semiannualDiscountPercent, annualDiscountPercent, active]

@@ -17,6 +17,7 @@ import { getRequestUserId, getStaffContext } from "../lib/fiudia-access";
 import { linkedMember } from "./member-app";
 import { resendRequest } from "../lib/resend-client";
 import { getStripeClient } from "../lib/stripe-client";
+import { DEFAULT_CONTRACT_TERMS } from "../lib/default-contract-terms";
 
 const router: IRouter = Router();
 const settingsSchema = z.object({
@@ -40,6 +41,15 @@ const settingsSchema = z.object({
 const signatureSchema = z.object({
   signatureName: z.string().min(2).max(160),
   acceptTerms: z.literal(true),
+});
+
+router.get("/v1/public/contract-terms", (_req, res): void => {
+  res.json({
+    title: "Allgemeine Geschäftsbedingungen",
+    termsText: DEFAULT_CONTRACT_TERMS,
+    termsVersion: 1,
+    isTemplate: true,
+  });
 });
 
 function jsonContract(row: typeof memberContractsTable.$inferSelect) {
@@ -143,7 +153,7 @@ router.get("/v1/contracts/settings", async (req, res): Promise<void> => {
     legalAddress: settings?.legalAddress ?? "",
     contactEmail: settings?.contactEmail ?? "",
     contactPhone: settings?.contactPhone ?? "",
-    termsText: settings?.termsText ?? "",
+    termsText: settings?.termsText || DEFAULT_CONTRACT_TERMS,
     termsVersion: settings?.termsVersion ?? 1,
     enrollmentFeeCents: settings?.enrollmentFeeCents ?? 0,
     membershipCardFeeCents: settings?.membershipCardFeeCents ?? 0,
