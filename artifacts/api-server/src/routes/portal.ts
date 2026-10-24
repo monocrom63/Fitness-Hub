@@ -743,7 +743,7 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     const editableFields = new Set([
       "fullName", "email", "phone", "membershipType", "billingInterval",
       "birthDate", "address", "contractStart", "contractDurationMonths",
-      "restPeriodStart", "restPeriodEnd",
+      "restPeriodStart", "restPeriodEnd", "status",
     ]);
     if (Object.keys(body.data).some((field) => !editableFields.has(field))) {
       res.status(403).json({ error: "Deine Rolle darf nur Mitglieds- und Vertragsdaten bearbeiten." });

@@ -251,7 +251,17 @@ test("member records remain inside the caller's studio and organization", async 
       );
       assert.equal(employeePatch.status, 200);
       assert.equal(employeePatch.body.phone, "666");
-      assert.equal((await api(employeeA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { status: "paused" })).status, 403);
+      const employeeStatus = await api<MemberView>(
+        employeeA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { status: "paused" },
+      );
+      assert.equal(employeeStatus.status, 200);
+      const [pausedMember] = await db.select({ status: membersTable.status })
+        .from(membersTable).where(eq(membersTable.id, memberA1.id));
+      assert.equal(pausedMember.status, "paused");
+      const restoredStatus = await api<MemberView>(
+        managerA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { status: "active" },
+      );
+      assert.equal(restoredStatus.status, 200);
       const unchanged = await db.select({ phone: membersTable.phone })
         .from(membersTable).where(eq(membersTable.id, memberA1.id));
       assert.equal(unchanged[0]?.phone, "666");

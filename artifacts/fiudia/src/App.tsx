@@ -454,7 +454,7 @@ function EmployeeMemberEditor() {
   const [form, setForm] = useState({
     fullName: "", email: "", phone: "", membershipType: "", billingInterval: "monthly",
     birthDate: "", address: "", contractStart: "", contractDurationMonths: "",
-    restPeriodStart: "", restPeriodEnd: "",
+    restPeriodStart: "", restPeriodEnd: "", status: "active",
   });
   const selected = query.data?.find(member => member.id === Number(selectedId));
   const chooseMember = (id: string) => {
@@ -468,6 +468,7 @@ function EmployeeMemberEditor() {
       contractStart: member.contractStart ?? "",
       contractDurationMonths: member.contractDurationMonths ? String(member.contractDurationMonths) : "",
       restPeriodStart: member.restPeriodStart ?? "", restPeriodEnd: member.restPeriodEnd ?? "",
+      status: member.status,
     });
   };
   const update = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -482,6 +483,7 @@ function EmployeeMemberEditor() {
       address: form.address || null, contractStart: form.contractStart || null,
       contractDurationMonths: form.contractDurationMonths ? Number(form.contractDurationMonths) : null,
       restPeriodStart: form.restPeriodStart || null, restPeriodEnd: form.restPeriodEnd || null,
+      status: form.status as "active" | "trial" | "paused",
     } }, { onSuccess: () => {
       void client.invalidateQueries({ queryKey: getListMembersQueryKey() });
       void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
@@ -497,6 +499,7 @@ function EmployeeMemberEditor() {
           <TextField label="E-Mail-Adresse" name="employee-member-email" type="email" value={form.email} onChange={value => setForm(current => ({ ...current, email: value }))} />
           <TextField label="Telefon" name="employee-member-phone" value={form.phone} onChange={value => setForm(current => ({ ...current, phone: value }))} />
           <TextField label="Tarif" name="employee-member-plan" value={form.membershipType} onChange={value => setForm(current => ({ ...current, membershipType: value }))} />
+          <label className="field"><span>Mitgliedsstatus</span><select value={form.status} onChange={update("status")}><option value="active">Aktiv</option><option value="trial">Probetraining</option><option value="paused">Pausiert</option></select></label>
           <label className="field"><span>Abbuchungsrhythmus</span><select value={form.billingInterval} onChange={update("billingInterval")}><option value="monthly">Monatlich</option><option value="semiannual">Halbjährlich – 5 % Rabatt</option><option value="annual">Jährlich – 10 % Rabatt</option></select></label>
           <div className="field-grid">
             <TextField label="Geburtsdatum" name="employee-member-birth-date" type="date" value={form.birthDate} onChange={value => setForm(current => ({ ...current, birthDate: value }))} />
