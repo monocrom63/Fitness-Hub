@@ -38,6 +38,8 @@ export async function linkedMember(userId: string) {
     address: membersTable.address,
     contractStart: membersTable.contractStart,
     contractDurationMonths: membersTable.contractDurationMonths,
+    restPeriodStart: membersTable.restPeriodStart,
+    restPeriodEnd: membersTable.restPeriodEnd,
     stripeCustomerId: membersTable.stripeCustomerId,
     stripeSubscriptionId: membersTable.stripeSubscriptionId,
     stripeCheckoutSessionId: membersTable.stripeCheckoutSessionId,

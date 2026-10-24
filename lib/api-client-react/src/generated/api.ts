@@ -28,6 +28,9 @@ import type {
   ClosureEmailDeliveryReport,
   ClosurePushDeliveryReport,
   ClosurePushReadiness,
+  ContractSettings,
+  ContractSettingsInput,
+  ContractSignatureInput,
   Course,
   CourseBooking,
   CourseClosureResolution,
@@ -56,6 +59,7 @@ import type {
   MemberBilling,
   MemberBillingCheckout,
   MemberCheckIn,
+  MemberContract,
   MemberCourse,
   MemberCourseDetail,
   MemberHome,
@@ -5866,4 +5870,412 @@ export const useAcceptInvitation = <TError = ErrorType<void>,
       > => {
       return useMutation(getAcceptInvitationMutationOptions(options));
     }
+
+export const getGetContractSettingsUrl = () => {
+
+
+
+
+  return `/api/v1/contracts/settings`
+}
+
+/**
+ * @summary Get organization contract settings
+ */
+export const getContractSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<ContractSettings> => {
+
+  return customFetch<ContractSettings>(getGetContractSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetContractSettingsQueryKey = () => {
+    return [
+    `/api/v1/contracts/settings`
+    ] as const;
+    }
+
+
+export const getGetContractSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getContractSettings>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContractSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetContractSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getContractSettings>>> = ({ signal }) => getContractSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getContractSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetContractSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getContractSettings>>>
+export type GetContractSettingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get organization contract settings
+ */
+
+export function useGetContractSettings<TData = Awaited<ReturnType<typeof getContractSettings>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContractSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetContractSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateContractSettingsUrl = () => {
+
+
+
+
+  return `/api/v1/contracts/settings`
+}
+
+/**
+ * @summary Update organization contract settings and membership plans
+ */
+export const updateContractSettings = async (contractSettingsInput: ContractSettingsInput, options?: Parameters<typeof customFetch>[1]): Promise<ContractSettings> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ContractSettings>(getUpdateContractSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(contractSettingsInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateContractSettingsMutationKey = () => ['updateContractSettings'] as const;
+
+export const getUpdateContractSettingsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContractSettings>>, TError,UpdateContractSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateContractSettings>>, TError,UpdateContractSettingsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateContractSettingsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateContractSettings>>, UpdateContractSettingsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateContractSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateContractSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateContractSettings>>>
+    export type UpdateContractSettingsMutationBody = BodyType<ContractSettingsInput>
+    export type UpdateContractSettingsMutationError = ErrorType<void>
+    export type UpdateContractSettingsMutationVariables = {data: BodyType<ContractSettingsInput>}
+
+    /**
+ * @summary Update organization contract settings and membership plans
+ */
+export const useUpdateContractSettings = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContractSettings>>, TError,UpdateContractSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateContractSettings>>,
+        TError,
+        UpdateContractSettingsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateContractSettingsMutationOptions(options));
+    }
+
+export const getGetCurrentMemberContractUrl = () => {
+
+
+
+
+  return `/api/v1/member/contracts/current`
+}
+
+/**
+ * @summary Get or create the member's current unsigned contract
+ */
+export const getCurrentMemberContract = async ( options?: Parameters<typeof customFetch>[1]): Promise<MemberContract> => {
+
+  return customFetch<MemberContract>(getGetCurrentMemberContractUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentMemberContractQueryKey = () => {
+    return [
+    `/api/v1/member/contracts/current`
+    ] as const;
+    }
+
+
+export const getGetCurrentMemberContractQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentMemberContract>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentMemberContract>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentMemberContractQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentMemberContract>>> = ({ signal }) => getCurrentMemberContract({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentMemberContract>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentMemberContractQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentMemberContract>>>
+export type GetCurrentMemberContractQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get or create the member's current unsigned contract
+ */
+
+export function useGetCurrentMemberContract<TData = Awaited<ReturnType<typeof getCurrentMemberContract>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentMemberContract>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentMemberContractQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSignMemberContractUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/contracts/${id}/sig`
+}
+
+/**
+ * @summary Accept terms and sign the member contract
+ */
+export const signMemberContract = async (id: number,
+    contractSignatureInput: ContractSignatureInput, options?: Parameters<typeof customFetch>[1]): Promise<MemberContract> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<MemberContract>(getSignMemberContractUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(contractSignatureInput)
+  }
+);}
+
+
+
+
+
+export const getSignMemberContractMutationKey = () => ['signMemberContract'] as const;
+
+export const getSignMemberContractMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof signMemberContract>>, TError,SignMemberContractMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof signMemberContract>>, TError,SignMemberContractMutationVariables, TContext> => {
+
+const mutationKey = getSignMemberContractMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof signMemberContract>>, SignMemberContractMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  signMemberContract(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SignMemberContractMutationResult = NonNullable<Awaited<ReturnType<typeof signMemberContract>>>
+    export type SignMemberContractMutationBody = BodyType<ContractSignatureInput>
+    export type SignMemberContractMutationError = ErrorType<void>
+    export type SignMemberContractMutationVariables = {id: number;data: BodyType<ContractSignatureInput>}
+
+    /**
+ * @summary Accept terms and sign the member contract
+ */
+export const useSignMemberContract = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof signMemberContract>>, TError,SignMemberContractMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof signMemberContract>>,
+        TError,
+        SignMemberContractMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSignMemberContractMutationOptions(options));
+    }
+
+export const getGetMemberContractPdfUrl = (id: number,) => {
+
+
+
+
+  return `/api/v1/contracts/${id}/pdf`
+}
+
+/**
+ * @summary Render the immutable contract snapshot as a PDF
+ */
+export const getMemberContractPdf = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetMemberContractPdfUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMemberContractPdfQueryKey = (id: number,) => {
+    return [
+    `/api/v1/contracts/${id}/pdf`
+    ] as const;
+    }
+
+
+export const getGetMemberContractPdfQueryOptions = <TData = Awaited<ReturnType<typeof getMemberContractPdf>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberContractPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMemberContractPdfQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemberContractPdf>>> = ({ signal }) => getMemberContractPdf(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemberContractPdf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMemberContractPdfQueryResult = NonNullable<Awaited<ReturnType<typeof getMemberContractPdf>>>
+export type GetMemberContractPdfQueryError = ErrorType<void>
+
+
+/**
+ * @summary Render the immutable contract snapshot as a PDF
+ */
+
+export function useGetMemberContractPdf<TData = Awaited<ReturnType<typeof getMemberContractPdf>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberContractPdf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMemberContractPdfQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 

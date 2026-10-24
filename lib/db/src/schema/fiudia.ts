@@ -2,6 +2,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   serial,
   text,
@@ -105,11 +106,84 @@ export const membersTable = pgTable("fiudia_members", {
   address: text("address"),
   contractStart: date("contract_start", { mode: "string" }),
   contractDurationMonths: integer("contract_duration_months"),
+  restPeriodStart: date("rest_period_start", { mode: "string" }),
+  restPeriodEnd: date("rest_period_end", { mode: "string" }),
   waitlistEmailEnabled: integer("waitlist_email_enabled").notNull().default(0),
   joinedAt: timestamp("joined_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+export const contractSettingsTable = pgTable(
+  "fiudia_contract_settings",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" })
+      .unique(),
+    legalName: text("legal_name").notNull().default(""),
+    legalAddress: text("legal_address").notNull().default(""),
+    contactEmail: text("contact_email").notNull().default(""),
+    contactPhone: text("contact_phone").notNull().default(""),
+    termsText: text("terms_text").notNull().default(""),
+    termsVersion: integer("terms_version").notNull().default(1),
+    enrollmentFeeCents: integer("enrollment_fee_cents").notNull().default(0),
+    membershipCardFeeCents: integer("membership_card_fee_cents").notNull().default(0),
+    paymentDueDay: integer("payment_due_day").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const membershipPlansTable = pgTable(
+  "fiudia_membership_plans",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    durationMonths: integer("duration_months").notNull(),
+    monthlyPriceCents: integer("monthly_price_cents").notNull(),
+    semiannualDiscountPercent: integer("semiannual_discount_percent")
+      .notNull()
+      .default(5),
+    annualDiscountPercent: integer("annual_discount_percent")
+      .notNull()
+      .default(10),
+    active: integer("active").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [unique("fiudia_membership_plan_org_name").on(table.organizationId, table.name)],
+);
+
+export const memberContractsTable = pgTable(
+  "fiudia_member_contracts",
+  {
+    id: serial("id").primaryKey(),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => membersTable.id, { onDelete: "cascade" }),
+    organizationId: integer("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("draft"),
+    contractSnapshot: jsonb("contract_snapshot").notNull(),
+    termsVersion: integer("terms_version").notNull(),
+    signatureName: text("signature_name"),
+    signedEmail: text("signed_email"),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
+    emailStatus: text("email_status").notNull().default("not_sent"),
+    emailFailureReason: text("email_failure_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
 
 export const memberInvitationsTable = pgTable("fiudia_member_invitations", {
   id: serial("id").primaryKey(),

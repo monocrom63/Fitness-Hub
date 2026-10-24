@@ -1953,3 +1953,155 @@ export const AcceptInvitationResponse = zod.object({
 })
 
 
+/**
+ * @summary Get organization contract settings
+ */
+export const GetContractSettingsResponse = zod.object({
+  "legalName": zod.string(),
+  "legalAddress": zod.string(),
+  "contactEmail": zod.string(),
+  "contactPhone": zod.string(),
+  "termsText": zod.string(),
+  "termsVersion": zod.number().int(),
+  "enrollmentFeeCents": zod.number().int(),
+  "membershipCardFeeCents": zod.number().int(),
+  "paymentDueDay": zod.number().int(),
+  "plans": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "durationMonths": zod.number().int(),
+  "monthlyPriceCents": zod.number().int(),
+  "semiannualDiscountPercent": zod.number().int(),
+  "annualDiscountPercent": zod.number().int(),
+  "active": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Update organization contract settings and membership plans
+ */
+export const updateContractSettingsBodyLegalNameMax = 200;
+
+export const updateContractSettingsBodyLegalAddressMax = 500;
+
+export const updateContractSettingsBodyContactPhoneMax = 40;
+
+export const updateContractSettingsBodyTermsTextMax = 50000;
+
+export const updateContractSettingsBodyEnrollmentFeeCentsMin = 0;
+
+export const updateContractSettingsBodyMembershipCardFeeCentsMin = 0;
+
+export const updateContractSettingsBodyPaymentDueDayMax = 28;
+
+export const updateContractSettingsBodyPlansItemNameMin = 2;
+export const updateContractSettingsBodyPlansItemNameMax = 80;
+
+export const updateContractSettingsBodyPlansItemDurationMonthsMax = 1200;
+
+export const updateContractSettingsBodyPlansItemMonthlyPriceCentsMin = 0;
+
+export const updateContractSettingsBodyPlansItemSemiannualDiscountPercentMin = 0;
+export const updateContractSettingsBodyPlansItemSemiannualDiscountPercentMax = 100;
+
+export const updateContractSettingsBodyPlansItemAnnualDiscountPercentMin = 0;
+export const updateContractSettingsBodyPlansItemAnnualDiscountPercentMax = 100;
+
+
+
+export const UpdateContractSettingsBody = zod.object({
+  "legalName": zod.string().max(updateContractSettingsBodyLegalNameMax),
+  "legalAddress": zod.string().max(updateContractSettingsBodyLegalAddressMax),
+  "contactEmail": zod.string().email(),
+  "contactPhone": zod.string().max(updateContractSettingsBodyContactPhoneMax),
+  "termsText": zod.string().max(updateContractSettingsBodyTermsTextMax),
+  "enrollmentFeeCents": zod.number().int().min(updateContractSettingsBodyEnrollmentFeeCentsMin),
+  "membershipCardFeeCents": zod.number().int().min(updateContractSettingsBodyMembershipCardFeeCentsMin),
+  "paymentDueDay": zod.number().int().min(1).max(updateContractSettingsBodyPaymentDueDayMax),
+  "plans": zod.array(zod.object({
+  "id": zod.number().int().nullish(),
+  "name": zod.string().min(updateContractSettingsBodyPlansItemNameMin).max(updateContractSettingsBodyPlansItemNameMax),
+  "durationMonths": zod.number().int().min(1).max(updateContractSettingsBodyPlansItemDurationMonthsMax),
+  "monthlyPriceCents": zod.number().int().min(updateContractSettingsBodyPlansItemMonthlyPriceCentsMin),
+  "semiannualDiscountPercent": zod.number().int().min(updateContractSettingsBodyPlansItemSemiannualDiscountPercentMin).max(updateContractSettingsBodyPlansItemSemiannualDiscountPercentMax),
+  "annualDiscountPercent": zod.number().int().min(updateContractSettingsBodyPlansItemAnnualDiscountPercentMin).max(updateContractSettingsBodyPlansItemAnnualDiscountPercentMax)
+}))
+})
+
+export const UpdateContractSettingsResponse = zod.object({
+  "legalName": zod.string(),
+  "legalAddress": zod.string(),
+  "contactEmail": zod.string(),
+  "contactPhone": zod.string(),
+  "termsText": zod.string(),
+  "termsVersion": zod.number().int(),
+  "enrollmentFeeCents": zod.number().int(),
+  "membershipCardFeeCents": zod.number().int(),
+  "paymentDueDay": zod.number().int(),
+  "plans": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "durationMonths": zod.number().int(),
+  "monthlyPriceCents": zod.number().int(),
+  "semiannualDiscountPercent": zod.number().int(),
+  "annualDiscountPercent": zod.number().int(),
+  "active": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Get or create the member's current unsigned contract
+ */
+export const GetCurrentMemberContractResponse = zod.object({
+  "id": zod.number().int(),
+  "status": zod.enum(['draft', 'signed']),
+  "contractSnapshot": zod.record(zod.string(), zod.unknown()),
+  "termsVersion": zod.number().int(),
+  "signatureName": zod.string().nullable(),
+  "signedAt": zod.coerce.date().nullable(),
+  "emailStatus": zod.enum(['not_sent', 'sent', 'failed']),
+  "pdfUrl": zod.string()
+})
+
+
+/**
+ * @summary Accept terms and sign the member contract
+ */
+export const SignMemberContractParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const signMemberContractBodySignatureNameMin = 2;
+export const signMemberContractBodySignatureNameMax = 160;
+
+
+
+export const SignMemberContractBody = zod.object({
+  "signatureName": zod.string().min(signMemberContractBodySignatureNameMin).max(signMemberContractBodySignatureNameMax),
+  "acceptTerms": zod.literal(true)
+})
+
+export const SignMemberContractResponse = zod.object({
+  "id": zod.number().int(),
+  "status": zod.enum(['draft', 'signed']),
+  "contractSnapshot": zod.record(zod.string(), zod.unknown()),
+  "termsVersion": zod.number().int(),
+  "signatureName": zod.string().nullable(),
+  "signedAt": zod.coerce.date().nullable(),
+  "emailStatus": zod.enum(['not_sent', 'sent', 'failed']),
+  "pdfUrl": zod.string()
+})
+
+
+/**
+ * @summary Render the immutable contract snapshot as a PDF
+ */
+export const GetMemberContractPdfParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetMemberContractPdfResponse = zod.unknown()
+
+

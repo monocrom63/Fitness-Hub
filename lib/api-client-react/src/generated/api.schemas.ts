@@ -5,6 +5,119 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ContractPlan {
+  id: number;
+  name: string;
+  durationMonths: number;
+  monthlyPriceCents: number;
+  semiannualDiscountPercent: number;
+  annualDiscountPercent: number;
+  active: boolean;
+}
+
+export interface ContractPlanInput {
+  /** @nullable */
+  id?: number | null;
+  /**
+     * @minLength 2
+     * @maxLength 80
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 1200
+     */
+  durationMonths: number;
+  /** @minimum 0 */
+  monthlyPriceCents: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  semiannualDiscountPercent: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  annualDiscountPercent: number;
+}
+
+export interface ContractSettings {
+  legalName: string;
+  legalAddress: string;
+  contactEmail: string;
+  contactPhone: string;
+  termsText: string;
+  termsVersion: number;
+  enrollmentFeeCents: number;
+  membershipCardFeeCents: number;
+  paymentDueDay: number;
+  plans: ContractPlan[];
+}
+
+export interface ContractSettingsInput {
+  /** @maxLength 200 */
+  legalName: string;
+  /** @maxLength 500 */
+  legalAddress: string;
+  contactEmail: string;
+  /** @maxLength 40 */
+  contactPhone: string;
+  /** @maxLength 50000 */
+  termsText: string;
+  /** @minimum 0 */
+  enrollmentFeeCents: number;
+  /** @minimum 0 */
+  membershipCardFeeCents: number;
+  /**
+     * @minimum 1
+     * @maximum 28
+     */
+  paymentDueDay: number;
+  plans: ContractPlanInput[];
+}
+
+export interface ContractSignatureInput {
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  signatureName: string;
+  acceptTerms: true;
+}
+
+export type MemberContractStatus = typeof MemberContractStatus[keyof typeof MemberContractStatus];
+
+
+export const MemberContractStatus = {
+  draft: 'draft',
+  signed: 'signed',
+} as const;
+
+export type MemberContractContractSnapshot = { [key: string]: unknown };
+
+export type MemberContractEmailStatus = typeof MemberContractEmailStatus[keyof typeof MemberContractEmailStatus];
+
+
+export const MemberContractEmailStatus = {
+  not_sent: 'not_sent',
+  sent: 'sent',
+  failed: 'failed',
+} as const;
+
+export interface MemberContract {
+  id: number;
+  status: MemberContractStatus;
+  contractSnapshot: MemberContractContractSnapshot;
+  termsVersion: number;
+  /** @nullable */
+  signatureName: string | null;
+  /** @nullable */
+  signedAt: string | null;
+  emailStatus: MemberContractEmailStatus;
+  pdfUrl: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

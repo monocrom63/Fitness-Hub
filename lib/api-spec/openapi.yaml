@@ -1460,8 +1460,167 @@ paths:
           description: Invitation does not match the signed-in account
         "404":
           description: Invitation not found or expired
+  /v1/contracts/settings:
+    get:
+      operationId: getContractSettings
+      tags: [portal]
+      summary: Get organization contract settings
+      responses:
+        "200":
+          description: Contract settings and membership plans
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContractSettings" }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required }
+    put:
+      operationId: updateContractSettings
+      tags: [portal]
+      summary: Update organization contract settings and membership plans
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContractSettingsInput" }
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContractSettings" }
+        "400": { description: Invalid contract settings }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required }
+  /v1/member/contracts/current:
+    get:
+      operationId: getCurrentMemberContract
+      tags: [member-app]
+      summary: Get or create the member's current unsigned contract
+      responses:
+        "200":
+          description: Current contract details and PDF preview URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberContract" }
+        "401": { description: Sign-in required }
+        "403": { description: Linked membership required or contract settings incomplete }
+  /v1/contracts/{id}/sig:
+    post:
+      operationId: signMemberContract
+      tags: [member-app]
+      summary: Accept terms and sign the member contract
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContractSignatureInput" }
+      responses:
+        "200":
+          description: Signed contract; PDF was emailed to the member's registered address
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberContract" }
+        "400": { description: Invalid signature or terms acceptance }
+        "401": { description: Sign-in required }
+        "403": { description: Contract does not belong to this member }
+        "404": { description: Contract not found }
+        "409": { description: Contract already signed }
+  /v1/contracts/{id}/pdf:
+    get:
+      operationId: getMemberContractPdf
+      tags: [member-app]
+      summary: Render the immutable contract snapshot as a PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Contract PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { description: Sign-in required }
+        "403": { description: Contract access denied }
+        "404": { description: Contract not found }
 components:
   schemas:
+    ContractPlan:
+      type: object
+      required: [id, name, durationMonths, monthlyPriceCents, semiannualDiscountPercent, annualDiscountPercent, active]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        durationMonths: { type: integer }
+        monthlyPriceCents: { type: integer }
+        semiannualDiscountPercent: { type: integer }
+        annualDiscountPercent: { type: integer }
+        active: { type: boolean }
+    ContractPlanInput:
+      type: object
+      required: [name, durationMonths, monthlyPriceCents, semiannualDiscountPercent, annualDiscountPercent]
+      properties:
+        id: { type: ["integer", "null"] }
+        name: { type: string, minLength: 2, maxLength: 80 }
+        durationMonths: { type: integer, minimum: 1, maximum: 1200 }
+        monthlyPriceCents: { type: integer, minimum: 0 }
+        semiannualDiscountPercent: { type: integer, minimum: 0, maximum: 100 }
+        annualDiscountPercent: { type: integer, minimum: 0, maximum: 100 }
+    ContractSettings:
+      type: object
+      required: [legalName, legalAddress, contactEmail, contactPhone, termsText, termsVersion, enrollmentFeeCents, membershipCardFeeCents, paymentDueDay, plans]
+      properties:
+        legalName: { type: string }
+        legalAddress: { type: string }
+        contactEmail: { type: string }
+        contactPhone: { type: string }
+        termsText: { type: string }
+        termsVersion: { type: integer }
+        enrollmentFeeCents: { type: integer }
+        membershipCardFeeCents: { type: integer }
+        paymentDueDay: { type: integer }
+        plans:
+          type: array
+          items: { $ref: "#/components/schemas/ContractPlan" }
+    ContractSettingsInput:
+      type: object
+      required: [legalName, legalAddress, contactEmail, contactPhone, termsText, enrollmentFeeCents, membershipCardFeeCents, paymentDueDay, plans]
+      properties:
+        legalName: { type: string, maxLength: 200 }
+        legalAddress: { type: string, maxLength: 500 }
+        contactEmail: { type: string, format: email }
+        contactPhone: { type: string, maxLength: 40 }
+        termsText: { type: string, maxLength: 50000 }
+        enrollmentFeeCents: { type: integer, minimum: 0 }
+        membershipCardFeeCents: { type: integer, minimum: 0 }
+        paymentDueDay: { type: integer, minimum: 1, maximum: 28 }
+        plans:
+          type: array
+          items: { $ref: "#/components/schemas/ContractPlanInput" }
+    ContractSignatureInput:
+      type: object
+      required: [signatureName, acceptTerms]
+      properties:
+        signatureName: { type: string, minLength: 2, maxLength: 160 }
+        acceptTerms: { type: boolean, const: true }
+    MemberContract:
+      type: object
+      required: [id, status, contractSnapshot, termsVersion, signatureName, signedAt, emailStatus, pdfUrl]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [draft, signed] }
+        contractSnapshot: { type: object, additionalProperties: true }
+        termsVersion: { type: integer }
+        signatureName: { type: ["string", "null"] }
+        signedAt: { type: ["string", "null"], format: date-time }
+        emailStatus: { type: string, enum: [not_sent, sent, failed] }
+        pdfUrl: { type: string }
     HealthStatus:
       type: object
       properties:
@@ -1559,6 +1718,8 @@ components:
         address: { type: ["string", "null"], maxLength: 400 }
         contractStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         contractDurationMonths: { type: ["integer", "null"], minimum: 1, maximum: 1200 }
+        restPeriodStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        restPeriodEnd: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         studioId: { type: integer }
         studioName: { type: string }
         joinedAt: { type: string, format: date-time }
@@ -1579,6 +1740,8 @@ components:
         address: { type: ["string", "null"], maxLength: 400 }
         contractStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         contractDurationMonths: { type: ["integer", "null"], minimum: 1, maximum: 1200 }
+        restPeriodStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        restPeriodEnd: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         studioId: { type: integer }
     MemberUpdate:
       type: object
@@ -1999,6 +2162,11 @@ components:
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         address: { type: ["string", "null"], maxLength: 400 }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
+        membershipType: { type: string, minLength: 2, maxLength: 80 }
+        contractStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        contractDurationMonths: { type: ["integer", "null"], minimum: 1, maximum: 1200 }
+        restPeriodStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        restPeriodEnd: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
     MemberHome:
       type: object
       required: [member, checkInCount, nextCourse, upcomingBookings, coursesEnabled, checkInsEnabled, waitlistEmailEnabled]
