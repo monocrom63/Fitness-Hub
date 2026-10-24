@@ -5,7 +5,8 @@ description: Fiudia's agreed handling of contract terms and Stripe tariff change
 
 - Treat the uploaded sample contract as a layout reference only. Do not copy its third-party AGB; Fiudia's terms are entered by an administrator.
 - When a member signs a tariff or interval change with an active Stripe SEPA subscription, update the subscription without proration so the new amount applies to the next invoice.
+- Studio employees may edit member contact and contract fields only for members in their assigned studio; membership status and administrative actions remain restricted.
 
-**Why:** The user chose admin-managed Fiudia terms and explicitly selected next-invoice billing without retroactive adjustment.
+**Why:** The user chose admin-managed Fiudia terms and explicitly selected next-invoice billing without retroactive adjustment, then authorized studio employees to edit member data.
 
 **How to apply:** Preserve these rules in future contract, pricing, and recurring-billing changes.

@@ -729,10 +729,6 @@ router.post("/members", async (req, res): Promise<void> => {
 router.patch("/members/:id", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
-  if (staff.role === "studio_employee") {
-    res.status(403).json({ error: "Deine Rolle darf keine Mitglieder verwalten." });
-    return;
-  }
   const params = UpdateMemberParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -742,6 +738,17 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
   if (!body.success || Object.keys(body.data ?? {}).length === 0) {
     res.status(400).json({ error: body.success ? "Keine Änderungen angegeben." : body.error.message });
     return;
+  }
+  if (staff.role === "studio_employee") {
+    const editableFields = new Set([
+      "fullName", "email", "phone", "membershipType", "billingInterval",
+      "birthDate", "address", "contractStart", "contractDurationMonths",
+      "restPeriodStart", "restPeriodEnd",
+    ]);
+    if (Object.keys(body.data).some((field) => !editableFields.has(field))) {
+      res.status(403).json({ error: "Deine Rolle darf nur Mitglieds- und Vertragsdaten bearbeiten." });
+      return;
+    }
   }
   const [existing] = await db
     .select()

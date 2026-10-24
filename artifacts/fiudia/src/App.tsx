@@ -440,9 +440,80 @@ function MembersPage({ me }: { me: Me }) {
   const selectInvite = (member: Member, retry = false) => { setInviteMember(member); setResendExisting(retry); };
   return <>
     <MembersContent me={me} onInviteMember={(member, retry) => selectInvite(member, retry ?? (member.invitationStatus === 'pending' && member.invitationEmailStatus === 'failed'))} />
+    {me.role === 'studio_employee' && <EmployeeMemberEditor />}
     {manager && <MemberInvitationList onSelect={selectInvite} />}
     {manager && inviteMember && <MemberInvitationDialog key={`${inviteMember.id}-${resendExisting}`} member={inviteMember} resendExisting={resendExisting} onClose={() => setInviteMember(null)} />}
   </>;
+}
+
+function EmployeeMemberEditor() {
+  const client = useQueryClient();
+  const query = useListMembers(undefined, { query: { queryKey: getListMembersQueryKey() } });
+  const updateMember = useUpdateMember();
+  const [selectedId, setSelectedId] = useState("");
+  const [form, setForm] = useState({
+    fullName: "", email: "", phone: "", membershipType: "", billingInterval: "monthly",
+    birthDate: "", address: "", contractStart: "", contractDurationMonths: "",
+    restPeriodStart: "", restPeriodEnd: "",
+  });
+  const selected = query.data?.find(member => member.id === Number(selectedId));
+  const chooseMember = (id: string) => {
+    setSelectedId(id);
+    const member = query.data?.find(item => item.id === Number(id));
+    if (!member) return;
+    setForm({
+      fullName: member.fullName, email: member.email ?? "", phone: member.phone ?? "",
+      membershipType: member.membershipType, billingInterval: member.billingInterval,
+      birthDate: member.birthDate ?? "", address: member.address ?? "",
+      contractStart: member.contractStart ?? "",
+      contractDurationMonths: member.contractDurationMonths ? String(member.contractDurationMonths) : "",
+      restPeriodStart: member.restPeriodStart ?? "", restPeriodEnd: member.restPeriodEnd ?? "",
+    });
+  };
+  const update = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(current => ({ ...current, [key]: event.target.value }));
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selected) return;
+    updateMember.mutate({ id: selected.id, data: {
+      ...form,
+      billingInterval: form.billingInterval as "monthly" | "semiannual" | "annual",
+      phone: form.phone || null, birthDate: form.birthDate || null,
+      address: form.address || null, contractStart: form.contractStart || null,
+      contractDurationMonths: form.contractDurationMonths ? Number(form.contractDurationMonths) : null,
+      restPeriodStart: form.restPeriodStart || null, restPeriodEnd: form.restPeriodEnd || null,
+    } }, { onSuccess: () => {
+      void client.invalidateQueries({ queryKey: getListMembersQueryKey() });
+      void client.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    } });
+  };
+  return <section className="panel" aria-label="Mitgliedsdaten bearbeiten">
+    <div className="panel-head"><div><div className="eyebrow">Mitglieder / Bearbeitung</div><h3>Mitgliedsdaten bearbeiten</h3></div><Pencil size={18} className="muted-icon" /></div>
+    {query.isLoading ? <LoadingBlock label="Mitglieder werden geladen" /> : query.isError ? <ErrorBlock retry={() => query.refetch()} /> :
+      <form className="modal-form" onSubmit={submit}>
+        <label className="field"><span>Mitglied auswählen</span><select required value={selectedId} onChange={event => chooseMember(event.target.value)}><option value="">Mitglied auswählen</option>{query.data?.map(member => <option value={member.id} key={member.id}>{member.fullName} · #{member.id}</option>)}</select></label>
+        {selected && <>
+          <TextField label="Vollständiger Name" name="employee-member-name" value={form.fullName} onChange={value => setForm(current => ({ ...current, fullName: value }))} />
+          <TextField label="E-Mail-Adresse" name="employee-member-email" type="email" value={form.email} onChange={value => setForm(current => ({ ...current, email: value }))} />
+          <TextField label="Telefon" name="employee-member-phone" value={form.phone} onChange={value => setForm(current => ({ ...current, phone: value }))} />
+          <TextField label="Tarif" name="employee-member-plan" value={form.membershipType} onChange={value => setForm(current => ({ ...current, membershipType: value }))} />
+          <label className="field"><span>Abbuchungsrhythmus</span><select value={form.billingInterval} onChange={update("billingInterval")}><option value="monthly">Monatlich</option><option value="semiannual">Halbjährlich – 5 % Rabatt</option><option value="annual">Jährlich – 10 % Rabatt</option></select></label>
+          <div className="field-grid">
+            <TextField label="Geburtsdatum" name="employee-member-birth-date" type="date" value={form.birthDate} onChange={value => setForm(current => ({ ...current, birthDate: value }))} />
+            <TextField label="Vertragsbeginn" name="employee-member-contract-start" type="date" value={form.contractStart} onChange={value => setForm(current => ({ ...current, contractStart: value }))} />
+          </div>
+          <TextField label="Adresse" name="employee-member-address" value={form.address} onChange={value => setForm(current => ({ ...current, address: value }))} />
+          <div className="field-grid">
+            <TextField label="Vertragslaufzeit (Monate)" name="employee-member-duration" type="number" value={form.contractDurationMonths} onChange={value => setForm(current => ({ ...current, contractDurationMonths: value }))} />
+            <TextField label="Ruhezeit von" name="employee-member-rest-start" type="date" value={form.restPeriodStart} onChange={value => setForm(current => ({ ...current, restPeriodStart: value }))} />
+          </div>
+          <TextField label="Ruhezeit bis" name="employee-member-rest-end" type="date" value={form.restPeriodEnd} onChange={value => setForm(current => ({ ...current, restPeriodEnd: value }))} />
+          {updateMember.isError && <p className="form-error" role="alert">Mitgliedsdaten konnten nicht gespeichert werden.</p>}
+          {updateMember.isSuccess && <p className="profile-success" role="status">Mitgliedsdaten gespeichert.</p>}
+          <button className="button button-dark button-wide" type="submit" disabled={updateMember.isPending}>{updateMember.isPending ? "Wird gespeichert …" : "Änderungen speichern"}</button>
+        </>}
+      </form>}
+  </section>;
 }
 
 function MemberInvitationList({ onSelect }: { onSelect: (member: Member, resendExisting: boolean) => void }) {

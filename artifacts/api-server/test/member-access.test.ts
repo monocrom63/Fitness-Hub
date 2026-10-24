@@ -243,16 +243,18 @@ test("member records remain inside the caller's studio and organization", async 
       assert.equal(district.status, 200);
       assert.equal(district.body.phone, "555");
 
-      const employeePatch = await api(
+      const employeePatch = await api<MemberView>(
         employeeA1.clerkUserId,
         "PATCH",
         `/members/${memberA1.id}`,
         { phone: "666" },
       );
-      assert.equal(employeePatch.status, 403);
+      assert.equal(employeePatch.status, 200);
+      assert.equal(employeePatch.body.phone, "666");
+      assert.equal((await api(employeeA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { status: "paused" })).status, 403);
       const unchanged = await db.select({ phone: membersTable.phone })
         .from(membersTable).where(eq(membersTable.id, memberA1.id));
-      assert.equal(unchanged[0]?.phone, "444");
+      assert.equal(unchanged[0]?.phone, "666");
     });
 
     await t.test("member creation and check-ins cannot target an inaccessible studio", async () => {
@@ -477,13 +479,15 @@ test("member records remain inside the caller's studio and organization", async 
       const oldEdit = await api(managerA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { phone: "999" });
       assert.equal(oldEdit.status, 403);
       assert.equal(JSON.stringify(oldEdit.body).includes(memberA1.email), false);
+      const oldEmployeeEdit = await api(employeeA1.clerkUserId, "PATCH", `/members/${memberA1.id}`, { phone: "999" });
+      assert.equal(oldEmployeeEdit.status, 403);
       assert.equal((await api(managerA1.clerkUserId, "POST", "/members", draft(studioA1.id))).status, 403);
       const newEdit = await api<MemberView>(managerA1.clerkUserId, "PATCH", `/members/${memberA2.id}`, { phone: "777" });
       assert.equal(newEdit.status, 200);
       assert.equal(newEdit.body.phone, "777");
       const [oldMember] = await db.select({ phone: membersTable.phone })
         .from(membersTable).where(eq(membersTable.id, memberA1.id));
-      assert.equal(oldMember.phone, "444");
+      assert.equal(oldMember.phone, "666");
     });
   } finally {
     try {
