@@ -327,6 +327,16 @@ export interface Member {
      * @nullable
      */
   contractDurationMonths?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodStart?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodEnd?: string | null;
   studioId: number;
   studioName: string;
   joinedAt: string;
@@ -376,6 +386,16 @@ export interface MemberInput {
      * @nullable
      */
   contractDurationMonths?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodStart?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodEnd?: string | null;
   studioId: number;
 }
 
@@ -420,6 +440,16 @@ export interface MemberUpdate {
      * @nullable
      */
   contractDurationMonths?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodStart?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodEnd?: string | null;
 }
 
 export interface CourseImportDuplicateCandidate {
@@ -1044,6 +1074,32 @@ export interface MemberSelfUpdate {
      */
   address?: string | null;
   billingInterval?: BillingInterval;
+  /**
+     * @minLength 2
+     * @maxLength 80
+     */
+  membershipType?: string;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  contractStart?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 1200
+     * @nullable
+     */
+  contractDurationMonths?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodStart?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodEnd?: string | null;
 }
 
 /**

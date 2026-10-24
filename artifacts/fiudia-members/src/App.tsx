@@ -19,6 +19,7 @@ import { memberNotificationArchiveQueryOptions } from './notification-history';
 import courseBrowsePhoto from './assets/course-cable-pulldown.webp';
 import { acceptInvitation, afterAuthPath, clearInvite, enterInvitation, pendingInvitationPath, pendingInvite as getPendingInvite } from './invitation-return';
 import { clearCoursePushClickState, getOneSignal, listenForCoursePushClicks, optOutOnSignOut, registerPushSubscription, rememberPushChoice, rememberPushSubscriptionId, storedPushSubscriptionId, supportsPushEnvironment } from './lib/onesignal';
+import MemberContractPage from './MemberContractPage';
 import memberLoginPhoto from './assets/member-login-photo.jpeg';
 import memberSignupPhoto from './assets/member-signup-gym.jpg';
 
@@ -494,6 +495,9 @@ function ProfilePage({ member }: { member: Member }) {
     defaultValues: {
       fullName: member.fullName, phone: member.phone || '', birthDate: member.birthDate || '',
       address: member.address || '', billingInterval: member.billingInterval,
+      membershipType: member.membershipType, contractStart: member.contractStart || '',
+      contractDurationMonths: member.contractDurationMonths || '',
+      restPeriodStart: member.restPeriodStart || '', restPeriodEnd: member.restPeriodEnd || '',
     },
   });
   const [message, setMessage] = useState('');
@@ -515,6 +519,11 @@ function ProfilePage({ member }: { member: Member }) {
         fullName: values.fullName.trim(), phone: values.phone || null,
         birthDate: values.birthDate || null, address: values.address.trim() || null,
         billingInterval: values.billingInterval,
+        membershipType: values.membershipType.trim(),
+        contractStart: values.contractStart || null,
+        contractDurationMonths: values.contractDurationMonths ? Number(values.contractDurationMonths) : null,
+        restPeriodStart: values.restPeriodStart || null,
+        restPeriodEnd: values.restPeriodEnd || null,
       } });
       setMessage('Deine Angaben wurden gespeichert.');
     } catch (failure) { setError(errorMessage(failure)); }
@@ -528,19 +537,21 @@ function ProfilePage({ member }: { member: Member }) {
         <label className="profile-field">Geburtsdatum<input className="field" type="date" {...form.register('birthDate')} /></label>
         <label className="profile-field">E-Mail (Konto)<span className="field profile-readonly">{member.email || 'Keine E-Mail'}</span><Link className="text-link" href="/account">E-Mail im Konto ändern</Link></label>
         <label className="profile-field profile-wide">Adresse<textarea className="field profile-textarea" {...form.register('address')} /></label>
-        <label className="profile-field">Tarif<span className="field profile-readonly">{member.membershipType}</span></label>
-        <label className="profile-field">Abbuchungsrhythmus<select className="field" disabled={!billing.data?.canStartCheckout} {...form.register('billingInterval')}>
+        <label className="profile-field">Tarif<input className="field" required {...form.register('membershipType', { required: true, minLength: 2, maxLength: 80 })} /></label>
+        <label className="profile-field">Abbuchungsrhythmus<select className="field" {...form.register('billingInterval')}>
           <option value="monthly">Monatlich – kein Rabatt</option>
           <option value="semiannual">Halbjährlich – 5 % Rabatt</option>
           <option value="annual">Jährlich – 10 % Rabatt</option>
         </select></label>
-        <label className="profile-field">Vertragsbeginn<span className="field profile-readonly">{member.contractStart || 'Nicht hinterlegt'}</span></label>
-        <label className="profile-field">Vertragsdauer<span className="field profile-readonly">{member.contractDurationMonths ? `${member.contractDurationMonths} Monate` : 'Nicht hinterlegt'}</span></label>
+        <label className="profile-field">Vertragsbeginn<input className="field" type="date" {...form.register('contractStart')} /></label>
+        <label className="profile-field">Vertragsdauer (Monate)<input className="field" type="number" min={1} max={1200} {...form.register('contractDurationMonths')} /></label>
+        <label className="profile-field">Ruhezeit von<input className="field" type="date" {...form.register('restPeriodStart')} /></label>
+        <label className="profile-field">Ruhezeit bis<input className="field" type="date" {...form.register('restPeriodEnd')} /></label>
       </div>
-      <p className="field-help">Tarif und Vertragsdaten können nur vom Studio geändert werden. Deine Bankdaten und dein SEPA-Mandat gibst du sicher bei Stripe ein; Fiudia speichert keine Bankverbindung.</p>
+      <p className="field-help">Änderungen an Tarif und Laufzeit werden erst nach deiner Vertragsbestätigung wirksam. Bei aktiver Lastschrift gilt der neue Preis ab der nächsten Abbuchung. Bankdaten speichert Fiudia nicht.</p>
       {billing.isLoading && <p className="field-help" role="status">SEPA-Status wird geladen …</p>}
       {billing.isError && <p className="form-error" role="alert">Der SEPA-Status konnte nicht geladen werden.</p>}
-      {billing.data?.status === 'active' && <p className="profile-success" role="status">SEPA-Lastschrift ist aktiv. Der Tarifwechsel ist bis zur Änderung durch dein Studio gesperrt.</p>}
+      {billing.data?.status === 'active' && <p className="profile-success" role="status">SEPA-Lastschrift ist aktiv. Bestätigte Tarifänderungen gelten ohne Nachberechnung ab der nächsten Abbuchung.</p>}
       {billing.data?.status === 'checkout_pending' && <p className="field-help" role="status">Dein SEPA-Checkout läuft noch. Bitte schließe ihn bei Stripe ab.</p>}
       {billing.data?.status === 'pending' && <p className="field-help" role="status">Dein SEPA-Mandat wird von Stripe verarbeitet.</p>}
       {billing.data?.status === 'past_due' && <p className="form-error" role="alert">Bei deiner letzten Abbuchung gab es ein Problem. Bitte wende dich an dein Studio.</p>}
@@ -552,6 +563,7 @@ function ProfilePage({ member }: { member: Member }) {
       {message && <div className="profile-success" role="status">{message}</div>}
       <button className="button button-primary" type="submit" disabled={update.isPending}>{update.isPending ? 'Wird gespeichert …' : 'Änderungen speichern'} <Check size={15} /></button>
     </form>
+    <Link className="button button-outline" href="/contract">Vertrag anzeigen und unterschreiben</Link>
     <div className="footer-line">Deine Vertragsangaben bleiben mit deinem Studio verbunden.</div>
   </div>;
 }
@@ -564,7 +576,7 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   useEffect(() => pageTitle(signIn ? 'Anmelden' : 'Registrieren'), [signIn]);
   return <div className="auth-page"><div className="auth-aside auth-aside--photo"><img className={signIn ? 'auth-photo' : 'auth-photo auth-photo--signup'} src={signIn ? memberLoginPhoto : memberSignupPhoto} alt="" aria-hidden="true" /><Brand /><h1>Dein Studio.<br /><em>Dein Rhythmus.</em></h1><p>Alle Kurse, deine Buchungen und jeder Besuch. Ein ruhiger Ort für alles, was dich in Bewegung hält.</p><small>Fiudia / Dein Raum für Bewegung</small></div><main className="auth-main"><div className="auth-content"><div className="eyebrow">Fiudia Mitglieder</div><h2>{signIn ? 'Willkommen zurück.' : 'Schön, dass du da bist.'}</h2><p>{pendingInvite() ? 'Deine Einladung wartet nach der Anmeldung auf dich. Nutze die E-Mail-Adresse, an die dein Studio sie geschickt hat, und bestätige sie.' : signIn ? 'Melde dich an und mach dort weiter, wo du aufgehört hast.' : 'Erstelle ein Konto und verbinde danach deine Mitgliedschaft.'}</p><div className="auth-clerk">{signIn ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} forceRedirectUrl={redirect} /> : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} forceRedirectUrl={redirect} />}</div><div className="auth-switch">{signIn ? <>Noch kein Konto? <Link href="/sign-up" data-testid="link-sign-up">Registrieren</Link></> : <>Schon dabei? <Link href="/sign-in" data-testid="link-sign-in">Anmelden</Link></>}</div></div></main></div>;
 }
-function ProtectedPage({ page, courseDetail = false }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account'; courseDetail?: boolean }) {
+function ProtectedPage({ page, courseDetail = false }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' | 'contract'; courseDetail?: boolean }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return <LoadingPage />;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -572,7 +584,7 @@ function ProtectedPage({ page, courseDetail = false }: { page: 'today' | 'course
   if (pending) return <Redirect to={pending} />;
   return <AuthenticatedPage page={page} courseDetail={courseDetail} />;
 }
-function AuthenticatedPage({ page, token = '', courseDetail = false }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' | 'invite'; token?: string; courseDetail?: boolean }) {
+function AuthenticatedPage({ page, token = '', courseDetail = false }: { page: 'today' | 'courses' | 'check-ins' | 'connect' | 'notifications' | 'profile' | 'account' | 'contract' | 'invite'; token?: string; courseDetail?: boolean }) {
   const home = useGetMemberHome();
   if (home.isLoading) return <MemberShell member={null}><LoadingPage /></MemberShell>;
   if (home.isError || !home.data) return <MemberShell member={null}><div className="page"><PageHeader eyebrow="Dein Fiudia" title="Einen Moment." description="Wir versuchen, deine Mitgliedschaft zu laden." /><ErrorView onRetry={() => { void home.refetch(); }} /></div></MemberShell>;
@@ -580,7 +592,7 @@ function AuthenticatedPage({ page, token = '', courseDetail = false }: { page: '
   const member = memberHome.member;
   if ((page === 'courses' || page === 'notifications') && (!member || !memberHome.coursesEnabled) || page === 'check-ins' && !memberHome.checkInsEnabled) return <Redirect to="/" />;
   if (courseDetail) return <MemberShell member={member} home={memberHome}><CourseDetailPage /></MemberShell>;
-  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage home={memberHome} /> : page === 'check-ins' ? <CheckInsPage /> : page === 'profile' ? <ProfilePage member={member!} /> : page === 'account' ? <AccountPage /> : <ConnectPage member={member} />}</MemberShell>;
+  return <MemberShell member={member} home={memberHome}>{page === 'invite' ? <InvitePage token={token} member={member} /> : page !== 'connect' && !member ? <MembershipRequired /> : page === 'today' ? <TodayPage member={member!} home={memberHome} /> : page === 'courses' ? <CoursesPage /> : page === 'notifications' ? <NotificationsPage home={memberHome} /> : page === 'check-ins' ? <CheckInsPage /> : page === 'profile' ? <ProfilePage member={member!} /> : page === 'contract' ? <MemberContractPage member={member!} /> : page === 'account' ? <AccountPage /> : <ConnectPage member={member} />}</MemberShell>;
 }
 function NotFoundPage() {
   useEffect(() => pageTitle('Seite nicht gefunden'), []);
@@ -602,6 +614,7 @@ function Routes() {
     <Route path="/check-ins"><ProtectedPage page="check-ins" /></Route>
     <Route path="/connect"><ProtectedPage page="connect" /></Route>
     <Route path="/profile"><ProtectedPage page="profile" /></Route>
+    <Route path="/contract"><ProtectedPage page="contract" /></Route>
     <Route path="/account"><ProtectedPage page="account" /></Route>
     <Route component={NotFoundPage} />
   </Switch></RoutedErrorBoundary>;

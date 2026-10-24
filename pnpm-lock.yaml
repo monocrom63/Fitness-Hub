@@ -192,6 +192,9 @@ importers:
       '@replit/connectors-sdk':
         specifier: ^0.4.3
         version: 0.4.3
+      '@swc/helpers':
+        specifier: 0.5.23
+        version: 0.5.23
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod

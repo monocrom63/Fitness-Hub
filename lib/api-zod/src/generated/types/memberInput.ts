@@ -46,5 +46,15 @@ export interface MemberInput {
      * @nullable
      */
   contractDurationMonths?: number | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodStart?: string | null;
+  /**
+     * @nullable
+     * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+     */
+  restPeriodEnd?: string | null;
   studioId: number;
 }

@@ -186,6 +186,8 @@ export const listMembersResponseAddressMax = 400;
 export const listMembersResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const listMembersResponseContractDurationMonthsMax = 1200;
 
+export const listMembersResponseRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const listMembersResponseRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 
 export const ListMembersResponseItem = zod.object({
@@ -200,6 +202,8 @@ export const ListMembersResponseItem = zod.object({
   "address": zod.string().max(listMembersResponseAddressMax).nullish(),
   "contractStart": zod.string().regex(listMembersResponseContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(listMembersResponseContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(listMembersResponseRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(listMembersResponseRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -229,6 +233,8 @@ export const createMemberBodyAddressMax = 400;
 export const createMemberBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const createMemberBodyContractDurationMonthsMax = 1200;
 
+export const createMemberBodyRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const createMemberBodyRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 
 export const CreateMemberBody = zod.object({
@@ -242,6 +248,8 @@ export const CreateMemberBody = zod.object({
   "address": zod.string().max(createMemberBodyAddressMax).nullish(),
   "contractStart": zod.string().regex(createMemberBodyContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(createMemberBodyContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(createMemberBodyRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(createMemberBodyRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int()
 })
 
@@ -251,6 +259,8 @@ export const createMemberResponseAddressMax = 400;
 export const createMemberResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const createMemberResponseContractDurationMonthsMax = 1200;
 
+export const createMemberResponseRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const createMemberResponseRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 
 export const CreateMemberResponse = zod.object({
@@ -265,6 +275,8 @@ export const CreateMemberResponse = zod.object({
   "address": zod.string().max(createMemberResponseAddressMax).nullish(),
   "contractStart": zod.string().regex(createMemberResponseContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(createMemberResponseContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(createMemberResponseRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(createMemberResponseRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -297,6 +309,8 @@ export const updateMemberBodyAddressMax = 400;
 export const updateMemberBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberBodyContractDurationMonthsMax = 1200;
 
+export const updateMemberBodyRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberBodyRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 
 export const UpdateMemberBody = zod.object({
@@ -309,7 +323,9 @@ export const UpdateMemberBody = zod.object({
   "birthDate": zod.string().regex(updateMemberBodyBirthDateRegExp).nullish(),
   "address": zod.string().max(updateMemberBodyAddressMax).nullish(),
   "contractStart": zod.string().regex(updateMemberBodyContractStartRegExp).nullish(),
-  "contractDurationMonths": zod.number().int().min(1).max(updateMemberBodyContractDurationMonthsMax).nullish()
+  "contractDurationMonths": zod.number().int().min(1).max(updateMemberBodyContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(updateMemberBodyRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(updateMemberBodyRestPeriodEndRegExp).nullish()
 })
 
 export const updateMemberResponseBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
@@ -318,6 +334,8 @@ export const updateMemberResponseAddressMax = 400;
 export const updateMemberResponseContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberResponseContractDurationMonthsMax = 1200;
 
+export const updateMemberResponseRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberResponseRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 
 export const UpdateMemberResponse = zod.object({
@@ -332,6 +350,8 @@ export const UpdateMemberResponse = zod.object({
   "address": zod.string().max(updateMemberResponseAddressMax).nullish(),
   "contractStart": zod.string().regex(updateMemberResponseContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(updateMemberResponseContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(updateMemberResponseRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(updateMemberResponseRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1184,6 +1204,8 @@ export const getMemberHomeResponseMemberOneAddressMax = 400;
 export const getMemberHomeResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const getMemberHomeResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const getMemberHomeResponseMemberOneRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const getMemberHomeResponseMemberOneRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const getMemberHomeResponseUpcomingBookingsMin = 0;
 
 
@@ -1201,6 +1223,8 @@ export const GetMemberHomeResponse = zod.object({
   "address": zod.string().max(getMemberHomeResponseMemberOneAddressMax).nullish(),
   "contractStart": zod.string().regex(getMemberHomeResponseMemberOneContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(getMemberHomeResponseMemberOneContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(getMemberHomeResponseMemberOneRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(getMemberHomeResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1240,6 +1264,14 @@ export const updateOwnMemberProfileBodyPhoneMax = 40;
 export const updateOwnMemberProfileBodyBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateOwnMemberProfileBodyAddressMax = 400;
 
+export const updateOwnMemberProfileBodyMembershipTypeMin = 2;
+export const updateOwnMemberProfileBodyMembershipTypeMax = 80;
+
+export const updateOwnMemberProfileBodyContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateOwnMemberProfileBodyContractDurationMonthsMax = 1200;
+
+export const updateOwnMemberProfileBodyRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateOwnMemberProfileBodyRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 
 
 export const UpdateOwnMemberProfileBody = zod.object({
@@ -1247,7 +1279,12 @@ export const UpdateOwnMemberProfileBody = zod.object({
   "phone": zod.string().max(updateOwnMemberProfileBodyPhoneMax).nullish(),
   "birthDate": zod.string().regex(updateOwnMemberProfileBodyBirthDateRegExp).nullish(),
   "address": zod.string().max(updateOwnMemberProfileBodyAddressMax).nullish(),
-  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional()
+  "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional(),
+  "membershipType": zod.string().min(updateOwnMemberProfileBodyMembershipTypeMin).max(updateOwnMemberProfileBodyMembershipTypeMax).optional(),
+  "contractStart": zod.string().regex(updateOwnMemberProfileBodyContractStartRegExp).nullish(),
+  "contractDurationMonths": zod.number().int().min(1).max(updateOwnMemberProfileBodyContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(updateOwnMemberProfileBodyRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(updateOwnMemberProfileBodyRestPeriodEndRegExp).nullish()
 })
 
 export const updateOwnMemberProfileResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
@@ -1256,6 +1293,8 @@ export const updateOwnMemberProfileResponseMemberOneAddressMax = 400;
 export const updateOwnMemberProfileResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateOwnMemberProfileResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const updateOwnMemberProfileResponseMemberOneRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateOwnMemberProfileResponseMemberOneRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateOwnMemberProfileResponseUpcomingBookingsMin = 0;
 
 
@@ -1273,6 +1312,8 @@ export const UpdateOwnMemberProfileResponse = zod.object({
   "address": zod.string().max(updateOwnMemberProfileResponseMemberOneAddressMax).nullish(),
   "contractStart": zod.string().regex(updateOwnMemberProfileResponseMemberOneContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(updateOwnMemberProfileResponseMemberOneContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(updateOwnMemberProfileResponseMemberOneRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(updateOwnMemberProfileResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1347,6 +1388,8 @@ export const updateMemberNotificationSettingsResponseMemberOneAddressMax = 400;
 export const updateMemberNotificationSettingsResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberNotificationSettingsResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const updateMemberNotificationSettingsResponseMemberOneRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const updateMemberNotificationSettingsResponseMemberOneRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const updateMemberNotificationSettingsResponseUpcomingBookingsMin = 0;
 
 
@@ -1364,6 +1407,8 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "address": zod.string().max(updateMemberNotificationSettingsResponseMemberOneAddressMax).nullish(),
   "contractStart": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(updateMemberNotificationSettingsResponseMemberOneContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1431,6 +1476,8 @@ export const claimMembershipResponseMemberOneAddressMax = 400;
 export const claimMembershipResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const claimMembershipResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const claimMembershipResponseMemberOneRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const claimMembershipResponseMemberOneRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const claimMembershipResponseUpcomingBookingsMin = 0;
 
 
@@ -1448,6 +1495,8 @@ export const ClaimMembershipResponse = zod.object({
   "address": zod.string().max(claimMembershipResponseMemberOneAddressMax).nullish(),
   "contractStart": zod.string().regex(claimMembershipResponseMemberOneContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(claimMembershipResponseMemberOneContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(claimMembershipResponseMemberOneRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(claimMembershipResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),
@@ -1494,6 +1543,8 @@ export const acceptMemberInvitationResponseMemberOneAddressMax = 400;
 export const acceptMemberInvitationResponseMemberOneContractStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const acceptMemberInvitationResponseMemberOneContractDurationMonthsMax = 1200;
 
+export const acceptMemberInvitationResponseMemberOneRestPeriodStartRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+export const acceptMemberInvitationResponseMemberOneRestPeriodEndRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
 export const acceptMemberInvitationResponseUpcomingBookingsMin = 0;
 
 
@@ -1511,6 +1562,8 @@ export const AcceptMemberInvitationResponse = zod.object({
   "address": zod.string().max(acceptMemberInvitationResponseMemberOneAddressMax).nullish(),
   "contractStart": zod.string().regex(acceptMemberInvitationResponseMemberOneContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(acceptMemberInvitationResponseMemberOneContractDurationMonthsMax).nullish(),
+  "restPeriodStart": zod.string().regex(acceptMemberInvitationResponseMemberOneRestPeriodStartRegExp).nullish(),
+  "restPeriodEnd": zod.string().regex(acceptMemberInvitationResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
   "joinedAt": zod.coerce.date(),

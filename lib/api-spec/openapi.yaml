@@ -1756,6 +1756,8 @@ components:
         address: { type: ["string", "null"], maxLength: 400 }
         contractStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         contractDurationMonths: { type: ["integer", "null"], minimum: 1, maximum: 1200 }
+        restPeriodStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        restPeriodEnd: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
     Course:
       type: object
       required: [id, title, instructor, studioId, studioName, startsAt, endsAt, capacity, enrolled, room, status, revision]

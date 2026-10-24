@@ -16,6 +16,7 @@ import {
 import {
   checkInsTable, courseBookingsTable, coursesTable, db, memberNotificationsTable,
   memberPushSubscriptionsTable, membersTable, studiosTable, waitlistEmailDeliveriesTable,
+  membershipPlansTable,
 } from "@workspace/db";
 import { BookingError, bookCourse, cancelCourseBooking } from "../lib/course-bookings";
 import { getClerkIdentity, getRequestUserId } from "../lib/fiudia-access";
@@ -262,29 +263,31 @@ router.post("/member/me/billing", async (req, res): Promise<void> => {
   const normalize = (value: string) => value.normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
   const tariff = normalize(member.membershipType);
-  const expectedAmounts: Record<string, Record<string, number>> = {
-    basis: { monthly: 2990, semiannual: 17043, annual: 32292 },
-    premium: { monthly: 4990, semiannual: 28443, annual: 53892 },
-  };
-  const expectedAmount = expectedAmounts[tariff]?.[member.billingInterval];
-  if (!expectedAmount) {
-    res.status(409).json({ error: "Für diesen Tarif oder Abbuchungsrhythmus ist kein Preis eingerichtet." }); return;
-  }
+  const [plan] = await db.select().from(membershipPlansTable).where(and(
+    eq(membershipPlansTable.organizationId, member.organizationId),
+    eq(membershipPlansTable.name, member.membershipType),
+    eq(membershipPlansTable.active, 1),
+  )).limit(1);
+  if (!plan) { res.status(409).json({ error: "Für diesen Tarif ist noch kein aktiver Preis im Adminbereich eingerichtet." }); return; }
+  const intervalCount = member.billingInterval === "annual" ? 12 : member.billingInterval === "semiannual" ? 6 : 1;
+  const discount = member.billingInterval === "annual" ? plan.annualDiscountPercent
+    : member.billingInterval === "semiannual" ? plan.semiannualDiscountPercent : 0;
+  const expectedAmount = Math.round(plan.monthlyPriceCents * intervalCount * (100 - discount) / 100);
 
   try {
     const stripe = await getStripeClient();
     const products = await stripe.products.list({ active: true, limit: 100 });
-    const product = products.data.find(item => item.metadata.fiudia_tariff === tariff);
-    if (!product) {
-      res.status(409).json({ error: "Der Tarifpreis wurde in Stripe noch nicht eingerichtet." }); return;
-    }
+    const product = products.data.find(item => item.metadata.fiudia_tariff === tariff)
+      ?? await stripe.products.create({ name: member.membershipType, metadata: { fiudia_tariff: tariff } });
     const prices = await stripe.prices.list({ product: product.id, active: true, limit: 100 });
     const price = prices.data.find(item =>
-      item.metadata.fiudia_interval === member.billingInterval &&
-      item.currency === "eur" && item.unit_amount === expectedAmount);
-    if (!price) {
-      res.status(409).json({ error: "Der Preis in Stripe stimmt nicht mit dem gespeicherten Tarif überein." }); return;
-    }
+      item.currency === "eur" && item.unit_amount === expectedAmount &&
+      item.recurring?.interval === "month" && item.recurring.interval_count === intervalCount);
+    const resolvedPrice = price ?? await stripe.prices.create({
+      product: product.id, currency: "eur", unit_amount: expectedAmount,
+      recurring: { interval: "month", interval_count: intervalCount },
+      metadata: { fiudia_tariff: tariff, fiudia_interval: member.billingInterval },
+    });
     const customer = member.stripeCustomerId
       ? await stripe.customers.retrieve(member.stripeCustomerId)
       : await stripe.customers.create({
@@ -299,7 +302,7 @@ router.post("/member/me/billing", async (req, res): Promise<void> => {
       mode: "subscription",
       customer: customer.id,
       allowed_payment_method_types: ["sepa_debit"],
-      line_items: [{ price: price.id, quantity: 1 }],
+      line_items: [{ price: resolvedPrice.id, quantity: 1 }],
       client_reference_id: String(member.id),
       metadata: { fiudia_member_id: String(member.id) },
       subscription_data: { metadata: { fiudia_member_id: String(member.id), fiudia_tariff: tariff } },

@@ -37,7 +37,7 @@ export async function getStripeClient() {
     },
     prices: {
       list: (params: Record<string, unknown>) =>
-        stripeRequest<{ data: Array<{ id: string; metadata: Record<string, string>; currency: string; unit_amount: number | null }> }>(
+        stripeRequest<{ data: Array<{ id: string; metadata: Record<string, string>; currency: string; unit_amount: number | null; recurring: { interval: string; interval_count: number } | null }> }>(
           `/v1/prices?${query(params)}`),
       create: (body: unknown) => stripeRequest<{ id: string }>("/v1/prices", "POST", body),
     },
@@ -50,6 +50,12 @@ export async function getStripeClient() {
       list: (params: Record<string, unknown>) => stripeRequest<{ data: Array<{
         id: string; status: string; metadata: Record<string, string>; customer: string;
       }> }>(`/v1/subscriptions?${query(params)}`),
+      retrieve: (id: string) => stripeRequest<{
+        id: string;
+        items: { data: Array<{ id: string; price: { id: string } }> };
+      }>(`/v1/subscriptions/${encodeURIComponent(id)}`),
+      update: (id: string, body: unknown) => stripeRequest<{ id: string }>(
+        `/v1/subscriptions/${encodeURIComponent(id)}`, "POST", body),
     },
     checkoutSessions: {
       retrieve: (id: string) => stripeRequest<{ status: string }>(`/v1/checkout/sessions/${encodeURIComponent(id)}`),

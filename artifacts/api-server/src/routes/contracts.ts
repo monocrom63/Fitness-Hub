@@ -16,6 +16,7 @@ import {
 import { getRequestUserId, getStaffContext } from "../lib/fiudia-access";
 import { linkedMember } from "./member-app";
 import { resendRequest } from "../lib/resend-client";
+import { getStripeClient } from "../lib/stripe-client";
 
 const router: IRouter = Router();
 const settingsSchema = z.object({
@@ -77,6 +78,8 @@ async function pdfBytes(snapshot: Record<string, unknown>, signatureName?: strin
     ["Mitgliedschaft", snapshot.membershipType],
     ["Vertragsbeginn", snapshot.contractStart],
     ["Laufzeit", snapshot.contractDurationMonths ? `${snapshot.contractDurationMonths} Monate` : "Unbefristet"],
+    ["Ruhezeit", snapshot.restPeriodStart || snapshot.restPeriodEnd
+      ? `${snapshot.restPeriodStart ?? "—"} bis ${snapshot.restPeriodEnd ?? "—"}` : "Keine"],
     ["Zahlungsintervall", snapshot.billingInterval],
     ["Monatsbeitrag", snapshot.monthlyPrice],
     ["Beitrag je Abbuchung", snapshot.amountPerPayment],
@@ -167,11 +170,9 @@ router.put("/v1/contracts/settings", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const data = parsed.data;
   await db.transaction(async (tx) => {
-    const [existing] = await tx.select({ termsText: contractSettingsTable.termsText, termsVersion: contractSettingsTable.termsVersion })
+    const [existing] = await tx.select({ termsVersion: contractSettingsTable.termsVersion })
       .from(contractSettingsTable).where(eq(contractSettingsTable.organizationId, staff.organizationId)).limit(1);
-    const termsVersion = existing
-      ? existing.termsVersion + (existing.termsText === data.termsText ? 0 : 1)
-      : 1;
+    const termsVersion = existing ? existing.termsVersion + 1 : 1;
     await tx.insert(contractSettingsTable).values({
       organizationId: staff.organizationId,
       legalName: data.legalName.trim(),
@@ -246,9 +247,20 @@ router.get("/v1/member/contracts/current", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(memberContractsTable)
     .where(eq(memberContractsTable.memberId, member.id))
     .orderBy(desc(memberContractsTable.createdAt)).limit(1);
-  if (existing) { res.json(jsonContract(existing)); return; }
   const [settings] = await db.select().from(contractSettingsTable)
     .where(eq(contractSettingsTable.organizationId, member.organizationId)).limit(1);
+  if (existing?.status === "draft") { res.json(jsonContract(existing)); return; }
+  if (existing?.status === "signed" && settings) {
+    const prior = existing.contractSnapshot as Record<string, unknown>;
+    const unchanged = existing.termsVersion === settings.termsVersion &&
+      prior.membershipType === member.membershipType &&
+      prior.billingInterval === member.billingInterval &&
+      prior.contractStart === member.contractStart &&
+      prior.contractDurationMonths === member.contractDurationMonths &&
+      prior.restPeriodStart === member.restPeriodStart &&
+      prior.restPeriodEnd === member.restPeriodEnd;
+    if (unchanged) { res.json(jsonContract(existing)); return; }
+  }
   if (!settings?.legalName || !settings.termsText) {
     res.status(403).json({ error: "Die Leitung muss zuerst Fiudia-Vertragsangaben und AGB im Adminbereich hinterlegen." });
     return;
@@ -268,9 +280,11 @@ router.get("/v1/member/contracts/current", async (req, res): Promise<void> => {
     contractSnapshot: {
       memberName: member.fullName, email: member.email, phone: member.phone,
       birthDate: member.birthDate, address: member.address, membershipType: member.membershipType,
-      contractStart: member.contractStart, contractDurationMonths: member.contractDurationMonths,
+      contractStart: member.contractStart, contractDurationMonths: member.contractDurationMonths ?? plan.durationMonths,
       billingInterval: member.billingInterval, monthlyPrice: `${(plan.monthlyPriceCents / 100).toFixed(2)} €`,
-      amountPerPayment: `${(amount / 100).toFixed(2)} €`, termsText: settings.termsText,
+      amountPerPayment: `${(amount / 100).toFixed(2)} €`, amountPerPaymentCents: amount,
+      restPeriodStart: member.restPeriodStart, restPeriodEnd: member.restPeriodEnd,
+      termsText: settings.termsText,
       legalName: settings.legalName, legalAddress: settings.legalAddress,
       contactEmail: settings.contactEmail, contactPhone: settings.contactPhone,
     },
@@ -299,6 +313,47 @@ router.post("/v1/contracts/:id/sig", async (req, res): Promise<void> => {
   if (contract.status !== "draft") { res.status(409).json({ error: "Dieser Vertrag wurde bereits bestätigt." }); return; }
   const userId = getRequestUserId(req)!;
   const member = await linkedMember(userId);
+  const snapshot = contract.contractSnapshot as Record<string, unknown>;
+  if (member?.billingStatus === "active" && member.stripeSubscriptionId) {
+    try {
+      const stripe = await getStripeClient();
+      const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+      const tariff = normalize(String(snapshot.membershipType ?? ""));
+      const interval = String(snapshot.billingInterval ?? "monthly");
+      const intervalCount = interval === "annual" ? 12 : interval === "semiannual" ? 6 : 1;
+      const expectedAmount = Number(snapshot.amountPerPaymentCents);
+      const products = await stripe.products.list({ active: true, limit: 100 });
+      const product = products.data.find((item) => item.metadata.fiudia_tariff === tariff)
+        ?? await stripe.products.create({ name: String(snapshot.membershipType), metadata: { fiudia_tariff: tariff } });
+      if (!Number.isFinite(expectedAmount)) throw new Error("Für den gewählten Tarif ist kein gültiger Preis vorhanden.");
+      const prices = await stripe.prices.list({ product: product.id, active: true, limit: 100 });
+      const existingPrice = prices.data.find((price) => price.currency === "eur" &&
+        price.unit_amount === expectedAmount &&
+        price.recurring?.interval === "month" &&
+        price.recurring.interval_count === intervalCount);
+      let targetPriceId = existingPrice?.id;
+      if (!targetPriceId) {
+        const createdPrice = await stripe.prices.create({
+          product: product.id, currency: "eur", unit_amount: expectedAmount,
+          recurring: { interval: "month", interval_count: intervalCount },
+          metadata: { fiudia_tariff: tariff, fiudia_interval: interval },
+        });
+        targetPriceId = createdPrice.id;
+      }
+      const subscription = await stripe.subscriptions.retrieve(member.stripeSubscriptionId);
+      const item = subscription.items.data[0];
+      if (!item) throw new Error("Das Stripe-Abonnement enthält keine Position.");
+      if (item.price.id !== targetPriceId) {
+        await stripe.subscriptions.update(subscription.id, {
+          items: [{ id: item.id, price: targetPriceId }],
+          proration_behavior: "none",
+        });
+      }
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : "Die Tarifänderung konnte bei Stripe nicht vorgemerkt werden." });
+      return;
+    }
+  }
   const signedAt = new Date();
   const [signed] = await db.update(memberContractsTable).set({
     status: "signed", signatureName: parsed.data.signatureName.trim(),
