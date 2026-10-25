@@ -38,6 +38,10 @@ const settingsSchema = z.object({
     annualDiscountPercent: z.number().int().min(0).max(100),
   })),
 });
+const settingsPatchSchema = settingsSchema.partial().refine(
+  data => Object.keys(data).length > 0,
+  "Mindestens ein Einstellungsbereich muss übermittelt werden.",
+);
 const signatureSchema = z.object({
   signatureName: z.string().min(2).max(160),
   acceptTerms: z.literal(true),
@@ -240,6 +244,97 @@ router.put("/v1/contracts/settings", async (req, res): Promise<void> => {
     membershipCardFeeCents: settings.membershipCardFeeCents,
     paymentDueDay: settings.paymentDueDay,
     plans: plans.map((plan) => ({
+      id: plan.id, name: plan.name, durationMonths: plan.durationMonths,
+      monthlyPriceCents: plan.monthlyPriceCents,
+      semiannualDiscountPercent: plan.semiannualDiscountPercent,
+      annualDiscountPercent: plan.annualDiscountPercent,
+      active: Boolean(plan.active),
+    })),
+  });
+});
+
+router.patch("/v1/contracts/settings", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return; }
+  const staff = await getStaffContext(userId);
+  if (!staff || staff.role === "studio_employee") {
+    res.status(403).json({ error: "Nur Studio- oder Bezirksleitungen dürfen Vertragsdaten verwalten." });
+    return;
+  }
+  const parsed = settingsPatchSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const data = parsed.data;
+  await db.transaction(async tx => {
+    const [existing] = await tx.select({
+      termsText: contractSettingsTable.termsText,
+      termsVersion: contractSettingsTable.termsVersion,
+    }).from(contractSettingsTable)
+      .where(eq(contractSettingsTable.organizationId, staff.organizationId)).limit(1);
+    const termsText = data.termsText?.trim();
+    const termsVersion = existing
+      ? existing.termsVersion + (termsText !== undefined && termsText !== existing.termsText ? 1 : 0)
+      : 1;
+    const settingsUpdate = {
+      ...(data.legalName !== undefined ? { legalName: data.legalName.trim() } : {}),
+      ...(data.legalAddress !== undefined ? { legalAddress: data.legalAddress.trim() } : {}),
+      ...(data.contactEmail !== undefined ? { contactEmail: data.contactEmail.trim().toLowerCase() } : {}),
+      ...(data.contactPhone !== undefined ? { contactPhone: data.contactPhone.trim() } : {}),
+      ...(termsText !== undefined ? { termsText } : {}),
+      ...(data.enrollmentFeeCents !== undefined ? { enrollmentFeeCents: data.enrollmentFeeCents } : {}),
+      ...(data.membershipCardFeeCents !== undefined ? { membershipCardFeeCents: data.membershipCardFeeCents } : {}),
+      ...(data.paymentDueDay !== undefined ? { paymentDueDay: data.paymentDueDay } : {}),
+      termsVersion,
+      updatedAt: new Date(),
+    };
+    if (existing) {
+      await tx.update(contractSettingsTable).set(settingsUpdate)
+        .where(eq(contractSettingsTable.organizationId, staff.organizationId));
+    } else {
+      await tx.insert(contractSettingsTable).values({
+        organizationId: staff.organizationId,
+        legalName: data.legalName?.trim() ?? "",
+        legalAddress: data.legalAddress?.trim() ?? "",
+        contactEmail: data.contactEmail?.trim().toLowerCase() ?? "",
+        contactPhone: data.contactPhone?.trim() ?? "",
+        termsText: termsText ?? "",
+        termsVersion,
+        enrollmentFeeCents: data.enrollmentFeeCents ?? 0,
+        membershipCardFeeCents: data.membershipCardFeeCents ?? 0,
+        paymentDueDay: data.paymentDueDay ?? 1,
+        updatedAt: new Date(),
+      });
+    }
+    for (const plan of data.plans ?? []) {
+      if (plan.id) {
+        await tx.update(membershipPlansTable).set({
+          name: plan.name.trim(), durationMonths: plan.durationMonths,
+          monthlyPriceCents: plan.monthlyPriceCents,
+          semiannualDiscountPercent: plan.semiannualDiscountPercent,
+          annualDiscountPercent: plan.annualDiscountPercent,
+        }).where(and(eq(membershipPlansTable.id, plan.id), eq(membershipPlansTable.organizationId, staff.organizationId)));
+      } else {
+        await tx.insert(membershipPlansTable).values({
+          organizationId: staff.organizationId, name: plan.name.trim(),
+          durationMonths: plan.durationMonths, monthlyPriceCents: plan.monthlyPriceCents,
+          semiannualDiscountPercent: plan.semiannualDiscountPercent,
+          annualDiscountPercent: plan.annualDiscountPercent,
+        }).onConflictDoNothing();
+      }
+    }
+  });
+  const [settings] = await db.select().from(contractSettingsTable)
+    .where(eq(contractSettingsTable.organizationId, staff.organizationId)).limit(1);
+  const plans = await db.select().from(membershipPlansTable)
+    .where(eq(membershipPlansTable.organizationId, staff.organizationId));
+  res.json({
+    legalName: settings.legalName, legalAddress: settings.legalAddress,
+    contactEmail: settings.contactEmail, contactPhone: settings.contactPhone,
+    termsText: settings.termsText || DEFAULT_CONTRACT_TERMS,
+    termsVersion: settings.termsVersion,
+    enrollmentFeeCents: settings.enrollmentFeeCents,
+    membershipCardFeeCents: settings.membershipCardFeeCents,
+    paymentDueDay: settings.paymentDueDay,
+    plans: plans.map(plan => ({
       id: plan.id, name: plan.name, durationMonths: plan.durationMonths,
       monthlyPriceCents: plan.monthlyPriceCents,
       semiannualDiscountPercent: plan.semiannualDiscountPercent,

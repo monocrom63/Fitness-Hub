@@ -31,6 +31,7 @@ export * from './contractPlan';
 export * from './contractPlanInput';
 export * from './contractSettings';
 export * from './contractSettingsInput';
+export * from './contractSettingsPatch';
 export * from './contractSignatureInput';
 export * from './course';
 export * from './courseBooking';

@@ -1473,6 +1473,24 @@ paths:
               schema: { $ref: "#/components/schemas/ContractSettings" }
         "401": { description: Sign-in required }
         "403": { description: Manager access required }
+    patch:
+      operationId: patchContractSettings
+      tags: [portal]
+      summary: Save one contract settings section without changing the others
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContractSettingsPatch" }
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContractSettings" }
+        "400": { description: Invalid contract settings patch }
+        "401": { description: Sign-in required }
+        "403": { description: Manager access required }
     put:
       operationId: updateContractSettings
       tags: [portal]
@@ -1610,6 +1628,21 @@ components:
     ContractSettingsInput:
       type: object
       required: [legalName, legalAddress, contactEmail, contactPhone, termsText, enrollmentFeeCents, membershipCardFeeCents, paymentDueDay, plans]
+      properties:
+        legalName: { type: string, maxLength: 200 }
+        legalAddress: { type: string, maxLength: 500 }
+        contactEmail: { type: string, format: email }
+        contactPhone: { type: string, maxLength: 40 }
+        termsText: { type: string, maxLength: 50000 }
+        enrollmentFeeCents: { type: integer, minimum: 0 }
+        membershipCardFeeCents: { type: integer, minimum: 0 }
+        paymentDueDay: { type: integer, minimum: 1, maximum: 28 }
+        plans:
+          type: array
+          items: { $ref: "#/components/schemas/ContractPlanInput" }
+    ContractSettingsPatch:
+      type: object
+      minProperties: 1
       properties:
         legalName: { type: string, maxLength: 200 }
         legalAddress: { type: string, maxLength: 500 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetContractSettingsQueryKey, getGetPublicContractTermsQueryKey, getListMembersQueryKey, useGetContractSettings, useGetPublicContractTerms, useListMembers, useUpdateContractSettings, useUpdateMember } from "@workspace/api-client-react";
+import { getGetPublicContractTermsQueryKey, getListMembersQueryKey, useGetContractSettings, useGetPublicContractTerms, useListMembers, usePatchContractSettings, useUpdateMember } from "@workspace/api-client-react";
+import type { ContractSettingsPatch } from "@workspace/api-client-react";
 
 type Plan = {
   id?: number | null;
@@ -21,14 +22,17 @@ const blank: FormState = {
 };
 
 export default function ContractSettingsPanel({ studioId }: { studioId: number | null }) {
-  const client = useQueryClient();
   const query = useGetContractSettings();
   const standardTerms = useGetPublicContractTerms({ query: { queryKey: getGetPublicContractTermsQueryKey(), enabled: !query.data?.termsText } });
-  const save = useUpdateContractSettings();
+  const save = usePatchContractSettings();
   const [form, setForm] = useState<FormState>(blank);
-  const [saved, setSaved] = useState(false);
+  const [savedSection, setSavedSection] = useState<string | null>(null);
+  const [failedSection, setFailedSection] = useState<string | null>(null);
+  const [pendingSection, setPendingSection] = useState<string | null>(null);
+  const [sectionError, setSectionError] = useState<{ section: string; message: string } | null>(null);
   useEffect(() => {
-    if (query.data) setForm({
+    if (query.data) {
+      setForm({
       legalName: query.data.legalName, legalAddress: query.data.legalAddress,
       contactEmail: query.data.contactEmail, contactPhone: query.data.contactPhone,
       termsText: query.data.termsText || standardTerms.data?.termsText || "", enrollmentFeeCents: query.data.enrollmentFeeCents,
@@ -40,23 +44,74 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
           { name: "Basis", durationMonths: 0, monthlyPriceCents: 2990, semiannualDiscountPercent: 5, annualDiscountPercent: 10 },
           { name: "Premium", durationMonths: 0, monthlyPriceCents: 4990, semiannualDiscountPercent: 5, annualDiscountPercent: 10 },
         ],
-    });
+      });
+    }
   }, [query.data, standardTerms.data]);
-  const set = (key: keyof Omit<FormState, "plans">, value: string | number) =>
+  const set = (key: keyof Omit<FormState, "plans">, value: string | number) => {
+    setSavedSection(null);
     setForm(current => ({ ...current, [key]: value }));
-  const updatePlan = (index: number, key: keyof Plan, value: string | number) =>
+  };
+  const updatePlan = (index: number, key: keyof Plan, value: string | number) => {
+    setSavedSection(null);
     setForm(current => ({ ...current, plans: current.plans.map((plan, i) => i === index
       ? { ...plan, [key]: key === "name" ? value : Number(value) } : plan) }));
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    setSaved(false);
-    save.mutate({ data: form }, {
-      onSuccess: async () => {
-        await client.invalidateQueries({ queryKey: getGetContractSettingsQueryKey() });
-        setSaved(true);
+  };
+  const saveSection = (section: "details" | "fees" | "terms") => {
+    if (!query.data) return;
+    save.reset();
+    setSavedSection(null);
+    setFailedSection(null);
+    setSectionError(null);
+    if (section === "details" && (!form.legalName.trim() || !form.legalAddress.trim() ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail) ||
+      form.plans.some(plan => plan.name.trim().length < 2 || plan.durationMonths < 1 ||
+        plan.durationMonths > 1200 || plan.monthlyPriceCents < 0))) {
+      setFailedSection(section);
+      setSectionError({ section, message: "Bitte prüfe Vertragspartner, E-Mail-Adresse und alle Tarifangaben." });
+      return;
+    }
+    if (section === "terms" && !form.termsText.trim()) {
+      setFailedSection(section);
+      setSectionError({ section, message: "Bitte hinterlege AGB, bevor du sie speicherst." });
+      return;
+    }
+    setPendingSection(section);
+    let data: ContractSettingsPatch;
+    if (section === "details") {
+      data = {
+        legalName: form.legalName, legalAddress: form.legalAddress,
+        contactEmail: form.contactEmail, contactPhone: form.contactPhone,
+        plans: form.plans,
+      };
+    } else if (section === "fees") {
+      data = {
+        enrollmentFeeCents: form.enrollmentFeeCents,
+        membershipCardFeeCents: form.membershipCardFeeCents,
+        paymentDueDay: form.paymentDueDay,
+      };
+    } else {
+      data = { termsText: form.termsText };
+    }
+    save.mutate({ data }, {
+      onSuccess: response => {
+        if (section === "details") {
+          setForm(current => ({
+            ...current,
+            plans: response.plans.map(({ active: _active, ...plan }) => plan),
+          }));
+        }
+        setSavedSection(section);
+        setPendingSection(null);
       },
+      onError: () => { setFailedSection(section); setPendingSection(null); },
     });
   };
+  const sectionSaveButton = (section: "details" | "fees" | "terms", label: string) => <>
+    {failedSection === section && <p className="form-error" role="alert">{sectionError?.section === section ? sectionError.message : "Änderungen konnten nicht gespeichert werden."}</p>}
+    <button className="button button-primary" type="button" disabled={save.isPending} onClick={() => saveSection(section)}>
+      {pendingSection === section ? "Wird gespeichert …" : savedSection === section ? "Gespeichert" : label}
+    </button>
+  </>;
   return <section className="module-settings studio-settings contract-settings" aria-labelledby="contract-settings-title">
     <div className="studio-settings-head">
       <div>
@@ -66,7 +121,7 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
       </div>
     </div>
     {query.isLoading ? <p role="status">Vertragsdaten werden geladen …</p> : query.isError ? <p className="form-error" role="alert">Vertragsdaten konnten nicht geladen werden.</p> :
-      <form className="form-stack contract-settings-form" onSubmit={submit}>
+      <form className="form-stack contract-settings-form" onSubmit={event => event.preventDefault()}>
         <div className="contract-settings-card">
           <h3>Vertragspartner und Tarife</h3>
           <div className="form-grid">
@@ -86,6 +141,7 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
             </div>)}
           </div>
           <button className="button button-outline" type="button" onClick={() => setForm(current => ({ ...current, plans: [...current.plans, { name: "", durationMonths: 0, monthlyPriceCents: 0, semiannualDiscountPercent: 5, annualDiscountPercent: 10 }] }))}>Tarif hinzufügen</button>
+          {sectionSaveButton("details", "Vertragsdaten speichern")}
         </div>
         <div className="contract-settings-card">
           <h3>Aufnahmegebühr</h3>
@@ -94,15 +150,14 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
             <label className="profile-field">Kartenpfand (€)<input className="field" type="number" min={0} step="0.01" value={(form.membershipCardFeeCents / 100).toFixed(2)} onChange={e => set("membershipCardFeeCents", Math.round(Number(e.target.value) * 100))} /></label>
             <label className="profile-field">Abbuchung am Monatstag<input className="field" type="number" min={1} max={28} value={form.paymentDueDay} onChange={e => set("paymentDueDay", Number(e.target.value))} /></label>
           </div>
+          {sectionSaveButton("fees", "Gebühren speichern")}
         </div>
         <div className="contract-settings-card">
           <h3>AGB</h3>
           <label className="profile-field">Fiudia-AGB<textarea className="field" required minLength={1} maxLength={50000} rows={12} value={form.termsText} onChange={e => set("termsText", e.target.value)} placeholder="Die Musterfassung wird geladen." /></label>
           <p className="form-hint">Die Musterfassung ist ein Entwurf, kein Rechtsrat. Bitte Firmendaten ergänzen und vor der Verwendung rechtlich prüfen lassen.</p>
+          {sectionSaveButton("terms", "AGB speichern")}
         </div>
-        {save.isError && <p className="form-error" role="alert">Vertragsdaten konnten nicht gespeichert werden.</p>}
-        {saved && <p className="profile-success" role="status">Vertragsdaten gespeichert.</p>}
-        <button className="button button-primary" type="submit" disabled={save.isPending}>{save.isPending ? "Wird gespeichert …" : "Vertragsdaten speichern"}</button>
       </form>}
     <StaffMemberContractEditor studioId={studioId} />
   </section>;

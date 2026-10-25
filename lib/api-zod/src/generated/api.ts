@@ -2032,6 +2032,79 @@ export const GetContractSettingsResponse = zod.object({
 
 
 /**
+ * @summary Save one contract settings section without changing the others
+ */
+export const patchContractSettingsBodyLegalNameMax = 200;
+
+export const patchContractSettingsBodyLegalAddressMax = 500;
+
+export const patchContractSettingsBodyContactPhoneMax = 40;
+
+export const patchContractSettingsBodyTermsTextMax = 50000;
+
+export const patchContractSettingsBodyEnrollmentFeeCentsMin = 0;
+
+export const patchContractSettingsBodyMembershipCardFeeCentsMin = 0;
+
+export const patchContractSettingsBodyPaymentDueDayMax = 28;
+
+export const patchContractSettingsBodyPlansItemNameMin = 2;
+export const patchContractSettingsBodyPlansItemNameMax = 80;
+
+export const patchContractSettingsBodyPlansItemDurationMonthsMax = 1200;
+
+export const patchContractSettingsBodyPlansItemMonthlyPriceCentsMin = 0;
+
+export const patchContractSettingsBodyPlansItemSemiannualDiscountPercentMin = 0;
+export const patchContractSettingsBodyPlansItemSemiannualDiscountPercentMax = 100;
+
+export const patchContractSettingsBodyPlansItemAnnualDiscountPercentMin = 0;
+export const patchContractSettingsBodyPlansItemAnnualDiscountPercentMax = 100;
+
+
+
+export const PatchContractSettingsBody = zod.object({
+  "legalName": zod.string().max(patchContractSettingsBodyLegalNameMax).optional(),
+  "legalAddress": zod.string().max(patchContractSettingsBodyLegalAddressMax).optional(),
+  "contactEmail": zod.string().email().optional(),
+  "contactPhone": zod.string().max(patchContractSettingsBodyContactPhoneMax).optional(),
+  "termsText": zod.string().max(patchContractSettingsBodyTermsTextMax).optional(),
+  "enrollmentFeeCents": zod.number().int().min(patchContractSettingsBodyEnrollmentFeeCentsMin).optional(),
+  "membershipCardFeeCents": zod.number().int().min(patchContractSettingsBodyMembershipCardFeeCentsMin).optional(),
+  "paymentDueDay": zod.number().int().min(1).max(patchContractSettingsBodyPaymentDueDayMax).optional(),
+  "plans": zod.array(zod.object({
+  "id": zod.number().int().nullish(),
+  "name": zod.string().min(patchContractSettingsBodyPlansItemNameMin).max(patchContractSettingsBodyPlansItemNameMax),
+  "durationMonths": zod.number().int().min(1).max(patchContractSettingsBodyPlansItemDurationMonthsMax),
+  "monthlyPriceCents": zod.number().int().min(patchContractSettingsBodyPlansItemMonthlyPriceCentsMin),
+  "semiannualDiscountPercent": zod.number().int().min(patchContractSettingsBodyPlansItemSemiannualDiscountPercentMin).max(patchContractSettingsBodyPlansItemSemiannualDiscountPercentMax),
+  "annualDiscountPercent": zod.number().int().min(patchContractSettingsBodyPlansItemAnnualDiscountPercentMin).max(patchContractSettingsBodyPlansItemAnnualDiscountPercentMax)
+})).optional()
+})
+
+export const PatchContractSettingsResponse = zod.object({
+  "legalName": zod.string(),
+  "legalAddress": zod.string(),
+  "contactEmail": zod.string(),
+  "contactPhone": zod.string(),
+  "termsText": zod.string(),
+  "termsVersion": zod.number().int(),
+  "enrollmentFeeCents": zod.number().int(),
+  "membershipCardFeeCents": zod.number().int(),
+  "paymentDueDay": zod.number().int(),
+  "plans": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "durationMonths": zod.number().int(),
+  "monthlyPriceCents": zod.number().int(),
+  "semiannualDiscountPercent": zod.number().int(),
+  "annualDiscountPercent": zod.number().int(),
+  "active": zod.boolean()
+}))
+})
+
+
+/**
  * @summary Update organization contract settings and membership plans
  */
 export const updateContractSettingsBodyLegalNameMax = 200;

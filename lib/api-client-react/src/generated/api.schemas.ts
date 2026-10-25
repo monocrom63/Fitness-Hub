@@ -84,6 +84,28 @@ export interface ContractSettingsInput {
   plans: ContractPlanInput[];
 }
 
+export interface ContractSettingsPatch {
+  /** @maxLength 200 */
+  legalName?: string;
+  /** @maxLength 500 */
+  legalAddress?: string;
+  contactEmail?: string;
+  /** @maxLength 40 */
+  contactPhone?: string;
+  /** @maxLength 50000 */
+  termsText?: string;
+  /** @minimum 0 */
+  enrollmentFeeCents?: number;
+  /** @minimum 0 */
+  membershipCardFeeCents?: number;
+  /**
+     * @minimum 1
+     * @maximum 28
+     */
+  paymentDueDay?: number;
+  plans?: ContractPlanInput[];
+}
+
 export interface ContractSignatureInput {
   /**
      * @minLength 2
