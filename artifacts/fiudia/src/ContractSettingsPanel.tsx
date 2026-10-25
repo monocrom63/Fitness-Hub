@@ -57,34 +57,49 @@ export default function ContractSettingsPanel({ studioId }: { studioId: number |
       },
     });
   };
-  return <section className="module-settings" aria-labelledby="contract-settings-title">
-    <div className="eyebrow">Mitgliedschaft / Vertrag</div>
-    <h2 id="contract-settings-title">Vertragsdaten</h2>
-    <p>Hinterlege Fiudia-Angaben, Tarife, Laufzeiten und freigegebene AGB. Ohne ausgefüllte AGB können Mitglieder den Vertrag nicht unterschreiben.</p>
+  return <section className="module-settings studio-settings contract-settings" aria-labelledby="contract-settings-title">
+    <div className="studio-settings-head">
+      <div>
+        <div className="eyebrow">Mitgliedschaft / Vertrag</div>
+        <h2 id="contract-settings-title">Vertragsdaten Mitglieder</h2>
+        <p>Vertragspartner, Tarife, Aufnahmegebühren und freigegebene AGB verwalten.</p>
+      </div>
+    </div>
     {query.isLoading ? <p role="status">Vertragsdaten werden geladen …</p> : query.isError ? <p className="form-error" role="alert">Vertragsdaten konnten nicht geladen werden.</p> :
-      <form className="form-stack" onSubmit={submit}>
-        <label className="profile-field">Vertragspartner<input className="field" required maxLength={200} value={form.legalName} onChange={e => set("legalName", e.target.value)} /></label>
-        <label className="profile-field">Geschäftsadresse<textarea className="field" required maxLength={500} value={form.legalAddress} onChange={e => set("legalAddress", e.target.value)} /></label>
-        <div className="form-grid">
-          <label className="profile-field">Kontakt-E-Mail<input className="field" required type="email" value={form.contactEmail} onChange={e => set("contactEmail", e.target.value)} /></label>
-          <label className="profile-field">Telefon<input className="field" maxLength={40} value={form.contactPhone} onChange={e => set("contactPhone", e.target.value)} /></label>
+      <form className="form-stack contract-settings-form" onSubmit={submit}>
+        <div className="contract-settings-card">
+          <h3>Vertragspartner und Tarife</h3>
+          <div className="form-grid">
+            <label className="profile-field">Vertragspartner<input className="field" required maxLength={200} value={form.legalName} onChange={e => set("legalName", e.target.value)} /></label>
+            <label className="profile-field">Geschäftsadresse<textarea className="field" required maxLength={500} value={form.legalAddress} onChange={e => set("legalAddress", e.target.value)} /></label>
+            <label className="profile-field">Kontakt-E-Mail<input className="field" required type="email" value={form.contactEmail} onChange={e => set("contactEmail", e.target.value)} /></label>
+            <label className="profile-field">Telefon<input className="field" maxLength={40} value={form.contactPhone} onChange={e => set("contactPhone", e.target.value)} /></label>
+          </div>
+          <div className="contract-settings-subhead">Tarife und Vertragslaufzeiten</div>
+          <div className="contract-plan-list">
+            {form.plans.map((plan, index) => <div className="contract-plan-card" key={plan.id ?? `new-${index}`}>
+              <label className="profile-field">Tarif<input className="field" required value={plan.name} onChange={e => updatePlan(index, "name", e.target.value)} /></label>
+              <label className="profile-field">Laufzeit (Monate)<input className="field" type="number" min={1} max={1200} required value={plan.durationMonths || ""} onChange={e => updatePlan(index, "durationMonths", e.target.value)} /></label>
+              <label className="profile-field">Grundpreis / Monat (€)<input className="field" type="number" min={0} step="0.01" required value={(plan.monthlyPriceCents / 100).toFixed(2)} onChange={e => updatePlan(index, "monthlyPriceCents", Math.round(Number(e.target.value) * 100))} /></label>
+              <label className="profile-field">Rabatt 6 Monate (%)<input className="field" type="number" min={0} max={100} value={plan.semiannualDiscountPercent} onChange={e => updatePlan(index, "semiannualDiscountPercent", e.target.value)} /></label>
+              <label className="profile-field">Rabatt 12 Monate (%)<input className="field" type="number" min={0} max={100} value={plan.annualDiscountPercent} onChange={e => updatePlan(index, "annualDiscountPercent", e.target.value)} /></label>
+            </div>)}
+          </div>
+          <button className="button button-outline" type="button" onClick={() => setForm(current => ({ ...current, plans: [...current.plans, { name: "", durationMonths: 0, monthlyPriceCents: 0, semiannualDiscountPercent: 5, annualDiscountPercent: 10 }] }))}>Tarif hinzufügen</button>
         </div>
-        <div className="eyebrow">Tarife und Vertragslaufzeiten</div>
-        {form.plans.map((plan, index) => <div className="settings-card" key={plan.id ?? `new-${index}`} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 12 }}>
-          <label className="profile-field">Tarif<input className="field" required value={plan.name} onChange={e => updatePlan(index, "name", e.target.value)} /></label>
-          <label className="profile-field">Laufzeit (Monate)<input className="field" type="number" min={1} max={1200} required value={plan.durationMonths || ""} onChange={e => updatePlan(index, "durationMonths", e.target.value)} /></label>
-          <label className="profile-field">Grundpreis / Monat (€)<input className="field" type="number" min={0} step="0.01" required value={(plan.monthlyPriceCents / 100).toFixed(2)} onChange={e => updatePlan(index, "monthlyPriceCents", Math.round(Number(e.target.value) * 100))} /></label>
-          <label className="profile-field">Rabatt 6 Monate (%)<input className="field" type="number" min={0} max={100} value={plan.semiannualDiscountPercent} onChange={e => updatePlan(index, "semiannualDiscountPercent", e.target.value)} /></label>
-          <label className="profile-field">Rabatt 12 Monate (%)<input className="field" type="number" min={0} max={100} value={plan.annualDiscountPercent} onChange={e => updatePlan(index, "annualDiscountPercent", e.target.value)} /></label>
-        </div>)}
-        <button className="button button-outline" type="button" onClick={() => setForm(current => ({ ...current, plans: [...current.plans, { name: "", durationMonths: 0, monthlyPriceCents: 0, semiannualDiscountPercent: 5, annualDiscountPercent: 10 }] }))}>Tarif hinzufügen</button>
-        <div className="form-grid">
-          <label className="profile-field">Aufnahmegebühr (€)<input className="field" type="number" min={0} step="0.01" value={(form.enrollmentFeeCents / 100).toFixed(2)} onChange={e => set("enrollmentFeeCents", Math.round(Number(e.target.value) * 100))} /></label>
-          <label className="profile-field">Kartenpfand (€)<input className="field" type="number" min={0} step="0.01" value={(form.membershipCardFeeCents / 100).toFixed(2)} onChange={e => set("membershipCardFeeCents", Math.round(Number(e.target.value) * 100))} /></label>
-          <label className="profile-field">Abbuchung am Monatstag<input className="field" type="number" min={1} max={28} value={form.paymentDueDay} onChange={e => set("paymentDueDay", Number(e.target.value))} /></label>
+        <div className="contract-settings-card">
+          <h3>Aufnahmegebühr</h3>
+          <div className="form-grid">
+            <label className="profile-field">Aufnahmegebühr (€)<input className="field" type="number" min={0} step="0.01" value={(form.enrollmentFeeCents / 100).toFixed(2)} onChange={e => set("enrollmentFeeCents", Math.round(Number(e.target.value) * 100))} /></label>
+            <label className="profile-field">Kartenpfand (€)<input className="field" type="number" min={0} step="0.01" value={(form.membershipCardFeeCents / 100).toFixed(2)} onChange={e => set("membershipCardFeeCents", Math.round(Number(e.target.value) * 100))} /></label>
+            <label className="profile-field">Abbuchung am Monatstag<input className="field" type="number" min={1} max={28} value={form.paymentDueDay} onChange={e => set("paymentDueDay", Number(e.target.value))} /></label>
+          </div>
         </div>
-        <label className="profile-field">Fiudia-AGB<textarea className="field" required minLength={1} maxLength={50000} rows={12} value={form.termsText} onChange={e => set("termsText", e.target.value)} placeholder="Die Musterfassung wird geladen." /></label>
-        <p className="form-hint">Die Musterfassung ist ein Entwurf, kein Rechtsrat. Bitte Firmendaten ergänzen und vor der Verwendung rechtlich prüfen lassen.</p>
+        <div className="contract-settings-card">
+          <h3>AGB</h3>
+          <label className="profile-field">Fiudia-AGB<textarea className="field" required minLength={1} maxLength={50000} rows={12} value={form.termsText} onChange={e => set("termsText", e.target.value)} placeholder="Die Musterfassung wird geladen." /></label>
+          <p className="form-hint">Die Musterfassung ist ein Entwurf, kein Rechtsrat. Bitte Firmendaten ergänzen und vor der Verwendung rechtlich prüfen lassen.</p>
+        </div>
         {save.isError && <p className="form-error" role="alert">Vertragsdaten konnten nicht gespeichert werden.</p>}
         {saved && <p className="profile-success" role="status">Vertragsdaten gespeichert.</p>}
         <button className="button button-primary" type="submit" disabled={save.isPending}>{save.isPending ? "Wird gespeichert …" : "Vertragsdaten speichern"}</button>
@@ -125,13 +140,18 @@ function StaffMemberContractEditor({ studioId }: { studioId: number | null }) {
       void client.invalidateQueries({ queryKey: getListMembersQueryKey(params) });
     } });
   };
-  return <section className="module-settings" aria-labelledby="staff-contract-member-title">
-    <div className="eyebrow">Mitglieder / Vertragsangaben</div>
-    <h2 id="staff-contract-member-title">Mitgliedsdaten bearbeiten</h2>
+  return <section className="module-settings studio-settings contract-member-settings" aria-labelledby="staff-contract-member-title">
+    <div className="studio-settings-head">
+      <div>
+        <div className="eyebrow">Mitglieder / Vertragsangaben</div>
+        <h2 id="staff-contract-member-title">Mitgliedsdaten bearbeiten</h2>
+        <p>Tarif, Laufzeit, Abbuchungsrhythmus und Ruhezeiten für Mitglieder dieses Studios anpassen.</p>
+      </div>
+    </div>
     {!studioId ? <p>Wähle zuerst ein Studio aus, um dessen Mitgliedsdaten zu bearbeiten.</p> :
       members.isLoading ? <p role="status">Mitglieder werden geladen …</p> :
       members.isError ? <p className="form-error" role="alert">Mitglieder konnten nicht geladen werden.</p> :
-      <form className="form-stack" onSubmit={submit}>
+      <form className="form-stack contract-settings-card" onSubmit={submit}>
         <label className="profile-field">Mitglied
           <select className="field" value={memberId} onChange={e => setMemberId(e.target.value)} required>
             <option value="">Mitglied auswählen</option>

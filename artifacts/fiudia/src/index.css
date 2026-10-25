@@ -592,9 +592,25 @@ button { cursor: pointer; }
 .studio-create-actions { display: flex; align-items: end; gap: 8px; grid-column: 1 / -1; }
 .studio-create-form .form-error { grid-column: 1 / -1; margin: 0; }
 .studio-settings .booking-result { margin: 0 0 18px; }
+.contract-settings-form { display: grid; gap: 14px; }
+.contract-settings-card { display: grid; gap: 14px; padding: 20px; border: 1px solid hsl(var(--card-border)); border-radius: 15px; background: hsl(var(--card)); }
+.contract-settings-card h3 { margin: 0; font-family: var(--font-serif); font-size: 1rem; letter-spacing: -.025em; }
+.contract-settings-subhead { margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: .74rem; font-weight: 700; }
+.contract-settings .form-grid, .contract-plan-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.contract-plan-list { display: grid; gap: 10px; }
+.contract-plan-card { padding: 14px; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--background)); }
+.contract-settings .profile-field { display: grid; gap: 6px; color: hsl(var(--foreground)); font-size: .73rem; font-weight: 700; }
+.contract-settings .profile-field .field { min-height: 42px; width: 100%; padding: 9px 11px; border: 1px solid hsl(var(--border)); border-radius: 9px; outline: none; background: hsl(var(--muted)); color: hsl(var(--foreground)); font: inherit; font-size: .78rem; font-weight: 400; }
+.contract-settings .profile-field .field:focus { border-color: #9c8de4; box-shadow: 0 0 0 3px rgba(117,103,184,.12); }
+.contract-settings .profile-field textarea.field { min-height: 76px; resize: vertical; }
+.contract-settings .form-hint { margin: -5px 0 0; color: hsl(var(--muted-foreground)); font-size: .72rem; line-height: 1.55; }
+.contract-settings-form > .button { justify-self: start; }
+.contract-member-settings .contract-settings-card { margin: 0; }
 @media (max-width: 600px) {
   .studio-settings-head { align-items: stretch; flex-direction: column; }
   .studio-create-form { grid-template-columns: 1fr; }
+  .contract-settings .form-grid, .contract-plan-card { grid-template-columns: 1fr; }
+  .contract-settings-card { padding: 16px; }
 }
 .module-row strong, .module-row span { display: block; }
 .module-row strong { font-size: .83rem; }
