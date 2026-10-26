@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/fiudia-landing/"
+title = "Fiudia — Studioverwaltung mit Überblick"
+description = "Öffentliche Fiudia-Produktseite für Fitnessstudios: zeigt, wie Team, Mitglieder, Kurse und Studioalltag an einem Ort zusammenfinden."
+version = "1.0.0"
+id = "artifacts/fiudia-landing"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/fiudia-landing/" ]
+localPort = 22653
+
+[services.development]
+run = "pnpm --filter @workspace/fiudia-landing run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fiudia-landing", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fiudia-landing/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22653"
+BASE_PATH = "/fiudia-landing/"
