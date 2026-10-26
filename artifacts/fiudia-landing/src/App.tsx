@@ -74,7 +74,6 @@ function App() {
   return (
     <main className="site-shell" id="top">
       <header className="topbar">
-        <Brand />
         <button
           className="menu-toggle"
           type="button"
@@ -94,6 +93,7 @@ function App() {
       </header>
 
       <section className="hero" aria-labelledby="hero-title">
+        <div className="hero-brand-overlay"><Brand /></div>
         <div className="hero-copy">
           <div className="eyebrow">Ein klarer Platz für alles, was bewegt</div>
           <h1 id="hero-title">Dein Studio.<br /><em>Dein Rhythmus.</em></h1>
