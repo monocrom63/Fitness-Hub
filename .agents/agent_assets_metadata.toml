@@ -1,0 +1,44 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "cqSXGxOTIqLqYmiZ8Zd-I"
+uri = "file://artifacts/fiudia-members/public/logo.svg"
+type = "image"
+title = "Fiudia-Logo als SVG"
+description = "Das auf der Mitglieder-Anmeldeseite verwendete Fiudia-Logo als SVG-Datei – zum Herunterladen und Einbinden auf deiner Website."
+logical_id = "979d8853-5ad7-4863-8345-0d36c7a456ed"
+content_hash = "sha256:ed559a8c51017c77f9365fd9a343c3b84db27e6064c5863452730b84e1eda88d"
+size = 357
+mtime_ms = 1790438296290
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:762c8c55-8817-495d-ae6d-dd89e0a0b997/979d8853-5ad7-4863-8345-0d36c7a456ed/25d1e4ce-052e-4767-ac16-c9d096083061"
+storage_version_token = "1794741040604923"
+content_type = "image/svg+xml"
+
+[[outputs]]
+id = "_wYgY-quZFhRV8-ih_bcl"
+uri = "file://artifacts/fiudia-members/public/logo-white.svg"
+type = "image"
+title = "Fiudia-Logo für dunkle Hintergründe"
+description = "SVG-Variante mit weißem Schriftzug passend zum Logo über dem dunklen Headerfoto. Die vorhandene Version mit dunklem Schriftzug eignet sich für helle Hintergründe."
+logical_id = "9866a9fa-b405-49d2-a6d9-58f284bf16ab"
+content_hash = "sha256:a53a96ad2260ad8bb58f46b5b10fbee406323f2d2886b49f7f4b44b8180bb687"
+size = 358
+mtime_ms = 1794741055167
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:762c8c55-8817-495d-ae6d-dd89e0a0b997/9866a9fa-b405-49d2-a6d9-58f284bf16ab/a8237003-c926-4727-9286-29a74eec4770"
+storage_version_token = "1794741061178051"
+content_type = "image/svg+xml"
+
+[[outputs]]
+id = "GKXrUJE25LoiMzVJ5YTbV"
+uri = "file://artifacts/fiudia-members/public/logo-mark.svg"
+type = "image"
+title = "Fiudia-F-Zeichen als SVG"
+description = "Quadratische, skalierbare SVG-Version des angehängten Fiudia-Symbols – ohne Schriftzug."
+logical_id = "7de8efff-e29b-4d02-98b6-d6d71f99c90e"
+content_hash = "sha256:ea0bd692fc0d282fc9c86888c8cb8fb4115b1b1492c76e08844cc68b310e25d5"
+size = 221
+mtime_ms = 1794741081319
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:762c8c55-8817-495d-ae6d-dd89e0a0b997/7de8efff-e29b-4d02-98b6-d6d71f99c90e/bf27b3e7-8af7-4356-9ffb-5291acfdf177"
+storage_version_token = "1794741086119344"
+content_type = "image/svg+xml"
