@@ -75,7 +75,12 @@ function timeLabel(date: string) { return new Intl.DateTimeFormat('de-DE', { hou
 function initials(name: string) { return name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase(); }
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : 'Bitte versuche es noch einmal.'; }
 
-function Brand() {
+function Brand({ member }: { member?: Member | null }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => setLogoFailed(false), [member?.studioLogoAvailable, member?.studioId]);
+  if (member?.studioLogoAvailable && !logoFailed) {
+    return <Link href="/" className="logo" data-testid="link-brand"><img className="studio-logo-image" src="/api/member/studio-logo" alt={`${member.studioName} Logo`} onError={() => setLogoFailed(true)} /></Link>;
+  }
   return <Link href="/" className="logo" data-testid="link-brand"><span className="logo-symbol">F</span><span>Fiudia</span></Link>;
 }
 function LoadingPage() {
@@ -126,7 +131,7 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
   ];
   return <div className="app-shell">
     <aside className="rail">
-      <Brand />
+      <Brand member={member} />
       <div className="rail-kicker">Mein Fiudia</div>
       <nav className="rail-nav" aria-label="Hauptnavigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`rail-link ${location === href ? 'active' : ''}`} data-testid={`link-nav-${href === '/' ? 'today' : href.slice(1)}`}><Icon /><span className="nav-label">{label}</span>{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`} data-testid="status-unread-count">{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
       <div className="rail-bottom">
@@ -134,7 +139,7 @@ function MemberShell({ member, home, children }: { member: Member | null; home?:
         <div className="rail-user"><span className="avatar">{initials(member?.fullName || user?.fullName || 'Fiudia')}</span><span>{member?.fullName || user?.fullName || 'Mein Konto'}<small>{member?.studioName || 'Noch kein Studio verbunden'}</small></span><button className="signout" type="button" onClick={leave} disabled={signingOut} aria-label="Abmelden" title="Abmelden" data-testid="button-sign-out"><LogOut size={17} /></button></div>
       </div>
     </aside>
-    <div className="main"><div className="mobile-header"><Brand /><button className="signout" type="button" onClick={leave} disabled={signingOut} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{signOutError && <p className="form-error" role="alert">{signOutError}</p>}{children}</div>
+    <div className="main"><div className="mobile-header"><Brand member={member} /><button className="signout" type="button" onClick={leave} disabled={signingOut} aria-label="Abmelden" data-testid="button-mobile-sign-out"><LogOut size={18} /></button></div>{signOutError && <p className="form-error" role="alert">{signOutError}</p>}{children}</div>
     <nav className="mobile-nav" aria-label="Mobile Navigation">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={location === href ? 'active' : ''} data-testid={`link-mobile-${href === '/' ? 'today' : href.slice(1)}`}><Icon size={19} strokeWidth={1.7} />{label}{href === '/notifications' && unread > 0 && <span className="unread-badge" aria-label={`${unread} ungelesene Hinweise`}>{unread > 99 ? '99+' : unread}</span>}</Link>)}</nav>
   </div>;
 }

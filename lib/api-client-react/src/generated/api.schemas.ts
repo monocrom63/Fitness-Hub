@@ -231,6 +231,37 @@ export interface StudioInput {
   city: string;
 }
 
+export type StudioLogoUploadRequestContentType = typeof StudioLogoUploadRequestContentType[keyof typeof StudioLogoUploadRequestContentType];
+
+
+export const StudioLogoUploadRequestContentType = {
+  'image/png': 'image/png',
+  'image/jpeg': 'image/jpeg',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface StudioLogoUploadRequest {
+  contentType: StudioLogoUploadRequestContentType;
+  /**
+     * @minimum 1
+     * @maximum 5242880
+     */
+  size: number;
+}
+
+export interface StudioLogoUpload {
+  uploadUrl: string;
+  objectPath: string;
+}
+
+export interface StudioLogoUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  objectPath: string;
+}
+
 export type DashboardMetricTone = typeof DashboardMetricTone[keyof typeof DashboardMetricTone];
 
 
@@ -368,6 +399,7 @@ export interface Member {
   restPeriodEnd?: string | null;
   studioId: number;
   studioName: string;
+  studioLogoAvailable?: boolean;
   joinedAt: string;
   /** @nullable */
   lastCheckIn: string | null;

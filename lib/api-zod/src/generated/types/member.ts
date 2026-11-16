@@ -53,6 +53,7 @@ export interface Member {
   restPeriodEnd?: string | null;
   studioId: number;
   studioName: string;
+  studioLogoAvailable?: boolean;
   joinedAt: Date;
   /** @nullable */
   lastCheckIn: Date | null;

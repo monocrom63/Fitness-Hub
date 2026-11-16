@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { Plus } from 'lucide-react';
+import { useAuth } from '@clerk/react';
+import { ImagePlus, Plus } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
   getListPulseQueryKey, getListStudiosQueryKey, useCreateStudio, useListStudios, useUpdateStudio,
@@ -12,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 type StudioFields = { name: string; city: string };
 
 export default function StudioManagement() {
+  const { getToken } = useAuth();
   const client = useQueryClient();
   const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), refetchOnMount: 'always' } });
   const create = useCreateStudio();
@@ -20,6 +22,44 @@ export default function StudioManagement() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState('');
+
+  const uploadLogo = async (studio: StudioSummary, file?: File) => {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setUploadError('Bitte ein PNG-, JPEG- oder WebP-Logo bis 5 MB auswählen.');
+      return;
+    }
+    setUploadingId(studio.id);
+    setUploadError('');
+    setFeedback('');
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Deine Anmeldung konnte nicht bestätigt werden.');
+      const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+      const request = await fetch(`${basePath}/api/studios/${studio.id}/logo/upload-url`, {
+        method: 'POST', headers, body: JSON.stringify({ contentType: file.type, size: file.size }),
+      });
+      const uploadData = await request.json();
+      if (!request.ok) throw new Error(uploadData.error || 'Upload konnte nicht vorbereitet werden.');
+      const uploaded = await fetch(uploadData.uploadUrl, {
+        method: 'PUT', headers: { 'Content-Type': file.type }, body: file,
+      });
+      if (!uploaded.ok) throw new Error('Das Logo konnte nicht hochgeladen werden.');
+      const saved = await fetch(`${basePath}/api/studios/${studio.id}/logo`, {
+        method: 'PATCH', headers, body: JSON.stringify({ objectPath: uploadData.objectPath }),
+      });
+      const savedData = await saved.json().catch(() => ({}));
+      if (!saved.ok) throw new Error(savedData.error || 'Das Logo konnte nicht gespeichert werden.');
+      setFeedback(`Logo für „${studio.name}“ gespeichert.`);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Logo konnte nicht hochgeladen werden.');
+    } finally {
+      setUploadingId(null);
+    }
+  };
 
   const saved = (studio: StudioSummary, edited: boolean) => {
     void client.invalidateQueries({ queryKey: getListStudiosQueryKey() });
@@ -82,10 +122,11 @@ export default function StudioManagement() {
       </form>
     </Form>}
     {feedback && <p className="booking-result" role="status" data-testid="status-studio-created">{feedback}</p>}
+    {uploadError && <p className="form-error" role="alert" data-testid="error-studio-logo">{uploadError}</p>}
     {studios.isLoading ? <p className="studio-settings-status" role="status">Studios werden geladen …</p>
       : studios.isError ? <p className="form-error" role="alert">Studios konnten nicht geladen werden. <button type="button" className="button button-outline" onClick={() => void studios.refetch()} data-testid="button-retry-studio-list">Erneut versuchen</button></p>
       : <div className="module-list" data-testid="list-studios">{studios.data?.length
-        ? studios.data.map(studio => <div className="module-row" key={studio.id} data-testid={`row-studio-${studio.id}`}><div><strong>{studio.name}</strong><span>{studio.city}</span></div><button type="button" className="button button-outline" disabled={formOpen} onClick={() => {
+        ? studios.data.map(studio => <div className="module-row studio-logo-row" key={studio.id} data-testid={`row-studio-${studio.id}`}><div><strong>{studio.name}</strong><span>{studio.city}</span></div><label className="button button-outline studio-logo-upload" aria-label={`Logo für ${studio.name} hochladen`}><ImagePlus size={15} />{uploadingId === studio.id ? 'Lädt …' : 'Logo hochladen'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingId !== null} onChange={event => { void uploadLogo(studio, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} data-testid={`input-studio-logo-${studio.id}`} /></label><button type="button" className="button button-outline" disabled={formOpen || uploadingId !== null} onClick={() => {
           create.reset(); update.reset(); setFeedback(''); setEditingId(studio.id);
           form.reset({ name: studio.name, city: studio.city }); setFormOpen(true);
         }} data-testid={`button-edit-studio-${studio.id}`}>Bearbeiten</button></div>)

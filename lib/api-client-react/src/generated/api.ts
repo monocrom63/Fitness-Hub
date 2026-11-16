@@ -92,6 +92,9 @@ import type {
   RoomInput,
   StaffBookingInput,
   StudioInput,
+  StudioLogoUpdate,
+  StudioLogoUpload,
+  StudioLogoUploadRequest,
   StudioSummary,
   TrainerAbsence,
   TrainerAbsenceCourse,
@@ -624,6 +627,261 @@ export const useUpdateStudio = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateStudioMutationOptions(options));
     }
+
+export const getRequestStudioLogoUploadUrl = (id: number,) => {
+
+
+
+
+  return `/api/studios/${id}/logo/upload-url`
+}
+
+/**
+ * @summary Request a secure upload URL for a studio logo
+ */
+export const requestStudioLogoUpload = async (id: number,
+    studioLogoUploadRequest: StudioLogoUploadRequest, options?: Parameters<typeof customFetch>[1]): Promise<StudioLogoUpload> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StudioLogoUpload>(getRequestStudioLogoUploadUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(studioLogoUploadRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestStudioLogoUploadMutationKey = () => ['requestStudioLogoUpload'] as const;
+
+export const getRequestStudioLogoUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestStudioLogoUpload>>, TError,RequestStudioLogoUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestStudioLogoUpload>>, TError,RequestStudioLogoUploadMutationVariables, TContext> => {
+
+const mutationKey = getRequestStudioLogoUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestStudioLogoUpload>>, RequestStudioLogoUploadMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requestStudioLogoUpload(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestStudioLogoUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestStudioLogoUpload>>>
+    export type RequestStudioLogoUploadMutationBody = BodyType<StudioLogoUploadRequest>
+    export type RequestStudioLogoUploadMutationError = ErrorType<void>
+    export type RequestStudioLogoUploadMutationVariables = {id: number;data: BodyType<StudioLogoUploadRequest>}
+
+    /**
+ * @summary Request a secure upload URL for a studio logo
+ */
+export const useRequestStudioLogoUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestStudioLogoUpload>>, TError,RequestStudioLogoUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestStudioLogoUpload>>,
+        TError,
+        RequestStudioLogoUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestStudioLogoUploadMutationOptions(options));
+    }
+
+export const getUpdateStudioLogoUrl = (id: number,) => {
+
+
+
+
+  return `/api/studios/${id}/logo`
+}
+
+/**
+ * @summary Save the uploaded logo for a studio
+ */
+export const updateStudioLogo = async (id: number,
+    studioLogoUpdate: StudioLogoUpdate, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getUpdateStudioLogoUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(studioLogoUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateStudioLogoMutationKey = () => ['updateStudioLogo'] as const;
+
+export const getUpdateStudioLogoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudioLogo>>, TError,UpdateStudioLogoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStudioLogo>>, TError,UpdateStudioLogoMutationVariables, TContext> => {
+
+const mutationKey = getUpdateStudioLogoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStudioLogo>>, UpdateStudioLogoMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateStudioLogo(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStudioLogoMutationResult = NonNullable<Awaited<ReturnType<typeof updateStudioLogo>>>
+    export type UpdateStudioLogoMutationBody = BodyType<StudioLogoUpdate>
+    export type UpdateStudioLogoMutationError = ErrorType<void>
+    export type UpdateStudioLogoMutationVariables = {id: number;data: BodyType<StudioLogoUpdate>}
+
+    /**
+ * @summary Save the uploaded logo for a studio
+ */
+export const useUpdateStudioLogo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudioLogo>>, TError,UpdateStudioLogoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStudioLogo>>,
+        TError,
+        UpdateStudioLogoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateStudioLogoMutationOptions(options));
+    }
+
+export const getGetMemberStudioLogoUrl = () => {
+
+
+
+
+  return `/api/member/studio-logo`
+}
+
+/**
+ * @summary Serve the signed-in member's studio logo
+ */
+export const getMemberStudioLogo = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetMemberStudioLogoUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMemberStudioLogoQueryKey = () => {
+    return [
+    `/api/member/studio-logo`
+    ] as const;
+    }
+
+
+export const getGetMemberStudioLogoQueryOptions = <TData = Awaited<ReturnType<typeof getMemberStudioLogo>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberStudioLogo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMemberStudioLogoQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMemberStudioLogo>>> = ({ signal }) => getMemberStudioLogo({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMemberStudioLogo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMemberStudioLogoQueryResult = NonNullable<Awaited<ReturnType<typeof getMemberStudioLogo>>>
+export type GetMemberStudioLogoQueryError = ErrorType<void>
+
+
+/**
+ * @summary Serve the signed-in member's studio logo
+ */
+
+export function useGetMemberStudioLogo<TData = Awaited<ReturnType<typeof getMemberStudioLogo>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMemberStudioLogo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMemberStudioLogoQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetDashboardUrl = (params?: GetDashboardParams,) => {
   const normalizedParams = new URLSearchParams();

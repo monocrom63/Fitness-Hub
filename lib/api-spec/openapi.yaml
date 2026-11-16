@@ -147,6 +147,67 @@ paths:
           description: Studio not found in the district manager's organization
         "409":
           description: A studio with the same name and city already exists in this organization
+  /studios/{id}/logo/upload-url:
+    post:
+      operationId: requestStudioLogoUpload
+      tags: [portal]
+      summary: Request a secure upload URL for a studio logo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudioLogoUploadRequest" }
+      responses:
+        "200":
+          description: Upload URL and storage path
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StudioLogoUpload" }
+        "400": { description: Unsupported image or size }
+        "401": { description: Sign-in required }
+        "403": { description: Studio access denied }
+  /studios/{id}/logo:
+    patch:
+      operationId: updateStudioLogo
+      tags: [portal]
+      summary: Save the uploaded logo for a studio
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StudioLogoUpdate" }
+      responses:
+        "200": { description: Studio logo saved }
+        "400": { description: Invalid upload path }
+        "401": { description: Sign-in required }
+        "403": { description: Studio access denied }
+  /member/studio-logo:
+    get:
+      operationId: getMemberStudioLogo
+      tags: [member-app]
+      summary: Serve the signed-in member's studio logo
+      responses:
+        "200":
+          description: Studio logo image
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        "401": { description: Sign-in required }
+        "404": { description: No studio logo available }
   /dashboard:
     get:
       operationId: getDashboard
@@ -1722,6 +1783,25 @@ components:
       properties:
         name: { type: string, minLength: 2, maxLength: 120 }
         city: { type: string, minLength: 2, maxLength: 120 }
+    StudioLogoUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [contentType, size]
+      properties:
+        contentType: { type: string, enum: [image/png, image/jpeg, image/webp] }
+        size: { type: integer, minimum: 1, maximum: 5242880 }
+    StudioLogoUpload:
+      type: object
+      required: [uploadUrl, objectPath]
+      properties:
+        uploadUrl: { type: string, format: uri }
+        objectPath: { type: string }
+    StudioLogoUpdate:
+      type: object
+      additionalProperties: false
+      required: [objectPath]
+      properties:
+        objectPath: { type: string, minLength: 1, maxLength: 512 }
     DashboardMetric:
       type: object
       required: [label, value, delta, tone]
@@ -1774,6 +1854,7 @@ components:
         restPeriodEnd: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         studioId: { type: integer }
         studioName: { type: string }
+        studioLogoAvailable: { type: boolean }
         joinedAt: { type: string, format: date-time }
         lastCheckIn: { type: ["string", "null"], format: date-time }
         invitationStatus: { type: ["string", "null"], enum: [pending, accepted, expired, revoked, null] }

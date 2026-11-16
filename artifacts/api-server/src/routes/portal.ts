@@ -22,6 +22,8 @@ import {
   CreateMemberResponse,
   CreateStudioBody,
   CreateStudioResponse,
+  RequestStudioLogoUploadBody,
+  RequestStudioLogoUploadResponse,
   CheckCourseImportDuplicatesBody,
   CheckCourseImportDuplicatesResponse,
   CompleteOnboardingBody,
@@ -40,6 +42,8 @@ import {
   UpdateStudioBody,
   UpdateStudioParams,
   UpdateStudioResponse,
+  UpdateStudioLogoBody,
+  UpdateStudioLogoParams,
 } from "@workspace/api-zod";
 import {
   checkInsTable,
@@ -65,6 +69,7 @@ import {
 import { isModuleEnabled } from "../lib/module-access";
 import { closureIntersectsInterval, hasOverlappingLiveCourse } from "../lib/room-closures";
 import { isTrainerAbsentForCourse, trainerLockKey } from "../lib/trainer-scheduling";
+import { createStudioLogoUpload, getStudioLogoFile } from "../lib/studio-logos";
 
 const router: IRouter = Router();
 const CHECK_IN_MILESTONES = new Set([10, 25, 50, 100, 250, 500]);
@@ -380,6 +385,63 @@ router.patch("/studios/:id", async (req, res): Promise<void> => {
     return;
   }
   res.json(UpdateStudioResponse.parse(result.studio));
+});
+
+router.post("/studios/:id/logo/upload-url", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const params = UpdateStudioLogoParams.safeParse(req.params);
+  const body = RequestStudioLogoUploadBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Bitte ein PNG-, JPEG- oder WebP-Logo bis 5 MB auswählen." });
+    return;
+  }
+  if (staff.role === "studio_employee" || !(await canAccessStudio(staff, params.data.id))) {
+    res.status(403).json({ error: "Du darfst dieses Studio nicht bearbeiten." });
+    return;
+  }
+  try {
+    const upload = await createStudioLogoUpload(params.data.id);
+    res.json(RequestStudioLogoUploadResponse.parse(upload));
+  } catch (error) {
+    req.log.error({ err: error }, "Could not create studio logo upload URL");
+    res.status(500).json({ error: "Der Logo-Upload konnte nicht vorbereitet werden." });
+  }
+});
+
+router.patch("/studios/:id/logo", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  const params = UpdateStudioLogoParams.safeParse(req.params);
+  const body = UpdateStudioLogoBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Ungültige Logo-Daten." });
+    return;
+  }
+  const { id } = params.data;
+  if (staff.role === "studio_employee" || !(await canAccessStudio(staff, id))) {
+    res.status(403).json({ error: "Du darfst dieses Studio nicht bearbeiten." });
+    return;
+  }
+  if (!body.data.objectPath.startsWith(`/objects/studio-logos/${id}/`)) {
+    res.status(400).json({ error: "Der Upload gehört nicht zu diesem Studio." });
+    return;
+  }
+  const file = await getStudioLogoFile(body.data.objectPath);
+  if (!file) {
+    res.status(400).json({ error: "Das hochgeladene Logo wurde nicht gefunden." });
+    return;
+  }
+  const [metadata] = await file.getMetadata();
+  const actualSize = Number(metadata.size);
+  if (!["image/png", "image/jpeg", "image/webp"].includes(String(metadata.contentType)) ||
+      !Number.isFinite(actualSize) || actualSize < 1 || actualSize > 5 * 1024 * 1024) {
+    res.status(400).json({ error: "Bitte ein PNG-, JPEG- oder WebP-Logo bis 5 MB hochladen." });
+    return;
+  }
+  await db.update(studiosTable).set({ logoPath: body.data.objectPath })
+    .where(and(eq(studiosTable.id, id), eq(studiosTable.organizationId, staff.organizationId)));
+  res.json({ success: true });
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {

@@ -128,6 +128,52 @@ export const UpdateStudioResponse = zod.object({
 
 
 /**
+ * @summary Request a secure upload URL for a studio logo
+ */
+export const RequestStudioLogoUploadParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const requestStudioLogoUploadBodySizeMax = 5242880;
+
+
+
+export const RequestStudioLogoUploadBody = zod.object({
+  "contentType": zod.enum(['image/png', 'image/jpeg', 'image/webp']),
+  "size": zod.number().int().min(1).max(requestStudioLogoUploadBodySizeMax)
+})
+
+export const RequestStudioLogoUploadResponse = zod.object({
+  "uploadUrl": zod.string().url(),
+  "objectPath": zod.string()
+})
+
+
+/**
+ * @summary Save the uploaded logo for a studio
+ */
+export const UpdateStudioLogoParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateStudioLogoBodyObjectPathMax = 512;
+
+
+
+export const UpdateStudioLogoBody = zod.object({
+  "objectPath": zod.string().min(1).max(updateStudioLogoBodyObjectPathMax)
+})
+
+export const UpdateStudioLogoResponse = zod.unknown()
+
+
+/**
+ * @summary Serve the signed-in member's studio logo
+ */
+export const GetMemberStudioLogoResponse = zod.unknown()
+
+
+/**
  * @summary Get metrics and activity tailored to the signed-in user's role
  */
 export const GetDashboardQueryParams = zod.object({
@@ -206,6 +252,7 @@ export const ListMembersResponseItem = zod.object({
   "restPeriodEnd": zod.string().regex(listMembersResponseRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -279,6 +326,7 @@ export const CreateMemberResponse = zod.object({
   "restPeriodEnd": zod.string().regex(createMemberResponseRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -354,6 +402,7 @@ export const UpdateMemberResponse = zod.object({
   "restPeriodEnd": zod.string().regex(updateMemberResponseRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -1227,6 +1276,7 @@ export const GetMemberHomeResponse = zod.object({
   "restPeriodEnd": zod.string().regex(getMemberHomeResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -1316,6 +1366,7 @@ export const UpdateOwnMemberProfileResponse = zod.object({
   "restPeriodEnd": zod.string().regex(updateOwnMemberProfileResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -1411,6 +1462,7 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "restPeriodEnd": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -1499,6 +1551,7 @@ export const ClaimMembershipResponse = zod.object({
   "restPeriodEnd": zod.string().regex(claimMembershipResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),
@@ -1566,6 +1619,7 @@ export const AcceptMemberInvitationResponse = zod.object({
   "restPeriodEnd": zod.string().regex(acceptMemberInvitationResponseMemberOneRestPeriodEndRegExp).nullish(),
   "studioId": zod.number().int(),
   "studioName": zod.string(),
+  "studioLogoAvailable": zod.boolean().optional(),
   "joinedAt": zod.coerce.date(),
   "lastCheckIn": zod.coerce.date().nullable(),
   "invitationStatus": zod.union([zod.literal('pending'),zod.literal('accepted'),zod.literal('expired'),zod.literal('revoked'),zod.literal(null)]).nullish(),

@@ -592,6 +592,9 @@ button { cursor: pointer; }
 .studio-create-actions { display: flex; align-items: end; gap: 8px; grid-column: 1 / -1; }
 .studio-create-form .form-error { grid-column: 1 / -1; margin: 0; }
 .studio-settings .booking-result { margin: 0 0 18px; }
+.studio-logo-row { gap: 10px; }
+.studio-logo-upload { position: relative; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; cursor: pointer; }
+.studio-logo-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .contract-settings-form { display: grid; gap: 14px; }
 .contract-settings-card { display: grid; gap: 14px; padding: 20px; border: 1px solid hsl(var(--card-border)); border-radius: 15px; background: hsl(var(--card)); }
 .contract-settings-card h3 { margin: 0; font-family: var(--font-serif); font-size: 1rem; letter-spacing: -.025em; }

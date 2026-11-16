@@ -23,6 +23,7 @@ import { getClerkIdentity, getRequestUserId } from "../lib/fiudia-access";
 import { linkMembership, MemberLinkError } from "../lib/member-link";
 import { isModuleEnabled } from "../lib/module-access";
 import { getStripeClient } from "../lib/stripe-client";
+import { getStudioLogoFile, pipeStudioLogo } from "../lib/studio-logos";
 
 const router: IRouter = Router();
 
@@ -48,12 +49,15 @@ export async function linkedMember(userId: string) {
     waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
+    studioLogoPath: studiosTable.logoPath,
     organizationId: studiosTable.organizationId,
     joinedAt: membersTable.joinedAt,
   }).from(membersTable)
     .innerJoin(studiosTable, eq(membersTable.studioId, studiosTable.id))
     .where(eq(membersTable.clerkUserId, userId)).limit(1);
-  return member ?? null;
+  if (!member) return null;
+  const { studioLogoPath, ...profile } = member;
+  return { ...profile, studioLogoAvailable: Boolean(studioLogoPath) };
 }
 
 type LinkedMember = NonNullable<Awaited<ReturnType<typeof linkedMember>>>;
@@ -165,6 +169,19 @@ router.get("/member/me", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
   res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));
+});
+
+router.get("/member/studio-logo", async (req, res): Promise<void> => {
+  const userId = getRequestUserId(req);
+  if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
+  const member = await linkedMember(userId);
+  if (!member) { res.status(404).json({ error: "Mitgliedschaft nicht verbunden." }); return; }
+  const [studio] = await db.select({ logoPath: studiosTable.logoPath })
+    .from(studiosTable).where(eq(studiosTable.id, member.studioId)).limit(1);
+  if (!studio?.logoPath) { res.status(404).end(); return; }
+  const file = await getStudioLogoFile(studio.logoPath);
+  if (!file) { res.status(404).end(); return; }
+  await pipeStudioLogo(file, res);
 });
 
 router.patch("/member/me/profile", async (req, res): Promise<void> => {

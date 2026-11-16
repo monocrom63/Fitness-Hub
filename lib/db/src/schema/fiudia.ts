@@ -39,6 +39,7 @@ export const studiosTable = pgTable("fiudia_studios", {
     .references(() => organizationsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   city: text("city").notNull(),
+  logoPath: text("logo_path"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
