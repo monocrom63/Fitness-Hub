@@ -20,6 +20,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApiAccessDecision,
+  ApiAccessRequest,
+  ApiAccessRequestInput,
+  ApiAccessRequestList,
+  ApiCatalogResponse,
   BookingCancellationInput,
   CheckIn,
   CheckInInput,
@@ -4036,6 +4041,337 @@ export const useUpdateModule = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateModuleMutationOptions(options));
+    }
+
+export const getListApiCatalogUrl = () => {
+
+
+
+
+  return `/api/api-access/catalog`
+}
+
+/**
+ * @summary List APIs and the current user's access state
+ */
+export const listApiCatalog = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiCatalogResponse> => {
+
+  return customFetch<ApiCatalogResponse>(getListApiCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListApiCatalogQueryKey = () => {
+    return [
+    `/api/api-access/catalog`
+    ] as const;
+    }
+
+
+export const getListApiCatalogQueryOptions = <TData = Awaited<ReturnType<typeof listApiCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApiCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListApiCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listApiCatalog>>> = ({ signal }) => listApiCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listApiCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListApiCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof listApiCatalog>>>
+export type ListApiCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List APIs and the current user's access state
+ */
+
+export function useListApiCatalog<TData = Awaited<ReturnType<typeof listApiCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApiCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListApiCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListApiAccessRequestsUrl = () => {
+
+
+
+
+  return `/api/api-access/requests`
+}
+
+/**
+ * @summary List access requests visible to the current user
+ */
+export const listApiAccessRequests = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiAccessRequestList> => {
+
+  return customFetch<ApiAccessRequestList>(getListApiAccessRequestsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListApiAccessRequestsQueryKey = () => {
+    return [
+    `/api/api-access/requests`
+    ] as const;
+    }
+
+
+export const getListApiAccessRequestsQueryOptions = <TData = Awaited<ReturnType<typeof listApiAccessRequests>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApiAccessRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListApiAccessRequestsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listApiAccessRequests>>> = ({ signal }) => listApiAccessRequests({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listApiAccessRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListApiAccessRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof listApiAccessRequests>>>
+export type ListApiAccessRequestsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List access requests visible to the current user
+ */
+
+export function useListApiAccessRequests<TData = Awaited<ReturnType<typeof listApiAccessRequests>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listApiAccessRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListApiAccessRequestsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateApiAccessRequestUrl = () => {
+
+
+
+
+  return `/api/api-access/requests`
+}
+
+/**
+ * @summary Request access to a catalog API
+ */
+export const createApiAccessRequest = async (apiAccessRequestInput: ApiAccessRequestInput, options?: Parameters<typeof customFetch>[1]): Promise<ApiAccessRequest> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApiAccessRequest>(getCreateApiAccessRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(apiAccessRequestInput)
+  }
+);}
+
+
+
+
+
+export const getCreateApiAccessRequestMutationKey = () => ['createApiAccessRequest'] as const;
+
+export const getCreateApiAccessRequestMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApiAccessRequest>>, TError,CreateApiAccessRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createApiAccessRequest>>, TError,CreateApiAccessRequestMutationVariables, TContext> => {
+
+const mutationKey = getCreateApiAccessRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createApiAccessRequest>>, CreateApiAccessRequestMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createApiAccessRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateApiAccessRequestMutationResult = NonNullable<Awaited<ReturnType<typeof createApiAccessRequest>>>
+    export type CreateApiAccessRequestMutationBody = BodyType<ApiAccessRequestInput>
+    export type CreateApiAccessRequestMutationError = ErrorType<void>
+    export type CreateApiAccessRequestMutationVariables = {data: BodyType<ApiAccessRequestInput>}
+
+    /**
+ * @summary Request access to a catalog API
+ */
+export const useCreateApiAccessRequest = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApiAccessRequest>>, TError,CreateApiAccessRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createApiAccessRequest>>,
+        TError,
+        CreateApiAccessRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateApiAccessRequestMutationOptions(options));
+    }
+
+export const getReviewApiAccessRequestUrl = (id: number,) => {
+
+
+
+
+  return `/api/api-access/requests/${id}`
+}
+
+/**
+ * @summary Approve or reject an API access request as district manager
+ */
+export const reviewApiAccessRequest = async (id: number,
+    apiAccessDecision: ApiAccessDecision, options?: Parameters<typeof customFetch>[1]): Promise<ApiAccessRequest> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ApiAccessRequest>(getReviewApiAccessRequestUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(apiAccessDecision)
+  }
+);}
+
+
+
+
+
+export const getReviewApiAccessRequestMutationKey = () => ['reviewApiAccessRequest'] as const;
+
+export const getReviewApiAccessRequestMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewApiAccessRequest>>, TError,ReviewApiAccessRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewApiAccessRequest>>, TError,ReviewApiAccessRequestMutationVariables, TContext> => {
+
+const mutationKey = getReviewApiAccessRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewApiAccessRequest>>, ReviewApiAccessRequestMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewApiAccessRequest(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewApiAccessRequestMutationResult = NonNullable<Awaited<ReturnType<typeof reviewApiAccessRequest>>>
+    export type ReviewApiAccessRequestMutationBody = BodyType<ApiAccessDecision>
+    export type ReviewApiAccessRequestMutationError = ErrorType<void>
+    export type ReviewApiAccessRequestMutationVariables = {id: number;data: BodyType<ApiAccessDecision>}
+
+    /**
+ * @summary Approve or reject an API access request as district manager
+ */
+export const useReviewApiAccessRequest = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewApiAccessRequest>>, TError,ReviewApiAccessRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewApiAccessRequest>>,
+        TError,
+        ReviewApiAccessRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewApiAccessRequestMutationOptions(options));
     }
 
 export const getGetMarketingSubscriptionUrl = () => {

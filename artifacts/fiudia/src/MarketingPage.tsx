@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
+import { Link } from 'wouter';
 import {
   ArrowUpRight, CalendarClock, Check, ChevronRight, CircleHelp, Copy, ImagePlus, KeyRound,
   Mail, Megaphone, RotateCw, ShieldCheck, Users,
@@ -11,6 +12,7 @@ import {
   useCreateMarketingBillingPortal, useCreateMarketingCampaign,
   useCreateMarketingCheckout, useGetMarketingApiKey, useGetMarketingAudienceCount,
   useGetMarketingSubscription, useListMarketingCampaigns, useListStudios,
+  useListApiCatalog,
   useRequestMarketingImageUpload, useRotateMarketingApiKey, useSendMarketingCampaign,
 } from '@workspace/api-client-react';
 import type { MarketingCampaign, MarketingCampaignInput } from '@workspace/api-client-react';
@@ -83,6 +85,7 @@ export default function MarketingPage({ role }: { role: Role }) {
   const requestUpload = useRequestMarketingImageUpload();
   const apiKey = useGetMarketingApiKey();
   const rotateKey = useRotateMarketingApiKey();
+  const apiCatalog = useListApiCatalog();
   const confirmCheckout = useConfirmMarketingCheckout();
   const form = useForm<CampaignFields>({ defaultValues: emptyFields });
   const [imagePath, setImagePath] = useState('');
@@ -125,6 +128,7 @@ export default function MarketingPage({ role }: { role: Role }) {
 
   const active = subscription.data?.active === true;
   const canManageBilling = role === 'district_manager';
+  const marketingAccess = apiCatalog.data?.find(entry => entry.serviceKey === 'marketing');
   const uploadImage = async (file?: File) => {
     if (!file) return;
     setUploadError('');
@@ -196,6 +200,10 @@ export default function MarketingPage({ role }: { role: Role }) {
     onSuccess: result => { window.location.assign(result.url); },
   });
   const rotate = () => {
+    if (marketingAccess?.accessStatus !== 'approved') {
+      setNotice('Bitte beantrage zuerst den Marketing-API-Zugang in den REST-API-Einstellungen.');
+      return;
+    }
     if (apiKey.data?.active && !window.confirm('Den bisherigen Agentur-Schlüssel ersetzen? Der neue Schlüssel wird nur einmal angezeigt.')) return;
     setOneTimeKey('');
     rotateKey.mutate(undefined, {
@@ -234,7 +242,7 @@ export default function MarketingPage({ role }: { role: Role }) {
         <h1>Marketing, das ankommt.</h1>
         <p>Erstelle gezielte Kampagnen für deine Mitglieder — mit Einwilligung und Reichweite im Blick.</p>
       </div>
-      <a href="/api/external/marketing/docs" target="_blank" rel="noreferrer" className="button button-outline marketing-doc-link" data-testid="link-marketing-docs">API-Dokumentation <ArrowUpRight size={15} /></a>
+      <Link href="/settings/api" className="button button-outline marketing-doc-link" data-testid="link-marketing-docs">REST-API-Katalog <ArrowUpRight size={15} /></Link>
     </header>
 
     {!active ? <section className="marketing-paywall" aria-labelledby="marketing-paywall-title">
@@ -329,7 +337,9 @@ export default function MarketingPage({ role }: { role: Role }) {
               <div className="marketing-key-status"><span className={apiKey.data?.active ? 'marketing-key-indicator active' : 'marketing-key-indicator'} />{apiKey.isLoading ? 'Schlüsselstatus wird geladen …' : apiKey.isError ? 'Schlüsselstatus nicht verfügbar' : apiKey.data?.active ? `Aktiv · ${apiKey.data.keyPrefix ?? 'Schlüssel vorhanden'}` : 'Noch kein Schlüssel erstellt'}</div>
               {apiKey.data?.lastUsedAt && <small>Zuletzt verwendet am {dateLabel(apiKey.data.lastUsedAt)}</small>}
               {apiKey.isError && <button type="button" className="marketing-text-button" onClick={() => void apiKey.refetch()} data-testid="button-retry-marketing-key">Erneut laden</button>}
-              <button type="button" className="button button-dark" onClick={rotate} disabled={rotateKey.isPending || apiKey.isLoading} data-testid="button-rotate-marketing-key"><RotateCw size={15} />{rotateKey.isPending ? 'Schlüssel wird erstellt …' : apiKey.data?.active ? 'Schlüssel erneuern' : 'Schlüssel erstellen'}</button>
+              {marketingAccess?.accessStatus === 'approved'
+                ? <button type="button" className="button button-dark" onClick={rotate} disabled={rotateKey.isPending || apiKey.isLoading} data-testid="button-rotate-marketing-key"><RotateCw size={15} />{rotateKey.isPending ? 'Schlüssel wird erstellt …' : apiKey.data?.active ? 'Schlüssel erneuern' : 'Schlüssel erstellen'}</button>
+                : <Link href="/settings/api" className="button button-outline" data-testid="link-request-marketing-api">REST-API-Zugang beantragen <ArrowUpRight size={14} /></Link>}
               {rotateKey.isError && <p className="marketing-inline-error" role="alert" data-testid="error-marketing-key">{errorMessage(rotateKey.error, 'Schlüssel konnte nicht erstellt werden.')}</p>}
             </div>
             {oneTimeKey && <div className="marketing-key-reveal" role="status" data-testid="panel-marketing-key-reveal"><div><strong>Neuer Schlüssel — nur jetzt sichtbar</strong><p>Speichere ihn sicher. Fiudia zeigt ihn danach nicht erneut an.</p></div><code>{oneTimeKey}</code><button type="button" className="button button-outline" onClick={() => void copyKey()} data-testid="button-copy-marketing-key"><Copy size={14} /> Kopieren</button>{copyFeedback && <span>{copyFeedback}</span>}</div>}

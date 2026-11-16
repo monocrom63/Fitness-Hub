@@ -1326,6 +1326,100 @@ export const UpdateModuleResponse = zod.object({
 
 
 /**
+ * @summary List APIs and the current user's access state
+ */
+export const ListApiCatalogResponseItem = zod.object({
+  "serviceKey": zod.enum(['personio', 'marketing', 'access', 'accounting']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "availability": zod.enum(['available', 'planned']),
+  "accessStatus": zod.enum(['none', 'pending', 'approved', 'rejected']),
+  "requestId": zod.number().int().nullable(),
+  "hasKey": zod.boolean(),
+  "keyPrefix": zod.string().nullable(),
+  "createdAt": zod.coerce.date().nullable(),
+  "lastUsedAt": zod.coerce.date().nullable(),
+  "docsPath": zod.string().nullable()
+})
+export const ListApiCatalogResponse = zod.array(ListApiCatalogResponseItem)
+
+
+/**
+ * @summary List access requests visible to the current user
+ */
+export const ListApiAccessRequestsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "serviceKey": zod.enum(['personio', 'marketing', 'access', 'accounting']),
+  "serviceTitle": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "requestedBy": zod.string(),
+  "requestedByEmail": zod.string().email(),
+  "createdAt": zod.coerce.date(),
+  "reviewNote": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable()
+})
+export const ListApiAccessRequestsResponse = zod.array(ListApiAccessRequestsResponseItem)
+
+
+/**
+ * @summary Request access to a catalog API
+ */
+export const createApiAccessRequestBodyReasonMin = 10;
+export const createApiAccessRequestBodyReasonMax = 2000;
+
+
+
+export const CreateApiAccessRequestBody = zod.object({
+  "serviceKey": zod.enum(['personio', 'marketing', 'access', 'accounting']),
+  "reason": zod.string().min(createApiAccessRequestBodyReasonMin).max(createApiAccessRequestBodyReasonMax)
+})
+
+export const CreateApiAccessRequestResponse = zod.object({
+  "id": zod.number().int(),
+  "serviceKey": zod.enum(['personio', 'marketing', 'access', 'accounting']),
+  "serviceTitle": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "requestedBy": zod.string(),
+  "requestedByEmail": zod.string().email(),
+  "createdAt": zod.coerce.date(),
+  "reviewNote": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Approve or reject an API access request as district manager
+ */
+export const ReviewApiAccessRequestParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const reviewApiAccessRequestBodyReviewNoteMax = 500;
+
+
+
+export const ReviewApiAccessRequestBody = zod.object({
+  "decision": zod.enum(['approve', 'reject']),
+  "reviewNote": zod.string().max(reviewApiAccessRequestBodyReviewNoteMax).optional()
+})
+
+export const ReviewApiAccessRequestResponse = zod.object({
+  "id": zod.number().int(),
+  "serviceKey": zod.enum(['personio', 'marketing', 'access', 'accounting']),
+  "serviceTitle": zod.string(),
+  "reason": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "requestedBy": zod.string(),
+  "requestedByEmail": zod.string().email(),
+  "createdAt": zod.coerce.date(),
+  "reviewNote": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable()
+})
+
+
+/**
  * @summary Get organization marketing subscription status
  */
 export const GetMarketingSubscriptionResponse = zod.object({

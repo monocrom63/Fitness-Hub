@@ -6,6 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './apiAccessDecision';
+export * from './apiAccessDecisionDecision';
+export * from './apiAccessRequest';
+export * from './apiAccessRequestInput';
+export * from './apiAccessRequestList';
+export * from './apiAccessRequestStatus';
+export * from './apiAccessStatus';
+export * from './apiCatalogEntry';
+export * from './apiCatalogEntryAvailability';
+export * from './apiCatalogResponse';
+export * from './apiServiceKey';
 export * from './billingInterval';
 export * from './bookingCancellationInput';
 export * from './bookingCancellationInputExpectedStatus';

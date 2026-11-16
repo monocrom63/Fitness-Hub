@@ -140,6 +140,104 @@ export interface MarketingApiKeyCreated {
   keyPrefix: string;
 }
 
+export type ApiServiceKey = typeof ApiServiceKey[keyof typeof ApiServiceKey];
+
+
+export const ApiServiceKey = {
+  personio: 'personio',
+  marketing: 'marketing',
+  access: 'access',
+  accounting: 'accounting',
+} as const;
+
+export type ApiAccessStatus = typeof ApiAccessStatus[keyof typeof ApiAccessStatus];
+
+
+export const ApiAccessStatus = {
+  none: 'none',
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type ApiCatalogEntryAvailability = typeof ApiCatalogEntryAvailability[keyof typeof ApiCatalogEntryAvailability];
+
+
+export const ApiCatalogEntryAvailability = {
+  available: 'available',
+  planned: 'planned',
+} as const;
+
+export interface ApiCatalogEntry {
+  serviceKey: ApiServiceKey;
+  title: string;
+  description: string;
+  availability: ApiCatalogEntryAvailability;
+  accessStatus: ApiAccessStatus;
+  /** @nullable */
+  requestId: number | null;
+  hasKey: boolean;
+  /** @nullable */
+  keyPrefix: string | null;
+  /** @nullable */
+  createdAt: string | null;
+  /** @nullable */
+  lastUsedAt: string | null;
+  /** @nullable */
+  docsPath: string | null;
+}
+
+export type ApiCatalogResponse = ApiCatalogEntry[];
+
+export type ApiAccessRequestStatus = typeof ApiAccessRequestStatus[keyof typeof ApiAccessRequestStatus];
+
+
+export const ApiAccessRequestStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface ApiAccessRequest {
+  id: number;
+  serviceKey: ApiServiceKey;
+  serviceTitle: string;
+  reason: string;
+  status: ApiAccessRequestStatus;
+  requestedBy: string;
+  requestedByEmail: string;
+  createdAt: string;
+  /** @nullable */
+  reviewNote: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+}
+
+export type ApiAccessRequestList = ApiAccessRequest[];
+
+export interface ApiAccessRequestInput {
+  serviceKey: ApiServiceKey;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  reason: string;
+}
+
+export type ApiAccessDecisionDecision = typeof ApiAccessDecisionDecision[keyof typeof ApiAccessDecisionDecision];
+
+
+export const ApiAccessDecisionDecision = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+export interface ApiAccessDecision {
+  decision: ApiAccessDecisionDecision;
+  /** @maxLength 500 */
+  reviewNote?: string;
+}
+
 export type MarketingSubscriptionStatus = typeof MarketingSubscriptionStatus[keyof typeof MarketingSubscriptionStatus];
 
 

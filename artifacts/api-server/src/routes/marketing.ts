@@ -22,6 +22,7 @@ import { getRequestUserId, getStaffContext, type StaffContext } from "../lib/fiu
 import { createMarketingImageUpload, getMarketingImageFile, pipeMarketingImage } from "../lib/studio-logos";
 import { getStripeClient } from "../lib/stripe-client";
 import { resendRequest } from "../lib/resend-client";
+import { getApprovedApiRequest, hasCurrentApprovedApiAccess } from "../lib/api-access";
 
 const router: IRouter = Router();
 const activeCache = new Map<number, { expires: number; active: boolean; status: string; currentPeriodEnd: Date | null }>();
@@ -344,18 +345,26 @@ router.post("/marketing/uploads/request-url", async (req, res): Promise<void> =>
 router.get("/marketing/api-key", async (req, res): Promise<void> => {
   const staff = await getStaff(req, res);
   if (!staff) return;
+  const approval = await getApprovedApiRequest(staff.organizationId, "marketing");
   const [row] = await db.select().from(marketingApiKeysTable)
     .where(eq(marketingApiKeysTable.organizationId, staff.organizationId)).limit(1);
+  const active = !!row && !row.revokedAt && !!approval?.reviewedAt &&
+    row.createdAt >= approval.reviewedAt && (await subscriptionState(staff.organizationId)).active;
   res.json(GetMarketingApiKeyResponse.parse({
-    active: !!row && !row.revokedAt, keyPrefix: row?.keyPrefix ?? null,
-    createdAt: row?.createdAt.toISOString() ?? null, lastUsedAt: row?.lastUsedAt?.toISOString() ?? null,
+    active, keyPrefix: active ? row?.keyPrefix ?? null : null,
+    createdAt: active ? row?.createdAt.toISOString() ?? null : null,
+    lastUsedAt: active ? row?.lastUsedAt?.toISOString() ?? null : null,
   }));
 });
 
 router.post("/marketing/api-key", async (req, res): Promise<void> => {
   const staff = await getStaff(req, res);
   if (!staff) return;
-  if (staff.role !== "district_manager") { res.status(403).json({ error: "Nur die Bezirksleitung kann den Agenturzugang verwalten." }); return; }
+  const approval = await getApprovedApiRequest(staff.organizationId, "marketing");
+  if (!approval) { res.status(403).json({ error: "Für die Marketing-API ist noch kein Zugriff freigegeben." }); return; }
+  if (staff.role !== "district_manager" && approval.requestedByStaffId !== staff.id) {
+    res.status(403).json({ error: "Nur die antragstellende Person oder die Bezirksleitung kann den Schlüssel verwalten." }); return;
+  }
   if (!(await subscriptionState(staff.organizationId)).active) { res.status(403).json({ error: "Ein aktives Marketing-Abonnement ist erforderlich." }); return; }
   const secret = `fmk_live_${randomBytes(32).toString("base64url")}`;
   const keyPrefix = secret.slice(0, 16);
@@ -375,6 +384,9 @@ async function externalOrganization(req: Request, res: Response) {
   const prefix = key.slice(0, 16);
   const [row] = await db.select().from(marketingApiKeysTable)
     .where(and(eq(marketingApiKeysTable.keyPrefix, prefix), isNull(marketingApiKeysTable.revokedAt))).limit(1);
+  if (!row || !(await hasCurrentApprovedApiAccess(row.organizationId, "marketing", row.createdAt))) {
+    res.status(401).json({ error: "API-Schlüssel ungültig oder Zugriff nicht freigegeben." }); return null;
+  }
   const candidate = Buffer.from(hash(key), "hex");
   const expected = Buffer.from(row?.keyHash ?? "0".repeat(64), "hex");
   if (!row || candidate.length !== expected.length || !timingSafeEqual(candidate, expected)) {

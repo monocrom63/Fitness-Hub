@@ -7,7 +7,7 @@ import { deDE } from '@clerk/localizations';
 import {
   Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Copy, Dumbbell,
   LayoutDashboard, LogOut, Mail, MapPin, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2, DoorOpen,
-  ShieldCheck, Sparkles, Users, UserRound, X, Zap, Upload, Megaphone,
+  ShieldCheck, Sparkles, Users, UserRound, X, Zap, Upload, Megaphone, Code2,
 } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCourseBookingsQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
@@ -26,6 +26,7 @@ import RoomClosuresPage from './RoomClosuresPage';
 import StudioManagement from './StudioManagement';
 import DashboardAnalytics from './DashboardAnalytics';
 import MarketingPage from './MarketingPage';
+import RestApiCatalog from './RestApiCatalog';
 import { StudioScopeProvider, useStudioScope } from './StudioScope';
 import TrainerAbsencesPage from './TrainerAbsencesPage';
 import CoursePushDeliveries from './CoursePushDeliveries';
@@ -235,6 +236,7 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
     ...((me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? [{ href: '/team/absences', label: 'Trainer-Ausfälle', icon: UserRound }] : []),
     ...(me.role !== 'studio_employee' && moduleEnabled(modules, 'team') ? [{ href: '/team', label: 'Team', icon: UserRound }] : []),
     ...(me.role !== 'studio_employee' ? [{ href: '/marketing', label: 'Marketing', icon: Megaphone }] : []),
+    ...(me.role !== 'studio_employee' ? [{ href: '/settings/api', label: 'REST API', icon: Code2 }] : []),
     { href: '/contact', label: 'Kontakt', icon: Mail },
     { href: '/support', label: 'Support', icon: CircleHelp },
   ];
@@ -821,7 +823,7 @@ function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; mod
   return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Dein Profil und die Module deiner Organisation." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div><section className="module-settings"><div className="eyebrow">Organisation / Zugang</div><h2>Module</h2><p>{me.role === 'district_manager' ? 'Bestimme, welche Bereiche deiner Organisation zur Verfügung stehen.' : 'Für deinen Workspace verfügbare Bereiche.'}</p>{modulesError ? <ErrorBlock retry={retryModules} /> : <div className="module-list">{modules.filter(module => me.role === 'district_manager' || module.enabled).map(module => <div className="module-row" key={module.key} data-testid={`module-${module.key}`}><div><strong>{module.title}</strong><span>{module.enabled ? 'Aktiv' : 'Deaktiviert'}</span></div>{me.role === 'district_manager' && <button type="button" role="switch" aria-checked={module.enabled} aria-label={`${module.title} ${module.enabled ? 'deaktivieren' : 'aktivieren'}`} className={`module-switch ${module.enabled ? 'on' : ''}`} disabled={update.isPending} onClick={() => update.mutate({ key: module.key, data: { enabled: !module.enabled } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListModulesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} data-testid={`switch-module-${module.key}`}><i /></button>}</div>)}{!modules.some(module => module.enabled) && me.role !== 'district_manager' && <p>Keine weiteren Bereiche sind derzeit aktiviert.</p>}</div>}{update.isError && <p className="form-error" role="alert">Modul konnte nicht aktualisiert werden. Bitte erneut versuchen.</p>}</section>{me.role !== 'studio_employee' && <ContractSettingsPanel studioId={me.studioId ?? selectedStudioId} />}</>;
 }
 
-type ProtectedPage = 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' | 'contact' | 'support' | 'marketing';
+type ProtectedPage = 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' | 'contact' | 'support' | 'marketing' | 'api-settings';
 
 function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
   page: ProtectedPage; me: Me; modules: ModuleSetting[]; retryModules: () => void; modulesError: boolean;
@@ -832,6 +834,7 @@ function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
     if (page === 'contact') return <ContactPage />;
     if (page === 'support') return <SupportPage />;
     if (page === 'marketing') return me.role === 'district_manager' || me.role === 'studio_manager' ? <MarketingPage role={me.role} /> : <div className="empty-state"><h3>Bereich nicht verfügbar</h3><p>Marketing ist nur für die Studio- und Bezirksleitung verfügbar.</p></div>;
+    if (page === 'api-settings') return me.role === 'district_manager' || me.role === 'studio_manager' ? <RestApiCatalog role={me.role} /> : <div className="empty-state"><h3>Bereich nicht verfügbar</h3><p>REST-API-Zugänge sind nur für die Studio- und Bezirksleitung verfügbar.</p></div>;
     if (me.role === 'district_manager' && page !== 'team' && page !== 'pulse' && !selectedStudioId) {
       if (studios.isLoading) return <LoadingBlock label="Studios werden geladen" />;
       if (studios.isError) return <ErrorBlock retry={() => { void studios.refetch(); }} />;
@@ -859,7 +862,7 @@ function Router() {
   const { isLoaded, isSignedIn } = useAuth();
   const pending = invitationReturnDestination(sessionStorage, location, isLoaded, isSignedIn);
   if (pending) return <Redirect to={pending} />;
-  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/marketing"><ProtectedRoute page="marketing" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team/absences"><ProtectedRoute page="trainer-absences" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route path="/contact"><ProtectedRoute page="contact" /></Route><Route path="/support"><ProtectedRoute page="support" /></Route><Route component={NotFoundPage} /></Switch>;
+  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/marketing"><ProtectedRoute page="marketing" /></Route><Route path="/settings/api"><ProtectedRoute page="api-settings" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team/absences"><ProtectedRoute page="trainer-absences" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route path="/contact"><ProtectedRoute page="contact" /></Route><Route path="/support"><ProtectedRoute page="support" /></Route><Route component={NotFoundPage} /></Switch>;
 }
 
 function IdentityQueryProvider() {

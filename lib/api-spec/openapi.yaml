@@ -22,6 +22,8 @@ tags:
     description: Organization feature availability
   - name: marketing
     description: Paid marketing module and its agency API
+  - name: api-access
+    description: Fiudia API catalog and organization access approvals
 paths:
   /healthz:
     get:
@@ -1013,6 +1015,67 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ModuleSetting" }
         "403": { description: District manager required }
+  /api-access/catalog:
+    get:
+      operationId: listApiCatalog
+      tags: [api-access]
+      summary: List APIs and the current user's access state
+      responses:
+        "200":
+          description: Organization API catalog
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiCatalogResponse" }
+  /api-access/requests:
+    get:
+      operationId: listApiAccessRequests
+      tags: [api-access]
+      summary: List access requests visible to the current user
+      responses:
+        "200":
+          description: Requests visible to the user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiAccessRequestList" }
+    post:
+      operationId: createApiAccessRequest
+      tags: [api-access]
+      summary: Request access to a catalog API
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApiAccessRequestInput" }
+      responses:
+        "201":
+          description: Access request submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiAccessRequest" }
+        "409": { description: An open request already exists or access is already approved }
+  /api-access/requests/{id}:
+    patch:
+      operationId: reviewApiAccessRequest
+      tags: [api-access]
+      summary: Approve or reject an API access request as district manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApiAccessDecision" }
+      responses:
+        "200":
+          description: Request reviewed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiAccessRequest" }
+        "403": { description: District manager required }
+        "404": { description: Request not found }
   /marketing/subscription:
     get:
       operationId: getMarketingSubscription
@@ -1960,6 +2023,61 @@ components:
       properties:
         key: { type: string }
         keyPrefix: { type: string }
+    ApiServiceKey:
+      type: string
+      enum: [personio, marketing, access, accounting]
+    ApiAccessStatus:
+      type: string
+      enum: [none, pending, approved, rejected]
+    ApiCatalogEntry:
+      type: object
+      required: [serviceKey, title, description, availability, accessStatus, requestId, hasKey, keyPrefix, createdAt, lastUsedAt, docsPath]
+      properties:
+        serviceKey: { $ref: "#/components/schemas/ApiServiceKey" }
+        title: { type: string }
+        description: { type: string }
+        availability: { type: string, enum: [available, planned] }
+        accessStatus: { $ref: "#/components/schemas/ApiAccessStatus" }
+        requestId: { type: ["integer", "null"] }
+        hasKey: { type: boolean }
+        keyPrefix: { type: ["string", "null"] }
+        createdAt: { type: ["string", "null"], format: date-time }
+        lastUsedAt: { type: ["string", "null"], format: date-time }
+        docsPath: { type: ["string", "null"] }
+    ApiCatalogResponse:
+      type: array
+      items: { $ref: "#/components/schemas/ApiCatalogEntry" }
+    ApiAccessRequest:
+      type: object
+      required: [id, serviceKey, serviceTitle, reason, status, requestedBy, requestedByEmail, createdAt, reviewNote, reviewedAt]
+      properties:
+        id: { type: integer }
+        serviceKey: { $ref: "#/components/schemas/ApiServiceKey" }
+        serviceTitle: { type: string }
+        reason: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        requestedBy: { type: string }
+        requestedByEmail: { type: string, format: email }
+        createdAt: { type: string, format: date-time }
+        reviewNote: { type: ["string", "null"] }
+        reviewedAt: { type: ["string", "null"], format: date-time }
+    ApiAccessRequestList:
+      type: array
+      items: { $ref: "#/components/schemas/ApiAccessRequest" }
+    ApiAccessRequestInput:
+      type: object
+      additionalProperties: false
+      required: [serviceKey, reason]
+      properties:
+        serviceKey: { $ref: "#/components/schemas/ApiServiceKey" }
+        reason: { type: string, minLength: 10, maxLength: 2000 }
+    ApiAccessDecision:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        reviewNote: { type: string, maxLength: 500 }
     MarketingSubscription:
       type: object
       required: [active, status, currentPeriodEnd]

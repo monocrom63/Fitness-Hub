@@ -60,6 +60,23 @@ export const marketingApiKeysTable = pgTable(
   },
 );
 
+export const apiAccessRequestsTable = pgTable(
+  "fiudia_api_access_requests",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
+    serviceKey: text("service_key").notNull(),
+    requestedByStaffId: integer("requested_by_staff_id").notNull().references(() => staffTable.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    status: text("status").notNull().default("pending"),
+    reviewedByStaffId: integer("reviewed_by_staff_id").references(() => staffTable.id, { onDelete: "set null" }),
+    reviewNote: text("review_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
 export const marketingCampaignsTable = pgTable(
   "fiudia_marketing_campaigns",
   {
