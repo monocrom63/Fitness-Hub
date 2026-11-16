@@ -7,7 +7,7 @@ import { deDE } from '@clerk/localizations';
 import {
   Activity, ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, Clock3, Copy, Dumbbell,
   LayoutDashboard, LogOut, Mail, MapPin, Menu, MoreHorizontal, Pencil, Plus, Search, Settings2, DoorOpen,
-  ShieldCheck, Sparkles, Users, UserRound, X, Zap, Upload,
+  ShieldCheck, Sparkles, Users, UserRound, X, Zap, Upload, Megaphone,
 } from 'lucide-react';
 import {
   getGetDashboardQueryKey, getGetMeQueryKey, getListCourseBookingsQueryKey, getListCoursesQueryKey, getListInvitationsQueryKey,
@@ -25,6 +25,7 @@ import { ActionStrip, PulsePage, TodayPage } from './TodayPulse';
 import RoomClosuresPage from './RoomClosuresPage';
 import StudioManagement from './StudioManagement';
 import DashboardAnalytics from './DashboardAnalytics';
+import MarketingPage from './MarketingPage';
 import { StudioScopeProvider, useStudioScope } from './StudioScope';
 import TrainerAbsencesPage from './TrainerAbsencesPage';
 import CoursePushDeliveries from './CoursePushDeliveries';
@@ -174,8 +175,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return <div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><div className="eyebrow">Fiudia workspace</div><h2>{title}</h2></div><button className="icon-button" onClick={onClose} data-testid="button-close-modal"><X size={18} /></button></div>{children}</div></div>;
 }
 
+let marketingConsentDefault = false;
+
 function TextField({ label, name, value, onChange, type = 'text', placeholder }: { label: string; name: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
-  return <label className="field"><span>{label}</span><input data-testid={`input-${name}`} type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required /></label>;
+  return <>{<label className="field"><span>{label}</span><input data-testid={`input-${name}`} type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required /></label>}{name === 'member-membership' && <label className="marketing-consent-field"><input type="checkbox" name="marketingConsent" defaultChecked={marketingConsentDefault} data-testid="checkbox-member-marketing-consent" /><span><strong>Marketing-Einwilligung liegt dokumentiert vor</strong><small>Nur aktivieren, wenn das Mitglied ausdrücklich zugestimmt hat.</small></span></label>}</>;
 }
 
 function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me; modules: ModuleSetting[] }) {
@@ -231,6 +234,7 @@ function AppShell({ children, me, modules }: { children: React.ReactNode; me: Me
     ...((me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? [{ href: '/rooms', label: 'Räume', icon: DoorOpen }] : []),
     ...((me.role === 'studio_manager' || me.role === 'district_manager') && moduleEnabled(modules, 'courses') ? [{ href: '/team/absences', label: 'Trainer-Ausfälle', icon: UserRound }] : []),
     ...(me.role !== 'studio_employee' && moduleEnabled(modules, 'team') ? [{ href: '/team', label: 'Team', icon: UserRound }] : []),
+    ...(me.role !== 'studio_employee' ? [{ href: '/marketing', label: 'Marketing', icon: Megaphone }] : []),
     { href: '/contact', label: 'Kontakt', icon: Mail },
     { href: '/support', label: 'Support', icon: CircleHelp },
   ];
@@ -386,13 +390,14 @@ function MembersContent({ me, onInviteMember }: { me: Me; onInviteMember: (membe
   const checkIn = useCreateCheckIn();
   const create = useCreateMember();
   const updateMember = useUpdateMember();
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', membershipType: 'Standard', gender: '', billingInterval: 'monthly', status: 'active', birthDate: '', address: '', contractStart: '', contractDurationMonths: '', restPeriodStart: '', restPeriodEnd: '' });
+  const [form, setForm] = useState({ fullName: '', email: '', phone: '', membershipType: 'Standard', gender: '', marketingConsent: false, billingInterval: 'monthly', status: 'active', birthDate: '', address: '', contractStart: '', contractDurationMonths: '', restPeriodStart: '', restPeriodEnd: '' });
   const updateForm = (key: keyof typeof form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const openCreate = () => { setSelected(null); setForm({ fullName: '', email: '', phone: '', membershipType: 'Basis', gender: '', billingInterval: 'monthly', status: 'active', birthDate: '', address: '', contractStart: '', contractDurationMonths: '', restPeriodStart: '', restPeriodEnd: '' }); setModal('create'); };
-  const openEdit = (member: Member) => { setSelected(member); setForm({ fullName: member.fullName, email: member.email || '', phone: member.phone || '', membershipType: member.membershipType, gender: member.gender || '', billingInterval: member.billingInterval, status: member.status, birthDate: member.birthDate || '', address: member.address || '', contractStart: member.contractStart || '', contractDurationMonths: member.contractDurationMonths ? String(member.contractDurationMonths) : '', restPeriodStart: member.restPeriodStart || '', restPeriodEnd: member.restPeriodEnd || '' }); setModal('edit'); };
+  const openCreate = () => { marketingConsentDefault = false; setSelected(null); setForm({ fullName: '', email: '', phone: '', membershipType: 'Basis', gender: '', marketingConsent: false, billingInterval: 'monthly', status: 'active', birthDate: '', address: '', contractStart: '', contractDurationMonths: '', restPeriodStart: '', restPeriodEnd: '' }); setModal('create'); };
+  const openEdit = (member: Member) => { marketingConsentDefault = member.marketingConsent || false; setSelected(member); setForm({ fullName: member.fullName, email: member.email || '', phone: member.phone || '', membershipType: member.membershipType, gender: member.gender || '', marketingConsent: member.marketingConsent || false, billingInterval: member.billingInterval, status: member.status, birthDate: member.birthDate || '', address: member.address || '', contractStart: member.contractStart || '', contractDurationMonths: member.contractDurationMonths ? String(member.contractDurationMonths) : '', restPeriodStart: member.restPeriodStart || '', restPeriodEnd: member.restPeriodEnd || '' }); setModal('edit'); };
   const submit = (e: React.FormEvent) => {
     e.preventDefault(); if (me.role === 'studio_employee') return;
-    const memberData = { ...form, gender: form.gender ? form.gender as 'male' | 'female' | 'diverse' : null, billingInterval: form.billingInterval as 'monthly' | 'semiannual' | 'annual', phone: form.phone || undefined, birthDate: form.birthDate || null, address: form.address || null, contractStart: form.contractStart || null, contractDurationMonths: form.contractDurationMonths ? Number(form.contractDurationMonths) : null, restPeriodStart: form.restPeriodStart || null, restPeriodEnd: form.restPeriodEnd || null, status: form.status as 'active' | 'trial' | 'paused' };
+    const consentRecorded = new FormData(e.currentTarget as HTMLFormElement).get('marketingConsent') === 'on';
+    const memberData = { ...form, marketingConsent: consentRecorded, gender: form.gender ? form.gender as 'male' | 'female' | 'diverse' : null, billingInterval: form.billingInterval as 'monthly' | 'semiannual' | 'annual', phone: form.phone || undefined, birthDate: form.birthDate || null, address: form.address || null, contractStart: form.contractStart || null, contractDurationMonths: form.contractDurationMonths ? Number(form.contractDurationMonths) : null, restPeriodStart: form.restPeriodStart || null, restPeriodEnd: form.restPeriodEnd || null, status: form.status as 'active' | 'trial' | 'paused' };
     if (modal === 'create') create.mutate({ data: { ...memberData, studioId: me.studioId || 0 } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setModal(null); } });
     else if (selected) updateMember.mutate({ id: selected.id, data: { ...memberData, phone: form.phone || null } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListMembersQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setModal(null); } });
   };
@@ -816,7 +821,7 @@ function SettingsPage({ me, modules, retryModules, modulesError }: { me: Me; mod
   return <><PageHeader eyebrow="Workspace / Einstellungen" title="Einstellungen" description="Dein Profil und die Module deiner Organisation." /><div className="settings-card"><div className="settings-avatar avatar">{initials(user?.fullName || user?.firstName || 'F')}</div><div><h3>{user?.fullName || user?.firstName || 'Fiudia Nutzer'}</h3><p>{user?.primaryEmailAddress?.emailAddress || 'Dein Konto'}</p></div><button className="button button-outline" onClick={() => openUserProfile()} data-testid="button-open-profile">Profil verwalten</button></div><section className="module-settings"><div className="eyebrow">Organisation / Zugang</div><h2>Module</h2><p>{me.role === 'district_manager' ? 'Bestimme, welche Bereiche deiner Organisation zur Verfügung stehen.' : 'Für deinen Workspace verfügbare Bereiche.'}</p>{modulesError ? <ErrorBlock retry={retryModules} /> : <div className="module-list">{modules.filter(module => me.role === 'district_manager' || module.enabled).map(module => <div className="module-row" key={module.key} data-testid={`module-${module.key}`}><div><strong>{module.title}</strong><span>{module.enabled ? 'Aktiv' : 'Deaktiviert'}</span></div>{me.role === 'district_manager' && <button type="button" role="switch" aria-checked={module.enabled} aria-label={`${module.title} ${module.enabled ? 'deaktivieren' : 'aktivieren'}`} className={`module-switch ${module.enabled ? 'on' : ''}`} disabled={update.isPending} onClick={() => update.mutate({ key: module.key, data: { enabled: !module.enabled } }, { onSuccess: () => { client.invalidateQueries({ queryKey: getListModulesQueryKey() }); client.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); } })} data-testid={`switch-module-${module.key}`}><i /></button>}</div>)}{!modules.some(module => module.enabled) && me.role !== 'district_manager' && <p>Keine weiteren Bereiche sind derzeit aktiviert.</p>}</div>}{update.isError && <p className="form-error" role="alert">Modul konnte nicht aktualisiert werden. Bitte erneut versuchen.</p>}</section>{me.role !== 'studio_employee' && <ContractSettingsPanel studioId={me.studioId ?? selectedStudioId} />}</>;
 }
 
-type ProtectedPage = 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' | 'contact' | 'support';
+type ProtectedPage = 'dashboard' | 'pulse' | 'members' | 'courses' | 'rooms' | 'trainer-absences' | 'team' | 'settings' | 'contact' | 'support' | 'marketing';
 
 function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
   page: ProtectedPage; me: Me; modules: ModuleSetting[]; retryModules: () => void; modulesError: boolean;
@@ -826,6 +831,7 @@ function ProtectedContent({ page, me, modules, retryModules, modulesError }: {
     if (page === 'settings') return <><SettingsPage me={me} modules={modules} retryModules={retryModules} modulesError={modulesError} />{me.role === 'district_manager' && <StudioManagement />}</>;
     if (page === 'contact') return <ContactPage />;
     if (page === 'support') return <SupportPage />;
+    if (page === 'marketing') return me.role === 'district_manager' || me.role === 'studio_manager' ? <MarketingPage role={me.role} /> : <div className="empty-state"><h3>Bereich nicht verfügbar</h3><p>Marketing ist nur für die Studio- und Bezirksleitung verfügbar.</p></div>;
     if (me.role === 'district_manager' && page !== 'team' && page !== 'pulse' && !selectedStudioId) {
       if (studios.isLoading) return <LoadingBlock label="Studios werden geladen" />;
       if (studios.isError) return <ErrorBlock retry={() => { void studios.refetch(); }} />;
@@ -853,7 +859,7 @@ function Router() {
   const { isLoaded, isSignedIn } = useAuth();
   const pending = invitationReturnDestination(sessionStorage, location, isLoaded, isSignedIn);
   if (pending) return <Redirect to={pending} />;
-  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team/absences"><ProtectedRoute page="trainer-absences" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route path="/contact"><ProtectedRoute page="contact" /></Route><Route path="/support"><ProtectedRoute page="support" /></Route><Route component={NotFoundPage} /></Switch>;
+  return <Switch><Route path="/" component={HomeRedirect} /><Route path="/sign-in/*?" component={SignInPage} /><Route path="/sign-up/*?" component={SignUpPage} /><Route path="/onboarding" component={OnboardingPage} /><Route path="/invite/:token" component={InvitePage} /><Route path="/dashboard"><ProtectedRoute page="dashboard" /></Route><Route path="/marketing"><ProtectedRoute page="marketing" /></Route><Route path="/pulse"><ProtectedRoute page="pulse" /></Route><Route path="/members"><ProtectedRoute page="members" /></Route><Route path="/courses"><ProtectedRoute page="courses" /></Route><Route path="/rooms"><ProtectedRoute page="rooms" /></Route><Route path="/team/absences"><ProtectedRoute page="trainer-absences" /></Route><Route path="/team"><ProtectedRoute page="team" /></Route><Route path="/settings"><ProtectedRoute page="settings" /></Route><Route path="/contact"><ProtectedRoute page="contact" /></Route><Route path="/support"><ProtectedRoute page="support" /></Route><Route component={NotFoundPage} /></Switch>;
 }
 
 function IdentityQueryProvider() {

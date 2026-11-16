@@ -39,7 +39,7 @@ export async function getStripeClient() {
       list: (params: Record<string, unknown>) =>
         stripeRequest<{ data: Array<{ id: string; metadata: Record<string, string>; currency: string; unit_amount: number | null; recurring: { interval: string; interval_count: number } | null }> }>(
           `/v1/prices?${query(params)}`),
-      create: (body: unknown) => stripeRequest<{ id: string }>("/v1/prices", "POST", body),
+      create: (body: unknown) => stripeRequest<{ id: string; metadata: Record<string, string>; currency: string; unit_amount: number | null; recurring: { interval: string; interval_count: number } | null }>("/v1/prices", "POST", body),
     },
     customers: {
       retrieve: (id: string) => stripeRequest<{ id: string; deleted?: boolean }>(`/v1/customers/${encodeURIComponent(id)}`),
@@ -52,15 +52,24 @@ export async function getStripeClient() {
       }> }>(`/v1/subscriptions?${query(params)}`),
       retrieve: (id: string) => stripeRequest<{
         id: string;
+        status: string;
+        customer: string;
+        current_period_end?: number;
+        cancel_at_period_end?: boolean;
         items: { data: Array<{ id: string; price: { id: string } }> };
       }>(`/v1/subscriptions/${encodeURIComponent(id)}`),
       update: (id: string, body: unknown) => stripeRequest<{ id: string }>(
         `/v1/subscriptions/${encodeURIComponent(id)}`, "POST", body),
     },
     checkoutSessions: {
-      retrieve: (id: string) => stripeRequest<{ status: string }>(`/v1/checkout/sessions/${encodeURIComponent(id)}`),
+      retrieve: (id: string) => stripeRequest<{
+        status: string; payment_status: string; customer: string; subscription: string;
+        metadata: Record<string, string>;
+      }>(`/v1/checkout/sessions/${encodeURIComponent(id)}`),
     },
     checkout: { sessions: { create: (body: unknown) =>
       stripeRequest<{ id: string; url: string | null }>("/v1/checkout/sessions", "POST", body) } },
+    billingPortal: { sessions: { create: (body: unknown) =>
+      stripeRequest<{ url: string }>("/v1/billing_portal/sessions", "POST", body) } },
   };
 }

@@ -29,6 +29,7 @@ export interface MemberUpdate {
   membershipType?: string;
   /** @nullable */
   gender?: MemberUpdateGender;
+  marketingConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**

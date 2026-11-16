@@ -314,6 +314,7 @@ export const ListMembersResponseItem = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(listMembersResponseBirthDateRegExp).nullish(),
@@ -362,6 +363,7 @@ export const CreateMemberBody = zod.object({
   "phone": zod.string().max(createMemberBodyPhoneMax).optional(),
   "membershipType": zod.string().min(createMemberBodyMembershipTypeMin).max(createMemberBodyMembershipTypeMax),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional(),
   "status": zod.enum(['active', 'trial', 'paused']).optional(),
   "birthDate": zod.string().regex(createMemberBodyBirthDateRegExp).nullish(),
@@ -390,6 +392,7 @@ export const CreateMemberResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(createMemberResponseBirthDateRegExp).nullish(),
@@ -441,6 +444,7 @@ export const UpdateMemberBody = zod.object({
   "phone": zod.string().max(updateMemberBodyPhoneMax).nullish(),
   "membershipType": zod.string().min(updateMemberBodyMembershipTypeMin).max(updateMemberBodyMembershipTypeMax).optional(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']).optional(),
   "status": zod.enum(['active', 'trial', 'paused']).optional(),
   "birthDate": zod.string().regex(updateMemberBodyBirthDateRegExp).nullish(),
@@ -468,6 +472,7 @@ export const UpdateMemberResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateMemberResponseBirthDateRegExp).nullish(),
@@ -1295,7 +1300,7 @@ export const ResendMemberInvitationResponse = zod.object({
  * @summary List organization modules for navigation and permissions
  */
 export const ListModulesResponseItem = zod.object({
-  "key": zod.enum(['members', 'courses', 'pulse', 'team']),
+  "key": zod.enum(['members', 'courses', 'pulse', 'team', 'marketing']),
   "title": zod.string(),
   "enabled": zod.boolean()
 })
@@ -1306,7 +1311,7 @@ export const ListModulesResponse = zod.array(ListModulesResponseItem)
  * @summary Enable or disable an organization module as district manager
  */
 export const UpdateModuleParams = zod.object({
-  "key": zod.enum(['members', 'courses', 'pulse', 'team'])
+  "key": zod.enum(['members', 'courses', 'pulse', 'team', 'marketing'])
 })
 
 export const UpdateModuleBody = zod.object({
@@ -1314,9 +1319,310 @@ export const UpdateModuleBody = zod.object({
 })
 
 export const UpdateModuleResponse = zod.object({
-  "key": zod.enum(['members', 'courses', 'pulse', 'team']),
+  "key": zod.enum(['members', 'courses', 'pulse', 'team', 'marketing']),
   "title": zod.string(),
   "enabled": zod.boolean()
+})
+
+
+/**
+ * @summary Get organization marketing subscription status
+ */
+export const GetMarketingSubscriptionResponse = zod.object({
+  "active": zod.boolean(),
+  "status": zod.enum(['inactive', 'active', 'trialing', 'past_due', 'canceled', 'unpaid']),
+  "currentPeriodEnd": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Start the €99 monthly organization subscription
+ */
+export const CreateMarketingCheckoutResponse = zod.object({
+  "url": zod.string().url()
+})
+
+
+/**
+ * @summary Confirm a completed marketing checkout
+ */
+export const confirmMarketingCheckoutBodySessionIdMax = 255;
+
+
+
+export const ConfirmMarketingCheckoutBody = zod.object({
+  "sessionId": zod.string().min(1).max(confirmMarketingCheckoutBodySessionIdMax)
+})
+
+export const ConfirmMarketingCheckoutResponse = zod.object({
+  "active": zod.boolean(),
+  "status": zod.enum(['inactive', 'active', 'trialing', 'past_due', 'canceled', 'unpaid']),
+  "currentPeriodEnd": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Open Stripe billing portal
+ */
+export const CreateMarketingBillingPortalResponse = zod.object({
+  "url": zod.string().url()
+})
+
+
+/**
+ * @summary List this organization's marketing campaigns
+ */
+export const listMarketingCampaignsResponseAudienceAgeFromMin = 0;
+export const listMarketingCampaignsResponseAudienceAgeFromMax = 120;
+
+export const listMarketingCampaignsResponseAudienceAgeToMin = 0;
+export const listMarketingCampaignsResponseAudienceAgeToMax = 120;
+
+export const listMarketingCampaignsResponseAudienceCityMax = 120;
+
+export const listMarketingCampaignsResponseRecipientCountMin = 0;
+
+
+
+export const ListMarketingCampaignsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "headline": zod.string(),
+  "bodyText": zod.string(),
+  "imageUrl": zod.string().url(),
+  "audience": zod.object({
+  "gender": zod.enum(['all', 'male', 'female', 'diverse']),
+  "ageFrom": zod.number().int().min(listMarketingCampaignsResponseAudienceAgeFromMin).max(listMarketingCampaignsResponseAudienceAgeFromMax).nullable(),
+  "ageTo": zod.number().int().min(listMarketingCampaignsResponseAudienceAgeToMin).max(listMarketingCampaignsResponseAudienceAgeToMax).nullable(),
+  "city": zod.string().max(listMarketingCampaignsResponseAudienceCityMax).nullable(),
+  "studioId": zod.number().int().nullable()
+}),
+  "status": zod.enum(['draft', 'sent']),
+  "recipientCount": zod.number().int().min(listMarketingCampaignsResponseRecipientCountMin),
+  "createdAt": zod.coerce.date(),
+  "sentAt": zod.coerce.date().nullable()
+})
+export const ListMarketingCampaignsResponse = zod.array(ListMarketingCampaignsResponseItem)
+
+
+/**
+ * @summary Save a marketing campaign draft
+ */
+export const createMarketingCampaignBodyHeadlineMax = 160;
+
+export const createMarketingCampaignBodyBodyTextMax = 6000;
+
+export const createMarketingCampaignBodyImagePathMax = 512;
+
+export const createMarketingCampaignBodyAudienceAgeFromMin = 0;
+export const createMarketingCampaignBodyAudienceAgeFromMax = 120;
+
+export const createMarketingCampaignBodyAudienceAgeToMin = 0;
+export const createMarketingCampaignBodyAudienceAgeToMax = 120;
+
+export const createMarketingCampaignBodyAudienceCityMax = 120;
+
+
+
+export const CreateMarketingCampaignBody = zod.object({
+  "headline": zod.string().min(1).max(createMarketingCampaignBodyHeadlineMax),
+  "bodyText": zod.string().min(1).max(createMarketingCampaignBodyBodyTextMax),
+  "imagePath": zod.string().min(1).max(createMarketingCampaignBodyImagePathMax),
+  "audience": zod.object({
+  "gender": zod.enum(['all', 'male', 'female', 'diverse']),
+  "ageFrom": zod.number().int().min(createMarketingCampaignBodyAudienceAgeFromMin).max(createMarketingCampaignBodyAudienceAgeFromMax).nullable(),
+  "ageTo": zod.number().int().min(createMarketingCampaignBodyAudienceAgeToMin).max(createMarketingCampaignBodyAudienceAgeToMax).nullable(),
+  "city": zod.string().max(createMarketingCampaignBodyAudienceCityMax).nullable(),
+  "studioId": zod.number().int().nullable()
+})
+})
+
+export const createMarketingCampaignResponseAudienceAgeFromMin = 0;
+export const createMarketingCampaignResponseAudienceAgeFromMax = 120;
+
+export const createMarketingCampaignResponseAudienceAgeToMin = 0;
+export const createMarketingCampaignResponseAudienceAgeToMax = 120;
+
+export const createMarketingCampaignResponseAudienceCityMax = 120;
+
+export const createMarketingCampaignResponseRecipientCountMin = 0;
+
+
+
+export const CreateMarketingCampaignResponse = zod.object({
+  "id": zod.number().int(),
+  "headline": zod.string(),
+  "bodyText": zod.string(),
+  "imageUrl": zod.string().url(),
+  "audience": zod.object({
+  "gender": zod.enum(['all', 'male', 'female', 'diverse']),
+  "ageFrom": zod.number().int().min(createMarketingCampaignResponseAudienceAgeFromMin).max(createMarketingCampaignResponseAudienceAgeFromMax).nullable(),
+  "ageTo": zod.number().int().min(createMarketingCampaignResponseAudienceAgeToMin).max(createMarketingCampaignResponseAudienceAgeToMax).nullable(),
+  "city": zod.string().max(createMarketingCampaignResponseAudienceCityMax).nullable(),
+  "studioId": zod.number().int().nullable()
+}),
+  "status": zod.enum(['draft', 'sent']),
+  "recipientCount": zod.number().int().min(createMarketingCampaignResponseRecipientCountMin),
+  "createdAt": zod.coerce.date(),
+  "sentAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Send a saved campaign to eligible members
+ */
+export const SendMarketingCampaignParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const sendMarketingCampaignResponseRecipientCountMin = 0;
+
+export const sendMarketingCampaignResponseFailedCountMin = 0;
+
+
+
+export const SendMarketingCampaignResponse = zod.object({
+  "campaignId": zod.number().int(),
+  "recipientCount": zod.number().int().min(sendMarketingCampaignResponseRecipientCountMin),
+  "failedCount": zod.number().int().min(sendMarketingCampaignResponseFailedCountMin),
+  "status": zod.enum(['sent'])
+})
+
+
+/**
+ * @summary Request a secure campaign image upload URL
+ */
+export const requestMarketingImageUploadBodySizeMax = 5242880;
+
+
+
+export const RequestMarketingImageUploadBody = zod.object({
+  "contentType": zod.enum(['image/png', 'image/jpeg', 'image/webp']),
+  "size": zod.number().int().min(1).max(requestMarketingImageUploadBodySizeMax)
+})
+
+export const RequestMarketingImageUploadResponse = zod.object({
+  "uploadUrl": zod.string().url(),
+  "objectPath": zod.string()
+})
+
+
+/**
+ * @summary Preview matching members without exposing identities
+ */
+export const getMarketingAudienceCountQueryGenderDefault = `all`;
+export const getMarketingAudienceCountQueryAgeFromMin = 0;
+export const getMarketingAudienceCountQueryAgeFromMax = 120;
+
+export const getMarketingAudienceCountQueryAgeToMin = 0;
+export const getMarketingAudienceCountQueryAgeToMax = 120;
+
+export const getMarketingAudienceCountQueryCityMax = 120;
+
+
+
+export const GetMarketingAudienceCountQueryParams = zod.object({
+  "gender": zod.enum(['all', 'male', 'female', 'diverse']).default(getMarketingAudienceCountQueryGenderDefault),
+  "ageFrom": zod.coerce.number().int().min(getMarketingAudienceCountQueryAgeFromMin).max(getMarketingAudienceCountQueryAgeFromMax).optional(),
+  "ageTo": zod.coerce.number().int().min(getMarketingAudienceCountQueryAgeToMin).max(getMarketingAudienceCountQueryAgeToMax).optional(),
+  "city": zod.coerce.string().max(getMarketingAudienceCountQueryCityMax).optional(),
+  "studioId": zod.coerce.number().int().optional()
+})
+
+export const getMarketingAudienceCountResponseCountMin = 0;
+
+export const getMarketingAudienceCountResponseEligibleEmailCountMin = 0;
+
+
+
+export const GetMarketingAudienceCountResponse = zod.object({
+  "count": zod.number().int().min(getMarketingAudienceCountResponseCountMin),
+  "eligibleEmailCount": zod.number().int().min(getMarketingAudienceCountResponseEligibleEmailCountMin)
+})
+
+
+/**
+ * @summary Get agency API key status without revealing the key
+ */
+export const GetMarketingApiKeyResponse = zod.object({
+  "active": zod.boolean(),
+  "keyPrefix": zod.string().nullable(),
+  "createdAt": zod.coerce.date().nullable(),
+  "lastUsedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Create or rotate the agency API key
+ */
+export const RotateMarketingApiKeyResponse = zod.object({
+  "key": zod.string(),
+  "keyPrefix": zod.string()
+})
+
+
+/**
+ * @summary Return an anonymous audience count to an authorized agency
+ */
+export const getExternalMarketingAudienceCountQueryGenderDefault = `all`;
+export const getExternalMarketingAudienceCountQueryAgeFromMin = 0;
+export const getExternalMarketingAudienceCountQueryAgeFromMax = 120;
+
+export const getExternalMarketingAudienceCountQueryAgeToMin = 0;
+export const getExternalMarketingAudienceCountQueryAgeToMax = 120;
+
+export const getExternalMarketingAudienceCountQueryCityMax = 120;
+
+
+
+export const GetExternalMarketingAudienceCountQueryParams = zod.object({
+  "gender": zod.enum(['all', 'male', 'female', 'diverse']).default(getExternalMarketingAudienceCountQueryGenderDefault),
+  "ageFrom": zod.coerce.number().int().min(getExternalMarketingAudienceCountQueryAgeFromMin).max(getExternalMarketingAudienceCountQueryAgeFromMax).optional(),
+  "ageTo": zod.coerce.number().int().min(getExternalMarketingAudienceCountQueryAgeToMin).max(getExternalMarketingAudienceCountQueryAgeToMax).optional(),
+  "city": zod.coerce.string().max(getExternalMarketingAudienceCountQueryCityMax).optional(),
+  "studioId": zod.coerce.number().int().optional()
+})
+
+export const GetExternalMarketingAudienceCountHeader = zod.object({
+  "X-Fiudia-Marketing-Key": zod.string()
+})
+
+export const getExternalMarketingAudienceCountResponseCountMin = 0;
+
+export const getExternalMarketingAudienceCountResponseEligibleEmailCountMin = 0;
+
+
+
+export const GetExternalMarketingAudienceCountResponse = zod.object({
+  "count": zod.number().int().min(getExternalMarketingAudienceCountResponseCountMin),
+  "eligibleEmailCount": zod.number().int().min(getExternalMarketingAudienceCountResponseEligibleEmailCountMin)
+})
+
+
+/**
+ * @summary Show agency API documentation
+ */
+export const GetExternalMarketingDocsResponse = zod.unknown()
+
+
+/**
+ * @summary Serve the public campaign image
+ */
+export const GetMarketingCampaignImageParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetMarketingCampaignImageResponse = zod.unknown()
+
+
+/**
+ * @summary Unsubscribe from marketing email
+ */
+export const UnsubscribeFromMarketingParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const UnsubscribeFromMarketingResponse = zod.object({
+  "unsubscribed": zod.boolean()
 })
 
 
@@ -1343,6 +1649,7 @@ export const GetMemberHomeResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(getMemberHomeResponseMemberOneBirthDateRegExp).nullish(),
@@ -1434,6 +1741,7 @@ export const UpdateOwnMemberProfileResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateOwnMemberProfileResponseMemberOneBirthDateRegExp).nullish(),
@@ -1531,6 +1839,7 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneBirthDateRegExp).nullish(),
@@ -1621,6 +1930,7 @@ export const ClaimMembershipResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(claimMembershipResponseMemberOneBirthDateRegExp).nullish(),
@@ -1690,6 +2000,7 @@ export const AcceptMemberInvitationResponse = zod.object({
   "phone": zod.string().nullable(),
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
+  "marketingConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(acceptMemberInvitationResponseMemberOneBirthDateRegExp).nullish(),

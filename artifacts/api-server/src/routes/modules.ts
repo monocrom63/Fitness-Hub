@@ -22,6 +22,7 @@ const MODULE_TITLES: Record<ModuleKey, string> = {
   courses: "Kurse",
   pulse: "Pulse",
   team: "Team",
+  marketing: "Marketing",
 };
 
 type ModulesDependencies = {
@@ -69,7 +70,7 @@ export function createModulesRouter(
     );
     res.json(
       ListModulesResponse.parse(
-        MODULE_KEYS.map((key) => ({
+        MODULE_KEYS.filter((key) => key !== "marketing").map((key) => ({
           key,
           title: MODULE_TITLES[key],
           enabled: enabledByKey.get(key) ?? true,
@@ -97,6 +98,10 @@ export function createModulesRouter(
       return;
     }
     const key = params.data.key;
+    if (key === "marketing") {
+      res.status(403).json({ error: "Marketing wird über ein kostenpflichtiges Abonnement verwaltet." });
+      return;
+    }
     await database
       .insert(organizationModulesTable)
       .values({

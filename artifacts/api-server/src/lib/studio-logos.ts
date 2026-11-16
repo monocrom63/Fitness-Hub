@@ -65,6 +65,47 @@ export async function getStudioLogoFile(objectPath: string): Promise<File | null
   return exists ? file : null;
 }
 
+export async function createMarketingImageUpload(organizationId: number) {
+  const prefix = privateDir();
+  const fullPath = `${prefix}marketing/${organizationId}/${randomUUID()}`;
+  const { bucketName, objectName } = parseObjectPath(fullPath);
+  const response = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      bucket_name: bucketName,
+      object_name: objectName,
+      method: "PUT",
+      expires_at: new Date(Date.now() + 900_000).toISOString(),
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) throw new Error(`Could not create upload URL (${response.status}).`);
+  const { signed_url: uploadUrl } = await response.json() as { signed_url?: string };
+  if (!uploadUrl) throw new Error("Storage did not return an upload URL.");
+  const rawPath = new URL(uploadUrl).pathname;
+  if (!rawPath.startsWith(prefix)) throw new Error("Upload URL points outside private storage.");
+  return { uploadUrl, objectPath: `/objects/${rawPath.slice(prefix.length)}` };
+}
+
+export async function getMarketingImageFile(objectPath: string): Promise<File | null> {
+  if (!objectPath.startsWith("/objects/marketing/")) return null;
+  const entity = objectPath.slice("/objects/".length);
+  const { bucketName, objectName } = parseObjectPath(`${privateDir()}${entity}`);
+  const file = storage.bucket(bucketName).file(objectName);
+  const [exists] = await file.exists();
+  return exists ? file : null;
+}
+
+export async function pipeMarketingImage(file: File, res: import("express").Response) {
+  const [metadata] = await file.getMetadata();
+  res.setHeader("Content-Type", metadata.contentType || "application/octet-stream");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  if (metadata.size) res.setHeader("Content-Length", String(metadata.size));
+  Readable.from(file.createReadStream()).pipe(res);
+}
+
 export async function pipeStudioLogo(file: File, res: import("express").Response) {
   const [metadata] = await file.getMetadata();
   res.setHeader("Content-Type", metadata.contentType || "application/octet-stream");

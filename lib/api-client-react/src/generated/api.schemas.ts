@@ -5,6 +5,176 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type MarketingAudienceFiltersGender = typeof MarketingAudienceFiltersGender[keyof typeof MarketingAudienceFiltersGender];
+
+
+export const MarketingAudienceFiltersGender = {
+  all: 'all',
+  male: 'male',
+  female: 'female',
+  diverse: 'diverse',
+} as const;
+
+export interface MarketingAudienceFilters {
+  gender: MarketingAudienceFiltersGender;
+  /**
+     * @minimum 0
+     * @maximum 120
+     * @nullable
+     */
+  ageFrom: number | null;
+  /**
+     * @minimum 0
+     * @maximum 120
+     * @nullable
+     */
+  ageTo: number | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  city: string | null;
+  /** @nullable */
+  studioId: number | null;
+}
+
+export interface MarketingCampaignInput {
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  headline: string;
+  /**
+     * @minLength 1
+     * @maxLength 6000
+     */
+  bodyText: string;
+  /**
+     * @minLength 1
+     * @maxLength 512
+     */
+  imagePath: string;
+  audience: MarketingAudienceFilters;
+}
+
+export type MarketingCampaignStatus = typeof MarketingCampaignStatus[keyof typeof MarketingCampaignStatus];
+
+
+export const MarketingCampaignStatus = {
+  draft: 'draft',
+  sent: 'sent',
+} as const;
+
+export interface MarketingCampaign {
+  id: number;
+  headline: string;
+  bodyText: string;
+  imageUrl: string;
+  audience: MarketingAudienceFilters;
+  status: MarketingCampaignStatus;
+  /** @minimum 0 */
+  recipientCount: number;
+  createdAt: string;
+  /** @nullable */
+  sentAt: string | null;
+}
+
+export interface MarketingAudienceCount {
+  /** @minimum 0 */
+  count: number;
+  /** @minimum 0 */
+  eligibleEmailCount: number;
+}
+
+export type MarketingSendResultStatus = typeof MarketingSendResultStatus[keyof typeof MarketingSendResultStatus];
+
+
+export const MarketingSendResultStatus = {
+  sent: 'sent',
+} as const;
+
+export interface MarketingSendResult {
+  campaignId: number;
+  /** @minimum 0 */
+  recipientCount: number;
+  /** @minimum 0 */
+  failedCount: number;
+  status: MarketingSendResultStatus;
+}
+
+export type MarketingImageUploadRequestContentType = typeof MarketingImageUploadRequestContentType[keyof typeof MarketingImageUploadRequestContentType];
+
+
+export const MarketingImageUploadRequestContentType = {
+  'image/png': 'image/png',
+  'image/jpeg': 'image/jpeg',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface MarketingImageUploadRequest {
+  contentType: MarketingImageUploadRequestContentType;
+  /**
+     * @minimum 1
+     * @maximum 5242880
+     */
+  size: number;
+}
+
+export interface MarketingImageUpload {
+  uploadUrl: string;
+  objectPath: string;
+}
+
+export interface MarketingApiKeyStatus {
+  active: boolean;
+  /** @nullable */
+  keyPrefix: string | null;
+  /** @nullable */
+  createdAt: string | null;
+  /** @nullable */
+  lastUsedAt: string | null;
+}
+
+export interface MarketingApiKeyCreated {
+  key: string;
+  keyPrefix: string;
+}
+
+export type MarketingSubscriptionStatus = typeof MarketingSubscriptionStatus[keyof typeof MarketingSubscriptionStatus];
+
+
+export const MarketingSubscriptionStatus = {
+  inactive: 'inactive',
+  active: 'active',
+  trialing: 'trialing',
+  past_due: 'past_due',
+  canceled: 'canceled',
+  unpaid: 'unpaid',
+} as const;
+
+export interface MarketingSubscription {
+  active: boolean;
+  status: MarketingSubscriptionStatus;
+  /** @nullable */
+  currentPeriodEnd: string | null;
+}
+
+export interface MarketingCheckoutConfirm {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  sessionId: string;
+}
+
+export interface CheckoutUrl {
+  url: string;
+}
+
+export interface MarketingUnsubscribeResult {
+  unsubscribed: boolean;
+}
+
 export interface PublicContractTerms {
   title: string;
   termsText: string;
@@ -443,6 +613,7 @@ export interface Member {
   membershipType: string;
   /** @nullable */
   gender?: MemberGender;
+  marketingConsent?: boolean;
   billingInterval: BillingInterval;
   status: MemberStatus;
   /**
@@ -517,6 +688,7 @@ export interface MemberInput {
   membershipType: string;
   /** @nullable */
   gender?: MemberInputGender;
+  marketingConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
@@ -585,6 +757,7 @@ export interface MemberUpdate {
   membershipType?: string;
   /** @nullable */
   gender?: MemberUpdateGender;
+  marketingConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
@@ -1204,6 +1377,7 @@ export const ModuleKey = {
   courses: 'courses',
   pulse: 'pulse',
   team: 'team',
+  marketing: 'marketing',
 } as const;
 
 export interface ModuleSetting {
@@ -1521,6 +1695,24 @@ export interface PulseReadInput {
   revision: number;
 }
 
+export type MarketingGenderParameter = typeof MarketingGenderParameter[keyof typeof MarketingGenderParameter];
+
+
+export const MarketingGenderParameter = {
+  all: 'all',
+  male: 'male',
+  female: 'female',
+  diverse: 'diverse',
+} as const;
+
+export type MarketingAgeFromParameter = number;
+
+export type MarketingAgeToParameter = number;
+
+export type MarketingCityParameter = string;
+
+export type MarketingStudioIdParameter = number;
+
 export type GetDashboardParams = {
 studioId?: number;
 };
@@ -1565,6 +1757,44 @@ limit?: number;
 
 export type ListTrainerAbsencesParams = {
 studioId?: number;
+};
+
+export type GetMarketingAudienceCountParams = {
+gender?: MarketingGenderParameter;
+/**
+ * @minimum 0
+ * @maximum 120
+ */
+ageFrom?: MarketingAgeFromParameter;
+/**
+ * @minimum 0
+ * @maximum 120
+ */
+ageTo?: MarketingAgeToParameter;
+/**
+ * @maxLength 120
+ */
+city?: MarketingCityParameter;
+studioId?: MarketingStudioIdParameter;
+};
+
+export type GetExternalMarketingAudienceCountParams = {
+gender?: MarketingGenderParameter;
+/**
+ * @minimum 0
+ * @maximum 120
+ */
+ageFrom?: MarketingAgeFromParameter;
+/**
+ * @minimum 0
+ * @maximum 120
+ */
+ageTo?: MarketingAgeToParameter;
+/**
+ * @maxLength 120
+ */
+city?: MarketingCityParameter;
+studioId?: MarketingStudioIdParameter;
 };
 
 export type ListMemberNotificationsParams = {

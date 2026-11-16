@@ -32,6 +32,78 @@ export const organizationModulesTable = pgTable(
   (table) => [unique("fiudia_organization_module_key").on(table.organizationId, table.key)],
 );
 
+export const marketingSubscriptionsTable = pgTable(
+  "fiudia_marketing_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id").notNull().unique().references(() => organizationsTable.id, { onDelete: "cascade" }),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    stripePriceId: text("stripe_price_id"),
+    status: text("status").notNull().default("inactive"),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+export const marketingApiKeysTable = pgTable(
+  "fiudia_marketing_api_keys",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id").notNull().unique().references(() => organizationsTable.id, { onDelete: "cascade" }),
+    keyPrefix: text("key_prefix").notNull(),
+    keyHash: text("key_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+);
+
+export const marketingCampaignsTable = pgTable(
+  "fiudia_marketing_campaigns",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
+    createdByStaffId: integer("created_by_staff_id").notNull().references(() => staffTable.id, { onDelete: "cascade" }),
+    headline: text("headline").notNull(),
+    bodyText: text("body_text").notNull(),
+    imagePath: text("image_path").notNull(),
+    audienceFilters: jsonb("audience_filters").notNull(),
+    status: text("status").notNull().default("draft"),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+);
+
+export const marketingUnsubscribeTokensTable = pgTable(
+  "fiudia_marketing_unsubscribe_tokens",
+  {
+    id: serial("id").primaryKey(),
+    memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+);
+
+export const marketingDeliveriesTable = pgTable(
+  "fiudia_marketing_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    campaignId: integer("campaign_id").notNull().references(() => marketingCampaignsTable.id, { onDelete: "cascade" }),
+    memberId: integer("member_id").notNull().references(() => membersTable.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"),
+    providerMessageId: text("provider_message_id"),
+    errorMessage: text("error_message"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("fiudia_marketing_delivery_campaign_member").on(table.campaignId, table.memberId)],
+);
+
 export const studiosTable = pgTable("fiudia_studios", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id")
@@ -100,6 +172,8 @@ export const membersTable = pgTable("fiudia_members", {
   phone: text("phone"),
   membershipType: text("membership_type").notNull(),
   gender: text("gender"),
+  marketingConsent: integer("marketing_consent").notNull().default(0),
+  marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
   billingInterval: text("billing_interval").notNull().default("monthly"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),

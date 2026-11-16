@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import type { RequestHandler } from "express";
-import { db, organizationModulesTable } from "@workspace/db";
+import { db, organizationModulesTable, marketingSubscriptionsTable } from "@workspace/db";
 import {
   getRequestUserId,
   getStaffContext,
 } from "./fiudia-access";
 
-export const MODULE_KEYS = ["members", "courses", "pulse", "team"] as const;
+export const MODULE_KEYS = ["members", "courses", "pulse", "team", "marketing"] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 const moduleKeySet: ReadonlySet<string> = new Set(MODULE_KEYS);
@@ -20,6 +20,13 @@ export async function isModuleEnabled(
   key: ModuleKey,
   database: Pick<typeof db, "select"> = db,
 ): Promise<boolean> {
+  if (key === "marketing") {
+    const [subscription] = await database.select({ status: marketingSubscriptionsTable.status })
+      .from(marketingSubscriptionsTable)
+      .where(eq(marketingSubscriptionsTable.organizationId, organizationId))
+      .limit(1);
+    return subscription?.status === "active" || subscription?.status === "trialing";
+  }
   const [override] = await database
     .select({ enabled: organizationModulesTable.enabled })
     .from(organizationModulesTable)

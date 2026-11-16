@@ -802,6 +802,7 @@ router.get("/members", async (req, res): Promise<void> => {
       phone: membersTable.phone,
       membershipType: membersTable.membershipType,
       gender: membersTable.gender,
+      marketingConsent: membersTable.marketingConsent,
       billingInterval: membersTable.billingInterval,
       status: membersTable.status,
       birthDate: membersTable.birthDate,
@@ -863,8 +864,9 @@ router.get("/members", async (req, res): Promise<void> => {
         invitationEmailStatus: staff.role === "studio_employee"
           ? null : latestInvitation.get(member.id)?.emailStatus ?? null,
         ...(staff.role === "studio_employee"
-          ? { email: null, phone: null, gender: null, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
+          ? { email: null, phone: null, gender: null, marketingConsent: false, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
           : {}),
+        marketingConsent: staff.role !== "studio_employee" && member.marketingConsent === 1,
         joinedAt: member.joinedAt.toISOString(),
         lastCheckIn: latestCheckIn.get(member.id)?.toISOString() ?? null,
       })),
@@ -897,6 +899,8 @@ router.post("/members", async (req, res): Promise<void> => {
       email: body.data.email.trim().toLowerCase(),
       phone: body.data.phone?.trim() || null,
       membershipType: body.data.membershipType.trim(),
+      marketingConsent: body.data.marketingConsent ? 1 : 0,
+      marketingConsentAt: body.data.marketingConsent ? new Date() : null,
       status: body.data.status ?? "active",
       birthDate: body.data.birthDate || null,
       address: body.data.address?.trim() || null,
@@ -913,6 +917,7 @@ router.post("/members", async (req, res): Promise<void> => {
   res.status(201).json(
     CreateMemberResponse.parse({
       ...member,
+      marketingConsent: member.marketingConsent === 1,
       studioName: studio.name,
       joinedAt: member.joinedAt.toISOString(),
       lastCheckIn: null,
@@ -958,8 +963,9 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const { marketingConsent, ...memberChanges } = body.data;
   const values = {
-    ...body.data,
+    ...memberChanges,
     ...(body.data.email !== undefined
       ? { email: body.data.email.trim().toLowerCase() }
       : {}),
@@ -976,6 +982,10 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
     ...(body.data.contractStart !== undefined ? { contractStart: body.data.contractStart || null } : {}),
     ...(body.data.contractDurationMonths !== undefined ? { contractDurationMonths: body.data.contractDurationMonths } : {}),
+    ...(marketingConsent !== undefined ? {
+      marketingConsent: marketingConsent ? 1 : 0,
+      marketingConsentAt: marketingConsent ? new Date() : null,
+    } : {}),
   };
   const [updated] = await db
     .update(membersTable)
@@ -997,6 +1007,7 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
   res.json(
     UpdateMemberResponse.parse({
       ...updated,
+      marketingConsent: updated.marketingConsent === 1,
       studioName: studio.name,
       joinedAt: updated.joinedAt.toISOString(),
       lastCheckIn: latest?.checkedInAt.toISOString() ?? null,

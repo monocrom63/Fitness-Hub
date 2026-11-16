@@ -20,6 +20,8 @@ tags:
     description: Private member self-service
   - name: modules
     description: Organization feature availability
+  - name: marketing
+    description: Paid marketing module and its agency API
 paths:
   /healthz:
     get:
@@ -1011,6 +1013,208 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ModuleSetting" }
         "403": { description: District manager required }
+  /marketing/subscription:
+    get:
+      operationId: getMarketingSubscription
+      tags: [marketing]
+      summary: Get organization marketing subscription status
+      responses:
+        "200":
+          description: Current subscription state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingSubscription" }
+  /marketing/subscription/checkout:
+    post:
+      operationId: createMarketingCheckout
+      tags: [marketing]
+      summary: Start the €99 monthly organization subscription
+      responses:
+        "200":
+          description: Stripe Checkout URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckoutUrl" }
+        "403": { description: District manager required }
+  /marketing/subscription/confirm:
+    post:
+      operationId: confirmMarketingCheckout
+      tags: [marketing]
+      summary: Confirm a completed marketing checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarketingCheckoutConfirm" }
+      responses:
+        "200":
+          description: Subscription activated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingSubscription" }
+        "409": { description: Checkout is not complete or subscription is inactive }
+  /marketing/subscription/portal:
+    post:
+      operationId: createMarketingBillingPortal
+      tags: [marketing]
+      summary: Open Stripe billing portal
+      responses:
+        "200":
+          description: Stripe billing portal URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckoutUrl" }
+  /marketing/campaigns:
+    get:
+      operationId: listMarketingCampaigns
+      tags: [marketing]
+      summary: List this organization's marketing campaigns
+      responses:
+        "200":
+          description: Campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MarketingCampaign" }
+    post:
+      operationId: createMarketingCampaign
+      tags: [marketing]
+      summary: Save a marketing campaign draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarketingCampaignInput" }
+      responses:
+        "201":
+          description: Draft saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingCampaign" }
+  /marketing/campaigns/{id}/send:
+    post:
+      operationId: sendMarketingCampaign
+      tags: [marketing]
+      summary: Send a saved campaign to eligible members
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Campaign delivery result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingSendResult" }
+        "409": { description: Campaign has no eligible opted-in recipients }
+  /marketing/uploads/request-url:
+    post:
+      operationId: requestMarketingImageUpload
+      tags: [marketing]
+      summary: Request a secure campaign image upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarketingImageUploadRequest" }
+      responses:
+        "200":
+          description: Presigned upload URL and object path
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingImageUpload" }
+  /marketing/audience-count:
+    get:
+      operationId: getMarketingAudienceCount
+      tags: [marketing]
+      summary: Preview matching members without exposing identities
+      parameters:
+        - { $ref: "#/components/parameters/MarketingGender" }
+        - { $ref: "#/components/parameters/MarketingAgeFrom" }
+        - { $ref: "#/components/parameters/MarketingAgeTo" }
+        - { $ref: "#/components/parameters/MarketingCity" }
+        - { $ref: "#/components/parameters/MarketingStudioId" }
+      responses:
+        "200":
+          description: Aggregate audience counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingAudienceCount" }
+  /marketing/api-key:
+    get:
+      operationId: getMarketingApiKey
+      tags: [marketing]
+      summary: Get agency API key status without revealing the key
+      responses:
+        "200":
+          description: Key metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingApiKeyStatus" }
+    post:
+      operationId: rotateMarketingApiKey
+      tags: [marketing]
+      summary: Create or rotate the agency API key
+      responses:
+        "200":
+          description: New key shown once
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingApiKeyCreated" }
+  /external/marketing/audience-count:
+    get:
+      operationId: getExternalMarketingAudienceCount
+      tags: [marketing]
+      summary: Return an anonymous audience count to an authorized agency
+      parameters:
+        - name: X-Fiudia-Marketing-Key
+          in: header
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/MarketingGender" }
+        - { $ref: "#/components/parameters/MarketingAgeFrom" }
+        - { $ref: "#/components/parameters/MarketingAgeTo" }
+        - { $ref: "#/components/parameters/MarketingCity" }
+        - { $ref: "#/components/parameters/MarketingStudioId" }
+      responses:
+        "200":
+          description: Anonymous aggregate only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingAudienceCount" }
+        "401": { description: Valid agency key required }
+  /external/marketing/docs:
+    get:
+      operationId: getExternalMarketingDocs
+      tags: [marketing]
+      summary: Show agency API documentation
+      responses:
+        "200": { description: API documentation page, content: { text/html: { schema: { type: string } } } }
+  /marketing/images/{id}:
+    get:
+      operationId: getMarketingCampaignImage
+      tags: [marketing]
+      summary: Serve the public campaign image
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Campaign image, content: { image/*: { schema: { type: string, format: binary } } } }
+        "404": { description: Image not found }
+  /marketing/unsubscribe/{token}:
+    get:
+      operationId: unsubscribeFromMarketing
+      tags: [marketing]
+      summary: Unsubscribe from marketing email
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Subscription preference updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketingUnsubscribeResult" }
   /member/me:
     get:
       operationId: getMemberHome
@@ -1661,7 +1865,124 @@ paths:
         "403": { description: Contract access denied }
         "404": { description: Contract not found }
 components:
+  parameters:
+    MarketingGender:
+      name: gender
+      in: query
+      schema: { type: string, enum: [all, male, female, diverse], default: all }
+    MarketingAgeFrom:
+      name: ageFrom
+      in: query
+      schema: { type: integer, minimum: 0, maximum: 120 }
+    MarketingAgeTo:
+      name: ageTo
+      in: query
+      schema: { type: integer, minimum: 0, maximum: 120 }
+    MarketingCity:
+      name: city
+      in: query
+      schema: { type: string, maxLength: 120 }
+    MarketingStudioId:
+      name: studioId
+      in: query
+      schema: { type: integer }
   schemas:
+    MarketingAudienceFilters:
+      type: object
+      additionalProperties: false
+      required: [gender, ageFrom, ageTo, city, studioId]
+      properties:
+        gender: { type: string, enum: [all, male, female, diverse] }
+        ageFrom: { type: ["integer", "null"], minimum: 0, maximum: 120 }
+        ageTo: { type: ["integer", "null"], minimum: 0, maximum: 120 }
+        city: { type: ["string", "null"], maxLength: 120 }
+        studioId: { type: ["integer", "null"] }
+    MarketingCampaignInput:
+      type: object
+      additionalProperties: false
+      required: [headline, bodyText, imagePath, audience]
+      properties:
+        headline: { type: string, minLength: 1, maxLength: 160 }
+        bodyText: { type: string, minLength: 1, maxLength: 6000 }
+        imagePath: { type: string, minLength: 1, maxLength: 512 }
+        audience: { $ref: "#/components/schemas/MarketingAudienceFilters" }
+    MarketingCampaign:
+      type: object
+      required: [id, headline, bodyText, imageUrl, audience, status, recipientCount, createdAt, sentAt]
+      properties:
+        id: { type: integer }
+        headline: { type: string }
+        bodyText: { type: string }
+        imageUrl: { type: string, format: uri }
+        audience: { $ref: "#/components/schemas/MarketingAudienceFilters" }
+        status: { type: string, enum: [draft, sent] }
+        recipientCount: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        sentAt: { type: ["string", "null"], format: date-time }
+    MarketingAudienceCount:
+      type: object
+      required: [count, eligibleEmailCount]
+      properties:
+        count: { type: integer, minimum: 0 }
+        eligibleEmailCount: { type: integer, minimum: 0 }
+    MarketingSendResult:
+      type: object
+      required: [campaignId, recipientCount, failedCount, status]
+      properties:
+        campaignId: { type: integer }
+        recipientCount: { type: integer, minimum: 0 }
+        failedCount: { type: integer, minimum: 0 }
+        status: { type: string, enum: [sent] }
+    MarketingImageUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [contentType, size]
+      properties:
+        contentType: { type: string, enum: [image/png, image/jpeg, image/webp] }
+        size: { type: integer, minimum: 1, maximum: 5242880 }
+    MarketingImageUpload:
+      type: object
+      required: [uploadUrl, objectPath]
+      properties:
+        uploadUrl: { type: string, format: uri }
+        objectPath: { type: string }
+    MarketingApiKeyStatus:
+      type: object
+      required: [active, keyPrefix, createdAt, lastUsedAt]
+      properties:
+        active: { type: boolean }
+        keyPrefix: { type: ["string", "null"] }
+        createdAt: { type: ["string", "null"], format: date-time }
+        lastUsedAt: { type: ["string", "null"], format: date-time }
+    MarketingApiKeyCreated:
+      type: object
+      required: [key, keyPrefix]
+      properties:
+        key: { type: string }
+        keyPrefix: { type: string }
+    MarketingSubscription:
+      type: object
+      required: [active, status, currentPeriodEnd]
+      properties:
+        active: { type: boolean }
+        status: { type: string, enum: [inactive, active, trialing, past_due, canceled, unpaid] }
+        currentPeriodEnd: { type: ["string", "null"], format: date-time }
+    MarketingCheckoutConfirm:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, minLength: 1, maxLength: 255 }
+    CheckoutUrl:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, format: uri }
+    MarketingUnsubscribeResult:
+      type: object
+      required: [unsubscribed]
+      properties:
+        unsubscribed: { type: boolean }
     PublicContractTerms:
       type: object
       required: [title, termsText, termsVersion, isTemplate]
@@ -1909,6 +2230,7 @@ components:
         phone: { type: ["string", "null"] }
         membershipType: { type: string }
         gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
+        marketingConsent: { type: boolean }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -1933,6 +2255,7 @@ components:
         phone: { type: string, maxLength: 40 }
         membershipType: { type: string, minLength: 2, maxLength: 80 }
         gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
+        marketingConsent: { type: boolean }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -1950,6 +2273,7 @@ components:
         phone: { type: ["string", "null"], maxLength: 40 }
         membershipType: { type: string, minLength: 2, maxLength: 80 }
         gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
+        marketingConsent: { type: boolean }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -2337,7 +2661,7 @@ components:
         count: { type: integer, minimum: 0 }
     ModuleKey:
       type: string
-      enum: [members, courses, pulse, team]
+      enum: [members, courses, pulse, team, marketing]
     ModuleSetting:
       type: object
       required: [key, title, enabled]

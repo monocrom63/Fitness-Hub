@@ -14,4 +14,5 @@ export const ModuleKey = {
   courses: 'courses',
   pulse: 'pulse',
   team: 'team',
+  marketing: 'marketing',
 } as const;

@@ -7,6 +7,7 @@ import modulesRouter from "./modules";
 import memberAppRouter from "./member-app";
 import memberInvitationsRouter from "./member-invitations";
 import contractsRouter from "./contracts";
+import marketingRouter from "./marketing";
 import courseBookingsRouter from "./course-bookings";
 import courseEditsRouter from "./course-edits";
 import roomAssetsRouter from "./room-assets";
@@ -38,6 +39,7 @@ export function createApiRouter(team: IRouter = teamRouter): IRouter {
   router.use(memberAppRouter);
   router.use(memberInvitationsRouter);
   router.use(contractsRouter);
+  router.use(marketingRouter);
   return router;
 }
 
