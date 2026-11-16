@@ -10,7 +10,7 @@ import {
 import type { StudioSummary } from '@workspace/api-client-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-type StudioFields = { name: string; city: string };
+type StudioFields = { name: string; city: string; openingTime: string; closingTime: string };
 
 export default function StudioManagement() {
   const { getToken } = useAuth();
@@ -18,7 +18,7 @@ export default function StudioManagement() {
   const studios = useListStudios({ query: { queryKey: getListStudiosQueryKey(), refetchOnMount: 'always' } });
   const create = useCreateStudio();
   const update = useUpdateStudio();
-  const form = useForm<StudioFields>({ defaultValues: { name: '', city: '' } });
+  const form = useForm<StudioFields>({ defaultValues: { name: '', city: '', openingTime: '06:00', closingTime: '22:00' } });
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
@@ -76,7 +76,7 @@ export default function StudioManagement() {
 
   const submit = (fields: StudioFields) => {
     setFeedback('');
-    const data = { name: fields.name.trim(), city: fields.city.trim() };
+    const data = { name: fields.name.trim(), city: fields.city.trim(), openingTime: fields.openingTime, closingTime: fields.closingTime };
     if (editingId !== null) {
       update.mutate({ id: editingId, data }, { onSuccess: studio => saved(studio, true) });
     } else {
@@ -91,7 +91,7 @@ export default function StudioManagement() {
         <h2>Studios</h2>
         <p>Lege weitere Standorte an. Danach kannst du für sie Kurse planen und Teammitglieder einladen.</p>
       </div>
-      <button type="button" className="button button-dark" onClick={() => { create.reset(); update.reset(); setEditingId(null); form.reset({ name: '', city: '' }); setFormOpen(true); }} disabled={formOpen} data-testid="button-create-studio"><Plus size={16} /> Studio anlegen</button>
+      <button type="button" className="button button-dark" onClick={() => { create.reset(); update.reset(); setEditingId(null); form.reset({ name: '', city: '', openingTime: '06:00', closingTime: '22:00' }); setFormOpen(true); }} disabled={formOpen} data-testid="button-create-studio"><Plus size={16} /> Studio anlegen</button>
     </div>
     {formOpen && <Form {...form}>
       <form className="studio-create-form" onSubmit={form.handleSubmit(submit)} data-testid={editingId === null ? 'form-create-studio' : 'form-edit-studio'}>
@@ -112,6 +112,10 @@ export default function StudioManagement() {
           <FormControl><input {...field} autoComplete="address-level2" maxLength={120} data-testid="input-studio-city" /></FormControl>
           <FormMessage />
         </FormItem>} />
+        <div className="studio-hours-fields">
+          <FormField control={form.control} name="openingTime" render={({ field }) => <FormItem className="field"><FormLabel>Öffnet</FormLabel><FormControl><input {...field} type="time" required data-testid="input-studio-opening-time" /></FormControl><FormMessage /></FormItem>} />
+          <FormField control={form.control} name="closingTime" rules={{ validate: value => value > form.getValues('openingTime') || 'Die Schließzeit muss nach der Öffnungszeit liegen.' }} render={({ field }) => <FormItem className="field"><FormLabel>Schließt</FormLabel><FormControl><input {...field} type="time" required data-testid="input-studio-closing-time" /></FormControl><FormMessage /></FormItem>} />
+        </div>
         <div className="studio-create-actions">
           <button type="submit" className="button button-dark" disabled={create.isPending || update.isPending} data-testid="button-save-studio">{create.isPending || update.isPending ? 'Wird gespeichert …' : 'Speichern'}</button>
           <button type="button" className="button button-outline" disabled={create.isPending || update.isPending} onClick={() => { setFormOpen(false); setEditingId(null); form.reset(); create.reset(); update.reset(); }} data-testid="button-cancel-studio">Abbrechen</button>
@@ -128,7 +132,7 @@ export default function StudioManagement() {
       : <div className="module-list" data-testid="list-studios">{studios.data?.length
         ? studios.data.map(studio => <div className="module-row studio-logo-row" key={studio.id} data-testid={`row-studio-${studio.id}`}><div><strong>{studio.name}</strong><span>{studio.city}</span></div><label className="button button-outline studio-logo-upload" aria-label={`Logo für ${studio.name} hochladen`}><ImagePlus size={15} />{uploadingId === studio.id ? 'Lädt …' : 'Logo hochladen'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingId !== null} onChange={event => { void uploadLogo(studio, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} data-testid={`input-studio-logo-${studio.id}`} /></label><button type="button" className="button button-outline" disabled={formOpen || uploadingId !== null} onClick={() => {
           create.reset(); update.reset(); setFeedback(''); setEditingId(studio.id);
-          form.reset({ name: studio.name, city: studio.city }); setFormOpen(true);
+           form.reset({ name: studio.name, city: studio.city, openingTime: studio.openingTime || '06:00', closingTime: studio.closingTime || '22:00' }); setFormOpen(true);
         }} data-testid={`button-edit-studio-${studio.id}`}>Bearbeiten</button></div>)
         : <div className="module-row">Noch kein Studio angelegt.</div>}</div>}
   </section>;

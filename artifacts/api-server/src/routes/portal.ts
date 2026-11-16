@@ -30,6 +30,8 @@ import {
   CompleteOnboardingResponse,
   GetDashboardQueryParams,
   GetDashboardResponse,
+  GetDashboardAnalyticsQueryParams,
+  GetDashboardAnalyticsResponse,
   GetMeResponse,
   ListCoursesQueryParams,
   ListCoursesResponse,
@@ -50,6 +52,7 @@ import {
   coursesTable,
   db,
   membersTable,
+  memberContractsTable,
   memberInvitationsTable,
   organizationsTable,
   pulseMessagesTable,
@@ -174,6 +177,31 @@ function berlinDayRange(now = new Date()) {
   };
 }
 
+function berlinRange(period: "day" | "month" | "quarter" | "year", now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(now);
+  const value = (key: string) => Number(parts.find((part) => part.type === key)?.value);
+  const year = value("year");
+  const month = value("month");
+  const day = value("day");
+  const current = new Date(Date.UTC(year, month - 1, 1, 12));
+  if (period === "day") current.setUTCDate(day);
+  if (period === "quarter") current.setUTCMonth(Math.floor((month - 1) / 3) * 3);
+  if (period === "year") current.setUTCMonth(0);
+  const previous = new Date(current);
+  if (period === "day") previous.setUTCDate(previous.getUTCDate() - 1);
+  if (period === "month") previous.setUTCMonth(previous.getUTCMonth() - 1);
+  if (period === "quarter") previous.setUTCMonth(previous.getUTCMonth() - 3);
+  if (period === "year") previous.setUTCFullYear(previous.getUTCFullYear() - 1);
+  const next = new Date(current);
+  if (period === "day") next.setUTCDate(next.getUTCDate() + 1);
+  if (period === "month") next.setUTCMonth(next.getUTCMonth() + 1);
+  if (period === "quarter") next.setUTCMonth(next.getUTCMonth() + 3);
+  if (period === "year") next.setUTCFullYear(next.getUTCFullYear() + 1);
+  return { start: berlinDayRange(current).start, end: berlinDayRange(next).start, previousStart: berlinDayRange(previous).start };
+}
+
 router.get("/me", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) {
@@ -273,6 +301,8 @@ router.get("/studios", async (req, res): Promise<void> => {
       id: studiosTable.id,
       name: studiosTable.name,
       city: studiosTable.city,
+      openingTime: studiosTable.openingTime,
+      closingTime: studiosTable.closingTime,
     })
     .from(studiosTable)
     .where(
@@ -303,6 +333,10 @@ router.post("/studios", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Bitte Studio-Name und Stadt mit jeweils 2 bis 120 Zeichen angeben." });
     return;
   }
+  if ((body.data.openingTime ?? "06:00") >= (body.data.closingTime ?? "22:00")) {
+    res.status(400).json({ error: "Die Schließzeit muss nach der Öffnungszeit liegen." });
+    return;
+  }
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-studio-create:${staff.organizationId}`}))`);
     const [existing] = await tx.select({ id: studiosTable.id }).from(studiosTable).where(and(
@@ -312,8 +346,12 @@ router.post("/studios", async (req, res): Promise<void> => {
     )).limit(1);
     if (existing) return { error: "In dieser Stadt gibt es bereits ein Studio mit diesem Namen." as const };
     const [studio] = await tx.insert(studiosTable)
-      .values({ organizationId: staff.organizationId, name, city })
-      .returning({ id: studiosTable.id, name: studiosTable.name, city: studiosTable.city });
+      .values({
+        organizationId: staff.organizationId, name, city,
+        openingTime: body.data.openingTime ?? "06:00",
+        closingTime: body.data.closingTime ?? "22:00",
+      })
+      .returning({ id: studiosTable.id, name: studiosTable.name, city: studiosTable.city, openingTime: studiosTable.openingTime, closingTime: studiosTable.closingTime });
     return { studio };
   });
   if ("error" in result) {
@@ -347,6 +385,11 @@ router.patch("/studios/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  if ((body.data.openingTime ?? "06:00") >= (body.data.closingTime ?? "22:00")) {
+    res.status(400).json({ error: "Die Schließzeit muss nach der Öffnungszeit liegen." });
+    return;
+  }
+
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`fiudia-studio-create:${staff.organizationId}`}))`);
     const [existingStudio] = await tx
@@ -368,12 +411,16 @@ router.patch("/studios/:id", async (req, res): Promise<void> => {
     if (duplicate) return { duplicate: true as const };
 
     const [studio] = await tx.update(studiosTable)
-      .set({ name, city })
+      .set({
+        name, city,
+        openingTime: body.data.openingTime ?? "06:00",
+        closingTime: body.data.closingTime ?? "22:00",
+      })
       .where(and(
         eq(studiosTable.id, params.data.id),
         eq(studiosTable.organizationId, staff.organizationId),
       ))
-      .returning({ id: studiosTable.id, name: studiosTable.name, city: studiosTable.city });
+      .returning({ id: studiosTable.id, name: studiosTable.name, city: studiosTable.city, openingTime: studiosTable.openingTime, closingTime: studiosTable.closingTime });
     return { studio };
   });
   if ("notFound" in result) {
@@ -442,6 +489,90 @@ router.patch("/studios/:id/logo", async (req, res): Promise<void> => {
   await db.update(studiosTable).set({ logoPath: body.data.objectPath })
     .where(and(eq(studiosTable.id, id), eq(studiosTable.organizationId, staff.organizationId)));
   res.json({ success: true });
+});
+
+router.get("/dashboard/analytics", async (req, res): Promise<void> => {
+  const staff = await requireStaff(req, res);
+  if (!staff) return;
+  if (staff.role === "studio_employee") {
+    res.status(403).json({ error: "Dashboard-Analysen sind nur für Studioleitungen verfügbar." });
+    return;
+  }
+  if (!(await isModuleEnabled(staff.organizationId, "members"))) {
+    res.status(403).json({ error: "Das Mitglieder-Modul ist für diese Organisation nicht aktiviert." });
+    return;
+  }
+  const query = GetDashboardAnalyticsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "Ungültiger Zeitraum oder Studiofilter." });
+    return;
+  }
+  const accessible = await getAccessibleStudioIds(staff);
+  const studioId = query.data.studioId ?? staff.studioId ?? accessible[0];
+  if (!studioId || !accessible.includes(studioId) || !(await canAccessStudio(staff, studioId))) {
+    res.status(403).json({ error: "Kein Zugriff auf dieses Studio." });
+    return;
+  }
+  const [studio] = await db.select({
+    openingTime: studiosTable.openingTime,
+    closingTime: studiosTable.closingTime,
+  }).from(studiosTable).where(eq(studiosTable.id, studioId)).limit(1);
+  if (!studio) { res.status(404).json({ error: "Studio nicht gefunden." }); return; }
+
+  const { start, end, previousStart } = berlinRange(query.data.period);
+  const hourExpr = sql<number>`EXTRACT(HOUR FROM ${checkInsTable.checkedInAt} AT TIME ZONE 'Europe/Berlin')::int`;
+  const hourlyRows = await db.select({ hour: hourExpr, count: count() }).from(checkInsTable)
+    .where(and(eq(checkInsTable.studioId, studioId), gte(checkInsTable.checkedInAt, start), lt(checkInsTable.checkedInAt, end)))
+    .groupBy(hourExpr);
+  const openingHour = Number(studio.openingTime.slice(0, 2));
+  const closingHour = Number(studio.closingTime.slice(0, 2));
+  const currentHour = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23",
+  }).format(new Date()));
+  const checkInsByHour = Array.from({ length: Math.max(1, closingHour - openingHour) }, (_, i) => {
+    const hour = openingHour + i;
+    return { hour, count: Number(hourlyRows.find((row) => Number(row.hour) === hour)?.count ?? 0) };
+  });
+
+  const unit = query.data.period === "day" ? "hour" : query.data.period === "year" ? "month" : query.data.period === "quarter" ? "week" : "day";
+  const format = query.data.period === "day" ? "HH24:00" : query.data.period === "month" ? "DD" : query.data.period === "quarter" ? "IW" : "MM";
+  const bucketExpr = sql`date_trunc(${sql.raw(`'${unit}'`)}, ${memberContractsTable.signedAt} AT TIME ZONE 'Europe/Berlin')`;
+  const labelExpr = sql<string>`to_char(${bucketExpr}, ${sql.raw(`'${format}'`)})`;
+  const contractBucketsIn = (from: Date, to: Date) => db.select({ label: labelExpr, count: count() })
+    .from(memberContractsTable).innerJoin(membersTable, eq(memberContractsTable.memberId, membersTable.id))
+    .where(and(
+      eq(membersTable.studioId, studioId),
+      eq(memberContractsTable.status, "signed"),
+      gte(memberContractsTable.signedAt, from),
+      lt(memberContractsTable.signedAt, to),
+    )).groupBy(bucketExpr).orderBy(bucketExpr);
+  const [currentBuckets, previousBuckets, genderRows] = await Promise.all([
+    contractBucketsIn(start, end),
+    contractBucketsIn(previousStart, start),
+    db.select({ gender: membersTable.gender, count: count() }).from(membersTable)
+      .where(eq(membersTable.studioId, studioId)).groupBy(membersTable.gender),
+  ]);
+  const signedContracts = currentBuckets.reduce((sum, row) => sum + Number(row.count), 0);
+  const previousContracts = previousBuckets.reduce((sum, row) => sum + Number(row.count), 0);
+  const genderCounts = (["male", "female", "diverse"] as const).map((gender) => ({
+    gender, count: Number(genderRows.find((row) => row.gender === gender)?.count ?? 0),
+  }));
+  res.json(GetDashboardAnalyticsResponse.parse({
+    period: query.data.period,
+    openingTime: studio.openingTime,
+    closingTime: studio.closingTime,
+    currentHour,
+    checkInsByHour,
+    signedContracts,
+    previousContracts,
+    contractChangePercent: previousContracts ? Math.round((signedContracts - previousContracts) / previousContracts * 100) : null,
+    contractBuckets: [...new Set([...currentBuckets, ...previousBuckets].map((row) => row.label))].sort().map((label) => ({
+      label,
+      current: Number(currentBuckets.find((item) => item.label === label)?.count ?? 0),
+      previous: Number(previousBuckets.find((item) => item.label === label)?.count ?? 0),
+    })),
+    genderCounts,
+  }));
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {
@@ -670,6 +801,7 @@ router.get("/members", async (req, res): Promise<void> => {
       email: membersTable.email,
       phone: membersTable.phone,
       membershipType: membersTable.membershipType,
+      gender: membersTable.gender,
       billingInterval: membersTable.billingInterval,
       status: membersTable.status,
       birthDate: membersTable.birthDate,
@@ -731,7 +863,7 @@ router.get("/members", async (req, res): Promise<void> => {
         invitationEmailStatus: staff.role === "studio_employee"
           ? null : latestInvitation.get(member.id)?.emailStatus ?? null,
         ...(staff.role === "studio_employee"
-          ? { email: null, phone: null, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
+          ? { email: null, phone: null, gender: null, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
           : {}),
         joinedAt: member.joinedAt.toISOString(),
         lastCheckIn: latestCheckIn.get(member.id)?.toISOString() ?? null,

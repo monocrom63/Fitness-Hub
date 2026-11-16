@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BillingInterval } from './billingInterval';
+import type { MemberInputGender } from './memberInputGender';
 import type { MemberStatus } from './memberStatus';
 
 export interface MemberInput {
@@ -23,6 +24,8 @@ export interface MemberInput {
      * @maxLength 80
      */
   membershipType: string;
+  /** @nullable */
+  gender?: MemberInputGender;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**

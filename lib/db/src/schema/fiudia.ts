@@ -39,6 +39,8 @@ export const studiosTable = pgTable("fiudia_studios", {
     .references(() => organizationsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   city: text("city").notNull(),
+  openingTime: text("opening_time").notNull().default("06:00"),
+  closingTime: text("closing_time").notNull().default("22:00"),
   logoPath: text("logo_path"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -97,6 +99,7 @@ export const membersTable = pgTable("fiudia_members", {
   email: text("email").notNull(),
   phone: text("phone"),
   membershipType: text("membership_type").notNull(),
+  gender: text("gender"),
   billingInterval: text("billing_interval").notNull().default("monthly"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),

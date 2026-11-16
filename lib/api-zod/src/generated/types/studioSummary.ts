@@ -10,4 +10,8 @@ export interface StudioSummary {
   id: number;
   name: string;
   city: string;
+  /** @pattern ^[0-9]{2}:[0-9]{2}$ */
+  openingTime?: string;
+  /** @pattern ^[0-9]{2}:[0-9]{2}$ */
+  closingTime?: string;
 }

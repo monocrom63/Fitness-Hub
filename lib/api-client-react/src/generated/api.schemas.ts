@@ -216,6 +216,10 @@ export interface StudioSummary {
   id: number;
   name: string;
   city: string;
+  /** @pattern ^[0-9]{2}:[0-9]{2}$ */
+  openingTime?: string;
+  /** @pattern ^[0-9]{2}:[0-9]{2}$ */
+  closingTime?: string;
 }
 
 export interface StudioInput {
@@ -229,6 +233,10 @@ export interface StudioInput {
      * @maxLength 120
      */
   city: string;
+  /** @pattern ^[0-9]{2}:[0-9]{2}$ */
+  openingTime?: string;
+  /** @pattern ^[0-9]{2}:[0-9]{2}$ */
+  closingTime?: string;
 }
 
 export type StudioLogoUploadRequestContentType = typeof StudioLogoUploadRequestContentType[keyof typeof StudioLogoUploadRequestContentType];
@@ -330,6 +338,75 @@ export interface Dashboard {
   courses: Course[];
 }
 
+export type DashboardAnalyticsPeriod = typeof DashboardAnalyticsPeriod[keyof typeof DashboardAnalyticsPeriod];
+
+
+export const DashboardAnalyticsPeriod = {
+  day: 'day',
+  month: 'month',
+  quarter: 'quarter',
+  year: 'year',
+} as const;
+
+export interface HourlyCheckIns {
+  /**
+     * @minimum 0
+     * @maximum 23
+     */
+  hour: number;
+  /** @minimum 0 */
+  count: number;
+}
+
+export interface ContractBucket {
+  label: string;
+  /** @minimum 0 */
+  current: number;
+  /** @minimum 0 */
+  previous: number;
+}
+
+export type GenderCountGender = typeof GenderCountGender[keyof typeof GenderCountGender];
+
+
+export const GenderCountGender = {
+  male: 'male',
+  female: 'female',
+  diverse: 'diverse',
+} as const;
+
+export interface GenderCount {
+  gender: GenderCountGender;
+  /** @minimum 0 */
+  count: number;
+}
+
+export interface DashboardAnalytics {
+  period: DashboardAnalyticsPeriod;
+  openingTime: string;
+  closingTime: string;
+  currentHour: number;
+  checkInsByHour: HourlyCheckIns[];
+  signedContracts: number;
+  previousContracts: number;
+  /** @nullable */
+  contractChangePercent: number | null;
+  contractBuckets: ContractBucket[];
+  genderCounts: GenderCount[];
+}
+
+/**
+ * @nullable
+ */
+export type MemberGender = typeof MemberGender[keyof typeof MemberGender] | null;
+
+
+export const MemberGender = {
+  male: 'male',
+  female: 'female',
+  diverse: 'diverse',
+} as const;
+
 /**
  * @nullable
  */
@@ -364,6 +441,8 @@ export interface Member {
   /** @nullable */
   phone: string | null;
   membershipType: string;
+  /** @nullable */
+  gender?: MemberGender;
   billingInterval: BillingInterval;
   status: MemberStatus;
   /**
@@ -409,6 +488,18 @@ export interface Member {
   invitationEmailStatus?: MemberInvitationEmailStatus;
 }
 
+/**
+ * @nullable
+ */
+export type MemberInputGender = typeof MemberInputGender[keyof typeof MemberInputGender] | null;
+
+
+export const MemberInputGender = {
+  male: 'male',
+  female: 'female',
+  diverse: 'diverse',
+} as const;
+
 export interface MemberInput {
   /**
      * @minLength 2
@@ -424,6 +515,8 @@ export interface MemberInput {
      * @maxLength 80
      */
   membershipType: string;
+  /** @nullable */
+  gender?: MemberInputGender;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
@@ -460,6 +553,18 @@ export interface MemberInput {
   studioId: number;
 }
 
+/**
+ * @nullable
+ */
+export type MemberUpdateGender = typeof MemberUpdateGender[keyof typeof MemberUpdateGender] | null;
+
+
+export const MemberUpdateGender = {
+  male: 'male',
+  female: 'female',
+  diverse: 'diverse',
+} as const;
+
 export interface MemberUpdate {
   /**
      * @minLength 2
@@ -478,6 +583,8 @@ export interface MemberUpdate {
      * @maxLength 80
      */
   membershipType?: string;
+  /** @nullable */
+  gender?: MemberUpdateGender;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
@@ -1417,6 +1524,21 @@ export interface PulseReadInput {
 export type GetDashboardParams = {
 studioId?: number;
 };
+
+export type GetDashboardAnalyticsParams = {
+studioId?: number;
+period: GetDashboardAnalyticsPeriod;
+};
+
+export type GetDashboardAnalyticsPeriod = typeof GetDashboardAnalyticsPeriod[keyof typeof GetDashboardAnalyticsPeriod];
+
+
+export const GetDashboardAnalyticsPeriod = {
+  day: 'day',
+  month: 'month',
+  quarter: 'quarter',
+  year: 'year',
+} as const;
 
 export type ListMembersParams = {
 search?: string;

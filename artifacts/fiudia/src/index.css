@@ -792,3 +792,48 @@ button { cursor: pointer; }
     height: 230px;
   }
 }
+
+.studio-hours-fields,
+.analytics-header,
+.analytics-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.studio-hours-fields > * { flex: 1; }
+.dashboard-analytics { margin: 34px auto 0; max-width: 1320px; }
+.analytics-header { margin-bottom: 18px; flex-wrap: wrap; }
+.analytics-header h2 { margin: 5px 0 0; font-size: 24px; letter-spacing: -.04em; }
+.analytics-periods { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.analytics-periods button { border: 0; background: transparent; color: var(--muted-foreground); border-radius: 9px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.analytics-periods button.active { background: hsl(var(--chart-1)); color: #241b45; font-weight: 650; }
+.analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.analytics-card { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: 0 5px 20px rgba(28, 25, 45, .04); }
+.analytics-card--gender { grid-column: 1 / -1; }
+.analytics-card-title h3 { margin: 5px 0 0; font-size: 17px; letter-spacing: -.025em; }
+.analytics-caption, .analytics-footnote, .analytics-total-label { color: var(--muted-foreground); font-size: 12px; }
+.analytics-chart { height: 225px; margin-top: 18px; }
+.analytics-footnote { margin: 12px 0 0; }
+.analytics-trend { padding: 7px 10px; border-radius: 20px; background: hsl(var(--chart-2) / .16); color: hsl(var(--chart-2)); font-size: 12px; font-weight: 700; }
+.analytics-trend.down { background: hsl(var(--chart-4) / .12); color: hsl(var(--chart-4)); }
+.analytics-total { display: block; margin-top: 18px; font-size: 32px; letter-spacing: -.05em; }
+.analytics-total-label { display: block; margin-top: 2px; }
+.gender-chart { display: flex; align-items: center; justify-content: center; gap: 40px; min-height: 210px; }
+.gender-chart > div { width: min(270px, 55%); height: 210px; }
+.gender-chart ul { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; min-width: 160px; }
+.gender-chart li { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 9px; font-size: 13px; }
+.gender-chart li i { width: 9px; height: 9px; border-radius: 50%; }
+.analytics-empty, .analytics-loading, .analytics-error { padding: 28px 16px; color: var(--muted-foreground); }
+.analytics-error { display: flex; align-items: center; justify-content: space-between; }
+@media (max-width: 780px) {
+  .analytics-grid { grid-template-columns: 1fr; }
+  .analytics-card--gender { grid-column: auto; }
+}
+@media (max-width: 520px) {
+  .analytics-header { align-items: flex-start; flex-direction: column; }
+  .analytics-periods { width: 100%; justify-content: space-between; }
+  .analytics-periods button { padding: 8px; }
+  .gender-chart { gap: 12px; }
+  .gender-chart ul { min-width: 130px; }
+}

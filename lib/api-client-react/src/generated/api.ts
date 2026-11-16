@@ -44,6 +44,8 @@ import type {
   CourseRosterBooking,
   CourseUpdate,
   Dashboard,
+  DashboardAnalytics,
+  GetDashboardAnalyticsParams,
   GetDashboardParams,
   HealthStatus,
   Invitation,
@@ -955,6 +957,90 @@ export function useGetDashboard<TData = Awaited<ReturnType<typeof getDashboard>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDashboardAnalyticsUrl = (params: GetDashboardAnalyticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/analytics?${stringifiedParams}` : `/api/dashboard/analytics`
+}
+
+/**
+ * @summary Get studio activity analytics for a selected period
+ */
+export const getDashboardAnalytics = async (params: GetDashboardAnalyticsParams, options?: Parameters<typeof customFetch>[1]): Promise<DashboardAnalytics> => {
+
+  return customFetch<DashboardAnalytics>(getGetDashboardAnalyticsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardAnalyticsQueryKey = (params?: GetDashboardAnalyticsParams,) => {
+    return [
+    `/api/dashboard/analytics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDashboardAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardAnalytics>>, TError = ErrorType<void>>(params: GetDashboardAnalyticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardAnalyticsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardAnalytics>>> = ({ signal }) => getDashboardAnalytics(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardAnalytics>>>
+export type GetDashboardAnalyticsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get studio activity analytics for a selected period
+ */
+
+export function useGetDashboardAnalytics<TData = Awaited<ReturnType<typeof getDashboardAnalytics>>, TError = ErrorType<void>>(
+ params: GetDashboardAnalyticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardAnalyticsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

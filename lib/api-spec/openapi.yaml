@@ -231,6 +231,27 @@ paths:
           description: Sign-in required
         "403":
           description: Fiudia access has not been assigned or the requested studio is inaccessible
+  /dashboard/analytics:
+    get:
+      operationId: getDashboardAnalytics
+      tags: [portal]
+      summary: Get studio activity analytics for a selected period
+      parameters:
+        - name: studioId
+          in: query
+          schema: { type: integer }
+        - name: period
+          in: query
+          required: true
+          schema: { type: string, enum: [day, month, quarter, year] }
+      responses:
+        "200":
+          description: Hourly check-ins, signed contracts and member gender counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DashboardAnalytics" }
+        "401": { description: Sign-in required }
+        "403": { description: Manager role or studio access required }
   /members:
     get:
       operationId: listMembers
@@ -1777,12 +1798,16 @@ components:
         id: { type: integer }
         name: { type: string }
         city: { type: string }
+        openingTime: { type: string, pattern: "^[0-9]{2}:[0-9]{2}$" }
+        closingTime: { type: string, pattern: "^[0-9]{2}:[0-9]{2}$" }
     StudioInput:
       type: object
       required: [name, city]
       properties:
         name: { type: string, minLength: 2, maxLength: 120 }
         city: { type: string, minLength: 2, maxLength: 120 }
+        openingTime: { type: string, pattern: "^[0-9]{2}:[0-9]{2}$" }
+        closingTime: { type: string, pattern: "^[0-9]{2}:[0-9]{2}$" }
     StudioLogoUploadRequest:
       type: object
       additionalProperties: false
@@ -1835,6 +1860,45 @@ components:
         courses:
           type: array
           items: { $ref: "#/components/schemas/Course" }
+    DashboardAnalytics:
+      type: object
+      required: [period, openingTime, closingTime, currentHour, checkInsByHour, signedContracts, previousContracts, contractChangePercent, contractBuckets, genderCounts]
+      properties:
+        period: { type: string, enum: [day, month, quarter, year] }
+        openingTime: { type: string }
+        closingTime: { type: string }
+        currentHour: { type: integer }
+        checkInsByHour:
+          type: array
+          items: { $ref: "#/components/schemas/HourlyCheckIns" }
+        signedContracts: { type: integer }
+        previousContracts: { type: integer }
+        contractChangePercent: { type: ["number", "null"] }
+        contractBuckets:
+          type: array
+          items: { $ref: "#/components/schemas/ContractBucket" }
+        genderCounts:
+          type: array
+          items: { $ref: "#/components/schemas/GenderCount" }
+    HourlyCheckIns:
+      type: object
+      required: [hour, count]
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        count: { type: integer, minimum: 0 }
+    ContractBucket:
+      type: object
+      required: [label, current, previous]
+      properties:
+        label: { type: string }
+        current: { type: integer, minimum: 0 }
+        previous: { type: integer, minimum: 0 }
+    GenderCount:
+      type: object
+      required: [gender, count]
+      properties:
+        gender: { type: string, enum: [male, female, diverse] }
+        count: { type: integer, minimum: 0 }
     Member:
       type: object
       required: [id, fullName, email, phone, membershipType, billingInterval, status, studioId, studioName, joinedAt, lastCheckIn]
@@ -1844,6 +1908,7 @@ components:
         email: { type: ["string", "null"], format: email }
         phone: { type: ["string", "null"] }
         membershipType: { type: string }
+        gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -1867,6 +1932,7 @@ components:
         email: { type: string, format: email, maxLength: 320 }
         phone: { type: string, maxLength: 40 }
         membershipType: { type: string, minLength: 2, maxLength: 80 }
+        gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -1883,6 +1949,7 @@ components:
         email: { type: string, format: email, maxLength: 320 }
         phone: { type: ["string", "null"], maxLength: 40 }
         membershipType: { type: string, minLength: 2, maxLength: 80 }
+        gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }

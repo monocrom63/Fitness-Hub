@@ -7,6 +7,7 @@
  */
 import type { BillingInterval } from './billingInterval';
 import type { MemberStatus } from './memberStatus';
+import type { MemberUpdateGender } from './memberUpdateGender';
 
 export interface MemberUpdate {
   /**
@@ -26,6 +27,8 @@ export interface MemberUpdate {
      * @maxLength 80
      */
   membershipType?: string;
+  /** @nullable */
+  gender?: MemberUpdateGender;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
