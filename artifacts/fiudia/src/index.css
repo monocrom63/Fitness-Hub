@@ -405,6 +405,8 @@ button { cursor: pointer; }
 .workspace-switcher strong, .workspace-switcher span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-switcher strong { font-size: .76rem; font-weight: 700; }
 .workspace-switcher span { margin-top: 2px; color: rgba(242,244,249,.55); font-size: .68rem; }
+.system-organization-switcher { display: grid; gap: 6px; margin: 0 5px 14px; padding: 10px; border: 1px solid hsl(var(--sidebar-border)); border-radius: 12px; background: rgba(255,255,255,.045); color: rgba(242,244,249,.7); font-size: .68rem; }
+.system-organization-switcher select { width: 100%; min-width: 0; border: 1px solid hsl(var(--sidebar-border)); border-radius: 8px; padding: 8px; background: #20293d; color: #fff; font: inherit; }
 .workspace-switcher .workspace-dot { display: grid; place-items: center; margin-top: 0; color: #20293d; font-size: .64rem; }
 .workspace-menu { position: relative; margin: 0 5px 25px; }
 .workspace-switchers { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 8px; margin: 0 5px 25px; }

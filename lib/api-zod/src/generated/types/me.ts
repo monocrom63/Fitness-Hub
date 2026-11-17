@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MeOrganizationsItem } from './meOrganizationsItem';
 import type { Role } from './role';
 
 export interface Me {
@@ -12,6 +13,7 @@ export interface Me {
   userName: string;
   email: string;
   isOnboarded: boolean;
+  isSystemAdmin: boolean;
   role?: Role | null;
   /** @nullable */
   organizationId?: number | null;
@@ -21,4 +23,5 @@ export interface Me {
   studioId?: number | null;
   /** @nullable */
   studioName?: string | null;
+  organizations: MeOrganizationsItem[];
 }

@@ -9,7 +9,8 @@ import {
 import { db, organizationModulesTable } from "@workspace/db";
 import {
   getRequestUserId,
-  getStaffContext,
+  getRequestStaffContext,
+  isOrganizationAdmin,
   type StaffContext,
 } from "../lib/fiudia-access";
 import {
@@ -46,7 +47,7 @@ export function createModulesRouter(
       res.status(401).json({ error: "Bitte melde dich an." });
       return null;
     }
-    const staff = await getStaffContext(userId, database);
+    const staff = await getRequestStaffContext(req, database, userId);
     if (!staff) {
       res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
       return null;
@@ -73,7 +74,7 @@ export function createModulesRouter(
         MODULE_KEYS.filter((key) => key !== "marketing").map((key) => ({
           key,
           title: MODULE_TITLES[key],
-          enabled: enabledByKey.get(key) ?? true,
+          enabled: staff.isSystemAdmin || (enabledByKey.get(key) ?? true),
         })),
       ),
     );
@@ -82,7 +83,7 @@ export function createModulesRouter(
   router.patch("/modules/:key", async (req, res): Promise<void> => {
     const staff = await requireStaff(req, res);
     if (!staff) return;
-    if (staff.role !== "district_manager") {
+    if (!isOrganizationAdmin(staff)) {
       res.status(403).json({ error: "Nur Bezirksleitungen können Module verwalten." });
       return;
     }

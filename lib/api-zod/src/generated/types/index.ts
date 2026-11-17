@@ -146,6 +146,7 @@ export * from './memberSelfUpdate';
 export * from './memberStatus';
 export * from './memberUpdate';
 export * from './memberUpdateGender';
+export * from './meOrganizationsItem';
 export * from './moduleKey';
 export * from './moduleSetting';
 export * from './moduleUpdate';

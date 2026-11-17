@@ -3,7 +3,7 @@ import type { RequestHandler } from "express";
 import { db, organizationModulesTable, marketingSubscriptionsTable } from "@workspace/db";
 import {
   getRequestUserId,
-  getStaffContext,
+  getRequestStaffContext,
 } from "./fiudia-access";
 
 export const MODULE_KEYS = ["members", "courses", "pulse", "team", "marketing"] as const;
@@ -50,8 +50,8 @@ export function requireModule(key: ModuleKey): RequestHandler {
       res.status(401).json({ error: "Bitte melde dich an." });
       return;
     }
-    const staff = await getStaffContext(userId);
-    if (!staff || !(await isModuleEnabled(staff.organizationId, key))) {
+    const staff = await getRequestStaffContext(req);
+    if (!staff || (!staff.isSystemAdmin && !(await isModuleEnabled(staff.organizationId, key)))) {
       res.status(403).json({ error: "Dieses Modul ist für deine Organisation nicht aktiviert." });
       return;
     }

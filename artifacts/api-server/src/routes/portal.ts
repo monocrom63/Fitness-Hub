@@ -66,7 +66,10 @@ import {
   getAccessibleStudioIds,
   getClerkIdentity,
   getRequestUserId,
+  getRequestStaffContext,
   getStaffContext,
+  isOrganizationAdmin,
+  isSystemAdmin,
   type StaffContext,
 } from "../lib/fiudia-access";
 import { isModuleEnabled } from "../lib/module-access";
@@ -97,7 +100,7 @@ async function requireStaff(
     return null;
   }
 
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req, db, userId);
   if (!staff) {
     res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
     return null;
@@ -210,18 +213,23 @@ router.get("/me", async (req, res): Promise<void> => {
   }
 
   const identity = await getClerkIdentity(userId);
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req, db, userId);
+  const organizations = staff && isSystemAdmin(staff)
+    ? await db.select({ id: organizationsTable.id, name: organizationsTable.name }).from(organizationsTable).orderBy(asc(organizationsTable.name))
+    : [];
   res.json(
     GetMeResponse.parse({
       userId,
       userName: staff?.fullName ?? identity.fullName,
       email: staff?.email ?? identity.email,
       isOnboarded: !!staff,
+      isSystemAdmin: staff?.isSystemAdmin ?? false,
       role: staff?.role ?? null,
       organizationId: staff?.organizationId ?? null,
       organizationName: staff?.organizationName ?? null,
       studioId: staff?.studioId ?? null,
       studioName: staff?.studioName ?? null,
+      organizations,
     }),
   );
 });
@@ -278,11 +286,13 @@ router.post("/onboarding", async (req, res): Promise<void> => {
       userName: created.staff.fullName,
       email: created.staff.email,
       isOnboarded: true,
+      isSystemAdmin: false,
       role: created.staff.role,
       organizationId: created.organization.id,
       organizationName: created.organization.name,
       studioId: created.studio.id,
       studioName: created.studio.name,
+      organizations: [],
     }),
   );
 });
@@ -318,7 +328,7 @@ router.get("/studios", async (req, res): Promise<void> => {
 router.post("/studios", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
-  if (staff.role !== "district_manager") {
+  if (!isOrganizationAdmin(staff)) {
     res.status(403).json({ error: "Nur Bezirksleitungen können Studios anlegen." });
     return;
   }
@@ -364,7 +374,7 @@ router.post("/studios", async (req, res): Promise<void> => {
 router.patch("/studios/:id", async (req, res): Promise<void> => {
   const staff = await requireStaff(req, res);
   if (!staff) return;
-  if (staff.role !== "district_manager") {
+  if (!isOrganizationAdmin(staff)) {
     res.status(403).json({ error: "Nur Bezirksleitungen können Studios bearbeiten." });
     return;
   }
@@ -918,6 +928,7 @@ router.post("/members", async (req, res): Promise<void> => {
     CreateMemberResponse.parse({
       ...member,
       marketingConsent: member.marketingConsent === 1,
+      contactConsent: member.contactConsent === 1,
       studioName: studio.name,
       joinedAt: member.joinedAt.toISOString(),
       lastCheckIn: null,
@@ -1008,6 +1019,7 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     UpdateMemberResponse.parse({
       ...updated,
       marketingConsent: updated.marketingConsent === 1,
+      contactConsent: updated.contactConsent === 1,
       studioName: studio.name,
       joinedAt: updated.joinedAt.toISOString(),
       lastCheckIn: latest?.checkedInAt.toISOString() ?? null,

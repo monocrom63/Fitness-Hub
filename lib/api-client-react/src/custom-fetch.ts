@@ -336,6 +336,12 @@ export async function customFetch<T = unknown>(
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+  if (typeof window !== "undefined" && !headers.has("x-fiudia-organization-id")) {
+    const organizationId = window.localStorage.getItem("fiudia-active-organization-id");
+    if (organizationId && /^[1-9]\d*$/.test(organizationId)) {
+      headers.set("x-fiudia-organization-id", organizationId);
+    }
+  }
 
   if (
     typeof init.body === "string" &&

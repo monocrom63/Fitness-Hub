@@ -25,11 +25,16 @@ export const GetMeResponse = zod.object({
   "userName": zod.string(),
   "email": zod.string().email(),
   "isOnboarded": zod.boolean(),
+  "isSystemAdmin": zod.boolean(),
   "role": zod.enum(['district_manager', 'studio_manager', 'studio_employee']).nullish(),
   "organizationId": zod.number().int().nullish(),
   "organizationName": zod.string().nullish(),
   "studioId": zod.number().int().nullish(),
-  "studioName": zod.string().nullish()
+  "studioName": zod.string().nullish(),
+  "organizations": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string()
+}))
 })
 
 
@@ -58,11 +63,16 @@ export const CompleteOnboardingResponse = zod.object({
   "userName": zod.string(),
   "email": zod.string().email(),
   "isOnboarded": zod.boolean(),
+  "isSystemAdmin": zod.boolean(),
   "role": zod.enum(['district_manager', 'studio_manager', 'studio_employee']).nullish(),
   "organizationId": zod.number().int().nullish(),
   "organizationName": zod.string().nullish(),
   "studioId": zod.number().int().nullish(),
-  "studioName": zod.string().nullish()
+  "studioName": zod.string().nullish(),
+  "organizations": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string()
+}))
 })
 
 
@@ -2547,11 +2557,16 @@ export const AcceptInvitationResponse = zod.object({
   "userName": zod.string(),
   "email": zod.string().email(),
   "isOnboarded": zod.boolean(),
+  "isSystemAdmin": zod.boolean(),
   "role": zod.enum(['district_manager', 'studio_manager', 'studio_employee']).nullish(),
   "organizationId": zod.number().int().nullish(),
   "organizationName": zod.string().nullish(),
   "studioId": zod.number().int().nullish(),
-  "studioName": zod.string().nullish()
+  "studioName": zod.string().nullish(),
+  "organizations": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string()
+}))
 })
 
 

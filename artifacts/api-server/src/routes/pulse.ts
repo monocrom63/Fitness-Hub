@@ -28,7 +28,8 @@ import {
   canManageTeam,
   getAccessibleStudioIds,
   getRequestUserId,
-  getStaffContext,
+  getRequestStaffContext,
+  isOrganizationAdmin,
   type StaffContext,
 } from "../lib/fiudia-access";
 
@@ -50,7 +51,7 @@ function visibleMessages(staff: StaffContext, studioIds: number[]) {
       eq(pulseMessagesTable.audience, roleAudience),
       eq(pulseMessagesTable.authorStaffId, staff.id),
       // District managers oversee every announcement in their organization.
-      staff.role === "district_manager"
+      isOrganizationAdmin(staff)
         ? eq(pulseMessagesTable.audience, "employees")
         : undefined,
     ),
@@ -79,7 +80,7 @@ export function createPulseRouter(
       return null;
     }
 
-    const staff = await getStaffContext(userId, database);
+    const staff = await getRequestStaffContext(req, database, userId);
     if (!staff) {
       res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
       return null;
@@ -98,8 +99,8 @@ export function createPulseRouter(
       return null;
     }
     if (!canManageTeam(staff) ||
-        (staff.role !== "district_manager" && message.authorStaffId !== staff.id) ||
-        (message.studioId === null && staff.role !== "district_manager") ||
+        (!isOrganizationAdmin(staff) && message.authorStaffId !== staff.id) ||
+        (message.studioId === null && !isOrganizationAdmin(staff)) ||
         (message.studioId !== null && !(await canAccessStudio(staff, message.studioId, database)))) {
       res.status(403).json({ error: "Nur die zuständige Verfasserin, der zuständige Verfasser oder die Bezirksleitung kann diese Meldung ändern." });
       return null;
@@ -199,8 +200,8 @@ router.get("/pulse", async (req, res): Promise<void> => {
         createdAt: message.createdAt.toISOString(),
         editedAt: message.editedAt?.toISOString() ?? null,
         retractedAt: message.retractedAt?.toISOString() ?? null,
-        canManage: !message.retractedAt && canManageTeam(staff) && (staff.role === "district_manager" || message.authorStaffId === staff.id) &&
-          (message.studioId !== null || staff.role === "district_manager"),
+        canManage: !message.retractedAt && canManageTeam(staff) && (isOrganizationAdmin(staff) || message.authorStaffId === staff.id) &&
+          (message.studioId !== null || isOrganizationAdmin(staff)),
         isRead: readIds.has(message.id),
         readCount: totals.get(message.id) ?? 0,
       })),
@@ -272,7 +273,7 @@ router.post("/pulse", async (req, res): Promise<void> => {
     return;
   }
   const studioId = body.data.studioId;
-  if (studioId === null && staff.role !== "district_manager") {
+  if (studioId === null && !isOrganizationAdmin(staff)) {
     res.status(403).json({ error: "Nur Bezirksleitungen können organisationsweit schreiben." });
     return;
   }

@@ -14,7 +14,7 @@ import {
 } from "@workspace/db";
 import {
   canAccessStudio, canManageCourses, getAccessibleStudioIds, getRequestUserId,
-  getStaffContext, type StaffContext,
+  getRequestStaffContext, type StaffContext,
 } from "../lib/fiudia-access";
 import { processTrainerAbsencePush, trainerDecisionNotice } from "../lib/trainer-absence-push";
 import { isTrainerAbsentForCourse, retireTrainerAlertIfResolved, trainerAbsenceOverlapsCourse, trainerLockKey } from "../lib/trainer-scheduling";
@@ -50,7 +50,7 @@ export function createTrainerAbsencesRouter(deps: Partial<Dependencies> = {}): I
   async function manager(req: Request, res: Response): Promise<StaffContext | null> {
     const userId = userIdFromRequest(req);
     if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return null; }
-    const staff = await getStaffContext(userId, database);
+    const staff = await getRequestStaffContext(req, database, userId);
     if (!staff || !canManageCourses(staff)) {
       res.status(403).json({ error: "Nur Studio- und Bezirksleitungen dürfen Trainerabwesenheiten verwalten." });
       return null;

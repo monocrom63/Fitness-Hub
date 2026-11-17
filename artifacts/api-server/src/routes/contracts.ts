@@ -13,7 +13,7 @@ import {
   membersTable,
   studiosTable,
 } from "@workspace/db";
-import { getRequestUserId, getStaffContext } from "../lib/fiudia-access";
+import { getRequestUserId, getRequestStaffContext } from "../lib/fiudia-access";
 import { linkedMember } from "./member-app";
 import { resendRequest } from "../lib/resend-client";
 import { getStripeClient } from "../lib/stripe-client";
@@ -143,7 +143,7 @@ async function memberContract(req: Request, res: import("express").Response, con
 router.get("/v1/contracts/settings", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff || staff.role === "studio_employee") {
     res.status(403).json({ error: "Nur Studio- oder Bezirksleitungen dürfen Vertragsdaten verwalten." });
     return;
@@ -175,7 +175,7 @@ router.get("/v1/contracts/settings", async (req, res): Promise<void> => {
 router.put("/v1/contracts/settings", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff || staff.role === "studio_employee") {
     res.status(403).json({ error: "Nur Studio- oder Bezirksleitungen dürfen Vertragsdaten verwalten." });
     return;
@@ -256,7 +256,7 @@ router.put("/v1/contracts/settings", async (req, res): Promise<void> => {
 router.patch("/v1/contracts/settings", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff || staff.role === "studio_employee") {
     res.status(403).json({ error: "Nur Studio- oder Bezirksleitungen dürfen Vertragsdaten verwalten." });
     return;

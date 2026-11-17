@@ -2212,17 +2212,26 @@ components:
       enum: [monthly, semiannual, annual]
     Me:
       type: object
-      required: [userId, userName, email, isOnboarded]
+      required: [userId, userName, email, isOnboarded, isSystemAdmin, organizations]
       properties:
         userId: { type: string }
         userName: { type: string }
         email: { type: string, format: email }
         isOnboarded: { type: boolean }
+        isSystemAdmin: { type: boolean }
         role: { allOf: [{ $ref: "#/components/schemas/Role" }], nullable: true }
         organizationId: { type: ["integer", "null"] }
         organizationName: { type: ["string", "null"] }
         studioId: { type: ["integer", "null"] }
         studioName: { type: ["string", "null"] }
+        organizations:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: integer }
+              name: { type: string }
     OnboardingInput:
       type: object
       required: [organizationName, studioName, city]

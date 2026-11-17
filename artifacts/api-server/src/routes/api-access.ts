@@ -9,7 +9,7 @@ import {
 import {
   apiAccessRequestsTable, db, marketingApiKeysTable, staffTable,
 } from "@workspace/db";
-import { getRequestUserId, getStaffContext, type StaffContext } from "../lib/fiudia-access";
+import { getRequestUserId, getRequestStaffContext, isOrganizationAdmin, type StaffContext } from "../lib/fiudia-access";
 import { isModuleEnabled } from "../lib/module-access";
 
 const router: IRouter = Router();
@@ -24,7 +24,7 @@ const serviceTitles = new Map(services.map((service) => [service.serviceKey, ser
 async function requireManager(req: Request, res: Response): Promise<StaffContext | null> {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return null; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff) { res.status(403).json({ error: "Für dieses Konto ist kein Fiudia-Zugang hinterlegt." }); return null; }
   if (staff.role === "studio_employee") { res.status(403).json({ error: "REST-API-Zugänge sind nur für Studio- und Bezirksleitungen verfügbar." }); return null; }
   return staff;
@@ -83,7 +83,7 @@ router.get("/api-access/requests", async (req, res): Promise<void> => {
   const staff = await requireManager(req, res);
   if (!staff) return;
   const rows = await db.select().from(apiAccessRequestsTable).where(
-    staff.role === "district_manager"
+    isOrganizationAdmin(staff)
       ? eq(apiAccessRequestsTable.organizationId, staff.organizationId)
       : and(
         eq(apiAccessRequestsTable.organizationId, staff.organizationId),
@@ -122,7 +122,7 @@ router.post("/api-access/requests", async (req, res): Promise<void> => {
 router.patch("/api-access/requests/:id", async (req, res): Promise<void> => {
   const staff = await requireManager(req, res);
   if (!staff) return;
-  if (staff.role !== "district_manager") { res.status(403).json({ error: "Nur die Bezirksleitung kann API-Anträge freigeben." }); return; }
+  if (!isOrganizationAdmin(staff)) { res.status(403).json({ error: "Nur die Bezirksleitung kann API-Anträge freigeben." }); return; }
   const params = ReviewApiAccessRequestParams.safeParse(req.params);
   const body = ReviewApiAccessRequestBody.safeParse(req.body);
   if (!params.success || !body.success) { res.status(400).json({ error: "Ungültige Entscheidung." }); return; }

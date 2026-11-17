@@ -21,6 +21,7 @@ import {
   getAccessibleStudioIds,
   getClerkIdentity,
   getRequestUserId,
+  getRequestStaffContext,
   getStaffContext,
   type FiudiaRole,
   type StaffContext,
@@ -64,7 +65,7 @@ export function createTeamRouter(
       res.status(401).json({ error: "Bitte melde dich an." });
       return null;
     }
-    const staff = await getStaffContext(userId, database);
+    const staff = await getRequestStaffContext(req, database, userId);
     if (!staff) {
       res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
       return null;
@@ -329,11 +330,13 @@ router.post(
         userName: created.member.fullName,
         email: created.member.email,
         isOnboarded: true,
+        isSystemAdmin: false,
         role: created.member.role,
         organizationId: created.member.organizationId,
         organizationName: created.studio.organizationName,
         studioId: created.member.studioId,
         studioName: created.studio.studioName,
+        organizations: [],
       }),
     );
   },

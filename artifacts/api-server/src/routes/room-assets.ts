@@ -59,7 +59,7 @@ import {
   canAccessStudio,
   canManageCourses,
   getRequestUserId,
-  getStaffContext,
+  getRequestStaffContext,
   type StaffContext,
 } from "../lib/fiudia-access";
 import {
@@ -78,7 +78,7 @@ async function requireManager(req: Request, res: Response): Promise<StaffContext
     res.status(401).json({ error: "Bitte melde dich an." });
     return null;
   }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff) {
     res.status(403).json({ error: "Für dieses Konto ist noch kein Fiudia-Zugang hinterlegt." });
     return null;

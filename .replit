@@ -46,3 +46,4 @@ channel = "stable-25_05"
 
 [userenv.shared]
 FIUDIA_EMAIL_FROM = "Fiudia <mail@fiudia.com>"
+FIUDIA_SYSTEM_ADMIN_EMAILS = "skunz@outlook.de"

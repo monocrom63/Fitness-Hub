@@ -25,7 +25,7 @@ import {
   canManageCourses,
   getAccessibleStudioIds,
   getRequestUserId,
-  getStaffContext,
+  getRequestStaffContext,
   type StaffContext,
 } from "../lib/fiudia-access";
 import { closureIntersectsInterval, hasOverlappingLiveCourse } from "../lib/room-closures";
@@ -138,7 +138,7 @@ export function createCourseEditsRouter(deps: Partial<Dependencies> = {}): IRout
       res.status(401).json({ error: "Anmeldung erforderlich." });
       return null;
     }
-    const staff = await getStaffContext(userId, database);
+    const staff = await getRequestStaffContext(req, database, userId);
     if (!staff || !canManageCourses(staff)) {
       res.status(403).json({ error: "Nur Studio- und Bezirksleitungen dürfen Kurse bearbeiten." });
       return null;

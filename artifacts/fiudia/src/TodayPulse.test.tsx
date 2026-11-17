@@ -106,6 +106,7 @@ function renderPulse(role: Me['role'] = 'studio_employee') {
   const location = memoryLocation({ path: '/pulse' });
   const me: Me = {
     userId: 'staff-1', email: 'staff@example.test', userName: 'Test Team', isOnboarded: true,
+    isSystemAdmin: false, organizations: [],
     role, studioId: 1, organizationId: 1,
   };
   render(

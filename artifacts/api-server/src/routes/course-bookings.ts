@@ -12,14 +12,14 @@ import {
 } from "@workspace/api-zod";
 import { courseBookingsTable, coursesTable, db, membersTable } from "@workspace/db";
 import { BookingError, bookCourse, cancelCourseBooking } from "../lib/course-bookings";
-import { canAccessStudio, canManageCourses, getRequestUserId, getStaffContext } from "../lib/fiudia-access";
+import { canAccessStudio, canManageCourses, getRequestUserId, getRequestStaffContext } from "../lib/fiudia-access";
 
 const router: IRouter = Router();
 
 router.get("/courses/:id/bookings", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff) { res.status(403).json({ error: "Kein Teamzugang." }); return; }
   if (!canManageCourses(staff)) {
     res.status(403).json({ error: "Nur Studio-Manager dürfen Kursbuchungen einsehen." });
@@ -72,7 +72,7 @@ router.get("/courses/:id/bookings", async (req, res): Promise<void> => {
 router.post("/courses/:id/bookings", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff) { res.status(403).json({ error: "Kein Teamzugang." }); return; }
   if (!canManageCourses(staff)) {
     res.status(403).json({ error: "Nur Studio-Manager dürfen Kursbuchungen verwalten." });
@@ -102,7 +102,7 @@ router.post("/courses/:id/bookings", async (req, res): Promise<void> => {
 router.delete("/courses/:id/bookings/:memberId", async (req, res): Promise<void> => {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Anmeldung erforderlich." }); return; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff) { res.status(403).json({ error: "Kein Teamzugang." }); return; }
   if (!canManageCourses(staff)) {
     res.status(403).json({ error: "Nur Studio-Manager dürfen Kursbuchungen stornieren." });

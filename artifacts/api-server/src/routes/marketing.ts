@@ -18,7 +18,7 @@ import {
   marketingSubscriptionsTable, marketingUnsubscribeTokensTable, membersTable,
   studiosTable,
 } from "@workspace/db";
-import { getRequestUserId, getStaffContext, type StaffContext } from "../lib/fiudia-access";
+import { getRequestUserId, getRequestStaffContext, isOrganizationAdmin, type StaffContext } from "../lib/fiudia-access";
 import { createMarketingImageUpload, getMarketingImageFile, pipeMarketingImage } from "../lib/studio-logos";
 import { getStripeClient } from "../lib/stripe-client";
 import { resendRequest } from "../lib/resend-client";
@@ -105,7 +105,7 @@ async function audienceCounts(organizationId: number, filters: ReturnType<typeof
 async function getStaff(req: Request, res: Response) {
   const userId = getRequestUserId(req);
   if (!userId) { res.status(401).json({ error: "Bitte melde dich an." }); return null; }
-  const staff = await getStaffContext(userId);
+  const staff = await getRequestStaffContext(req);
   if (!staff) { res.status(403).json({ error: "Für dieses Konto ist kein Fiudia-Zugang hinterlegt." }); return null; }
   if (staff.role === "studio_employee") { res.status(403).json({ error: "Marketing ist nur für Studio- und Bezirksleitungen verfügbar." }); return null; }
   return staff;
@@ -190,7 +190,7 @@ router.get("/marketing/subscription", async (req, res): Promise<void> => {
 router.post("/marketing/subscription/checkout", async (req, res): Promise<void> => {
   const staff = await getStaff(req, res);
   if (!staff) return;
-  if (staff.role !== "district_manager") { res.status(403).json({ error: "Nur die Bezirksleitung kann das Organisationsabo abschließen." }); return; }
+  if (!isOrganizationAdmin(staff)) { res.status(403).json({ error: "Nur die Bezirksleitung kann das Organisationsabo abschließen." }); return; }
   try {
     const { stripe, price } = await ensureMarketingPrice();
     const [saved] = await db.select().from(marketingSubscriptionsTable)
@@ -262,7 +262,7 @@ router.post("/marketing/subscription/confirm", async (req, res): Promise<void> =
 router.post("/marketing/subscription/portal", async (req, res): Promise<void> => {
   const staff = await getStaff(req, res);
   if (!staff) return;
-  if (staff.role !== "district_manager") { res.status(403).json({ error: "Nur die Bezirksleitung kann die Abrechnung verwalten." }); return; }
+  if (!isOrganizationAdmin(staff)) { res.status(403).json({ error: "Nur die Bezirksleitung kann die Abrechnung verwalten." }); return; }
   const [subscription] = await db.select().from(marketingSubscriptionsTable)
     .where(eq(marketingSubscriptionsTable.organizationId, staff.organizationId)).limit(1);
   if (!subscription?.stripeCustomerId) { res.status(404).json({ error: "Kein Marketing-Abonnement gefunden." }); return; }
@@ -368,7 +368,7 @@ router.post("/marketing/api-key", async (req, res): Promise<void> => {
   if (!staff) return;
   const approval = await getApprovedApiRequest(staff.organizationId, "marketing");
   if (!approval) { res.status(403).json({ error: "Für die Marketing-API ist noch kein Zugriff freigegeben." }); return; }
-  if (staff.role !== "district_manager" && approval.requestedByStaffId !== staff.id) {
+  if (!isOrganizationAdmin(staff) && approval.requestedByStaffId !== staff.id) {
     res.status(403).json({ error: "Nur die antragstellende Person oder die Bezirksleitung kann den Schlüssel verwalten." }); return;
   }
   if (!(await subscriptionState(staff.organizationId)).active) { res.status(403).json({ error: "Ein aktives Marketing-Abonnement ist erforderlich." }); return; }

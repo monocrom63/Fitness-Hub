@@ -447,11 +447,17 @@ export const BillingInterval = {
   annual: 'annual',
 } as const;
 
+export type MeOrganizationsItem = {
+  id: number;
+  name: string;
+};
+
 export interface Me {
   userId: string;
   userName: string;
   email: string;
   isOnboarded: boolean;
+  isSystemAdmin: boolean;
   role?: Role | null;
   /** @nullable */
   organizationId?: number | null;
@@ -461,6 +467,7 @@ export interface Me {
   studioId?: number | null;
   /** @nullable */
   studioName?: string | null;
+  organizations: MeOrganizationsItem[];
 }
 
 export interface OnboardingInput {
