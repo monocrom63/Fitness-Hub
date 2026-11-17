@@ -25,7 +25,8 @@ export async function isModuleEnabled(
       .from(marketingSubscriptionsTable)
       .where(eq(marketingSubscriptionsTable.organizationId, organizationId))
       .limit(1);
-    return subscription?.status === "active" || subscription?.status === "trialing";
+    return subscription?.status === "active" || subscription?.status === "trialing" ||
+      (process.env.NODE_ENV !== "production" && subscription?.status === "test_access");
   }
   const [override] = await database
     .select({ enabled: organizationModulesTable.enabled })

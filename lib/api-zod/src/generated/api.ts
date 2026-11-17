@@ -1424,7 +1424,7 @@ export const ReviewApiAccessRequestResponse = zod.object({
  */
 export const GetMarketingSubscriptionResponse = zod.object({
   "active": zod.boolean(),
-  "status": zod.enum(['inactive', 'active', 'trialing', 'past_due', 'canceled', 'unpaid']),
+  "status": zod.enum(['inactive', 'active', 'trialing', 'past_due', 'canceled', 'unpaid', 'test_access']),
   "currentPeriodEnd": zod.coerce.date().nullable()
 })
 
@@ -1450,7 +1450,7 @@ export const ConfirmMarketingCheckoutBody = zod.object({
 
 export const ConfirmMarketingCheckoutResponse = zod.object({
   "active": zod.boolean(),
-  "status": zod.enum(['inactive', 'active', 'trialing', 'past_due', 'canceled', 'unpaid']),
+  "status": zod.enum(['inactive', 'active', 'trialing', 'past_due', 'canceled', 'unpaid', 'test_access']),
   "currentPeriodEnd": zod.coerce.date().nullable()
 })
 

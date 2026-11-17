@@ -248,6 +248,7 @@ export const MarketingSubscriptionStatus = {
   past_due: 'past_due',
   canceled: 'canceled',
   unpaid: 'unpaid',
+  test_access: 'test_access',
 } as const;
 
 export interface MarketingSubscription {

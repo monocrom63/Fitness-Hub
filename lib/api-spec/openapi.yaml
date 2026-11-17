@@ -2083,7 +2083,7 @@ components:
       required: [active, status, currentPeriodEnd]
       properties:
         active: { type: boolean }
-        status: { type: string, enum: [inactive, active, trialing, past_due, canceled, unpaid] }
+        status: { type: string, enum: [inactive, active, trialing, past_due, canceled, unpaid, test_access] }
         currentPeriodEnd: { type: ["string", "null"], format: date-time }
     MarketingCheckoutConfirm:
       type: object

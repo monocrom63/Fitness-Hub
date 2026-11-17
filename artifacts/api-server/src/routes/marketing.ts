@@ -116,7 +116,13 @@ async function subscriptionState(organizationId: number, force = false) {
   const [row] = await db.select().from(marketingSubscriptionsTable)
     .where(eq(marketingSubscriptionsTable.organizationId, organizationId)).limit(1);
   if (!row?.stripeSubscriptionId) {
-    const state = { expires: Date.now() + 30_000, active: false, status: row?.status ?? "inactive", currentPeriodEnd: row?.currentPeriodEnd ?? null };
+    const testAccess = process.env.NODE_ENV !== "production" && row?.status === "test_access";
+    const state = {
+      expires: Date.now() + 30_000,
+      active: testAccess,
+      status: testAccess ? "test_access" : row?.status === "test_access" ? "inactive" : row?.status ?? "inactive",
+      currentPeriodEnd: row?.currentPeriodEnd ?? null,
+    };
     activeCache.set(organizationId, state);
     return state;
   }
@@ -448,6 +454,11 @@ router.get("/marketing/unsubscribe/:token", async (req, res): Promise<void> => {
 router.post("/marketing/campaigns/:id/send", async (req, res): Promise<void> => {
   const staff = await requirePaidStaff(req, res);
   if (!staff) return;
+  const subscription = await subscriptionState(staff.organizationId);
+  if (process.env.NODE_ENV !== "production" && subscription.status === "test_access") {
+    res.status(403).json({ error: "Bei der kostenlosen Vorschau-Testfreigabe ist der reale E-Mail-Versand deaktiviert." });
+    return;
+  }
   const params = SendMarketingCampaignParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: "Ungültige Kampagne." }); return; }
   const [campaign] = await db.select().from(marketingCampaignsTable)

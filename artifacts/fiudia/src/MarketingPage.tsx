@@ -127,6 +127,7 @@ export default function MarketingPage({ role }: { role: Role }) {
   });
 
   const active = subscription.data?.active === true;
+  const testAccess = subscription.data?.status === 'test_access';
   const canManageBilling = role === 'district_manager';
   const marketingAccess = apiCatalog.data?.find(entry => entry.serviceKey === 'marketing');
   const uploadImage = async (file?: File) => {
@@ -260,8 +261,8 @@ export default function MarketingPage({ role }: { role: Role }) {
       <div className="marketing-paywall-aside"><span>01 / Reichweite</span><strong>Mitglieder direkt erreichen.</strong><span>02 / Kontrolle</span><strong>Nur mit dokumentierter Einwilligung.</strong></div>
     </section> : <>
       <section className="marketing-plan-bar">
-        <div className="marketing-plan-status"><span className="marketing-live-dot" /><div><strong>Marketing ist aktiv</strong><small>99 € / Monat · nächste Verlängerung {dateLabel(subscription.data.currentPeriodEnd)}</small></div></div>
-         {canManageBilling && <button type="button" className="button button-outline" onClick={openBillingPortal} disabled={billingPortal.isPending} data-testid="button-marketing-billing">
+        <div className="marketing-plan-status"><span className="marketing-live-dot" /><div><strong>{testAccess ? 'Kostenlose Testfreigabe aktiv' : 'Marketing ist aktiv'}</strong><small>{testAccess ? 'Nur in der Vorschau · keine Kosten, keine Kartendaten; E-Mail-Versand deaktiviert' : <>99 € / Monat · nächste Verlängerung {dateLabel(subscription.data.currentPeriodEnd)}</>}</small></div></div>
+         {canManageBilling && !testAccess && <button type="button" className="button button-outline" onClick={openBillingPortal} disabled={billingPortal.isPending} data-testid="button-marketing-billing">
           <CalendarClock size={15} /> {billingPortal.isPending ? 'Wird geöffnet …' : 'Abrechnung verwalten'}
          </button>}
         {billingPortal.isError && <span className="marketing-inline-error" role="alert">{errorMessage(billingPortal.error, 'Abrechnungsportal konnte nicht geöffnet werden.')}</span>}
