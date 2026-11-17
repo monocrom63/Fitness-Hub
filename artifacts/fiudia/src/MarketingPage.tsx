@@ -304,6 +304,7 @@ export default function MarketingPage({ role }: { role: Role }) {
                   <div><strong>{imageName || 'Kampagnenbild hinzufügen'}</strong><span>{imageName ? 'Bild hochgeladen und bereit' : 'PNG, JPEG oder WebP · bis 5 MB'}</span></div>
                   <label className="button button-outline marketing-upload-button">{uploadBusy ? 'Lädt …' : imageName ? 'Ändern' : 'Bild auswählen'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadBusy} onChange={event => { void uploadImage(event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} data-testid="input-marketing-image" /></label>
                 </div>
+                <p className="marketing-upload-help">Empfohlene Bildgröße: 1280 × 600 px (Querformat).</p>
                 {uploadError && <p className="marketing-inline-error" role="alert" data-testid="error-marketing-image">{uploadError}</p>}
                 {createCampaign.isError && <p className="marketing-inline-error" role="alert" data-testid="error-marketing-save">{errorMessage(createCampaign.error, 'Kampagne konnte nicht gespeichert werden.')}</p>}
               </div>
