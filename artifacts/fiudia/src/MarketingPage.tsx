@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { Link } from 'wouter';
 import {
-  ArrowUpRight, CalendarClock, Check, ChevronRight, CircleHelp, Copy, ImagePlus, KeyRound,
-  Mail, Megaphone, RotateCw, ShieldCheck, Users,
+  ArrowUpRight, CalendarClock, Check, ChevronRight, CircleHelp, Copy, Eye, ImagePlus, KeyRound,
+  Mail, Megaphone, RotateCw, ShieldCheck, Users, X,
 } from 'lucide-react';
 import {
   getGetMarketingApiKeyQueryKey, getGetMarketingAudienceCountQueryKey, getListMarketingCampaignsQueryKey,
@@ -90,12 +90,31 @@ export default function MarketingPage({ role }: { role: Role }) {
   const form = useForm<CampaignFields>({ defaultValues: emptyFields });
   const [imagePath, setImagePath] = useState('');
   const [imageName, setImageName] = useState('');
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [notice, setNotice] = useState('');
   const [oneTimeKey, setOneTimeKey] = useState('');
   const [copyFeedback, setCopyFeedback] = useState('');
   const checkoutConfirmed = useRef(false);
+
+  useEffect(() => {
+    if (!previewFile) return;
+    const objectUrl = URL.createObjectURL(previewFile);
+    setPreviewImageUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [previewFile]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [previewOpen]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -149,6 +168,7 @@ export default function MarketingPage({ role }: { role: Role }) {
       if (!result.ok) throw new Error('Das Bild konnte nicht hochgeladen werden.');
       setImagePath(upload.objectPath);
       setImageName(file.name);
+      setPreviewFile(file);
       setNotice('Bild ist bereit für deinen Kampagnenentwurf.');
     } catch (error) {
       setUploadError(errorMessage(error, 'Bild-Upload fehlgeschlagen. Bitte erneut versuchen.'));
@@ -308,9 +328,12 @@ export default function MarketingPage({ role }: { role: Role }) {
               </aside>
               <div className="marketing-form-footer">
                 <span>{notice && <span className="marketing-success" role="status" data-testid="status-marketing-feedback"><Check size={14} />{notice}</span>}</span>
-                <button type="submit" className="button button-dark" disabled={createCampaign.isPending || uploadBusy || !imagePath || (values.ageFrom !== '' && values.ageTo !== '' && Number(values.ageTo) < Number(values.ageFrom))} data-testid="button-save-marketing-draft">
-                  {createCampaign.isPending ? 'Wird gespeichert …' : 'Entwurf speichern'} <ChevronRight size={15} />
-                </button>
+                <div className="marketing-form-actions">
+                  <button type="button" className="button button-outline" onClick={() => setPreviewOpen(true)} data-testid="button-preview-marketing-draft"><Eye size={15} /> Vorschau</button>
+                  <button type="submit" className="button button-dark" disabled={createCampaign.isPending || uploadBusy || !imagePath || (values.ageFrom !== '' && values.ageTo !== '' && Number(values.ageTo) < Number(values.ageFrom))} data-testid="button-save-marketing-draft">
+                    {createCampaign.isPending ? 'Wird gespeichert …' : 'Entwurf speichern'} <ChevronRight size={15} />
+                  </button>
+                </div>
               </div>
             </form>
           </Form>
@@ -347,6 +370,25 @@ export default function MarketingPage({ role }: { role: Role }) {
           </div>
         </section>}
       </div>
+      {previewOpen && <div className="modal-backdrop marketing-preview-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPreviewOpen(false); }}>
+        <section className="marketing-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="marketing-preview-title" data-testid="dialog-marketing-preview">
+          <header className="marketing-preview-heading">
+            <div><div className="eyebrow">E-Mail-Vorschau</div><h2 id="marketing-preview-title">So sehen Mitglieder deine Nachricht</h2></div>
+            <button type="button" className="marketing-preview-close" onClick={() => setPreviewOpen(false)} aria-label="Vorschau schließen" data-testid="button-close-marketing-preview"><X size={19} /></button>
+          </header>
+          <article className="marketing-email-preview">
+            <div className="marketing-email-brand"><span>F</span><div><strong>Fiudia</strong><small>Nachricht deines Studios</small></div></div>
+            {previewImageUrl ? <img className="marketing-email-image" src={previewImageUrl} alt="Kampagnenbild" /> : <div className="marketing-email-image-placeholder"><ImagePlus size={24} /><span>Dein Kampagnenbild erscheint hier</span></div>}
+            <div className="marketing-email-content">
+              <small>FIUDIA MARKETING</small>
+              <h3>{values.headline.trim() || 'Deine Überschrift'}</h3>
+              <p>{values.bodyText.trim() || 'Dein Nachrichtentext erscheint hier.'}</p>
+            </div>
+            <footer className="marketing-email-footer">Du erhältst diese Nachricht, weil du Marketing-E-Mails deines Studios zugestimmt hast. <span>Abmelden</span></footer>
+          </article>
+          <p className="marketing-preview-note">Die Vorschau aktualisiert sich mit deinen Eingaben. Der tatsächliche E-Mail-Versand ist in der kostenlosen Testfreigabe deaktiviert.</p>
+        </section>
+      </div>}
     </>}
   </main>;
 }
