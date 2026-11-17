@@ -500,7 +500,7 @@ function ProfilePage({ member }: { member: Member }) {
     defaultValues: {
       fullName: member.fullName, phone: member.phone || '', birthDate: member.birthDate || '',
       address: member.address || '', billingInterval: member.billingInterval,
-      contactConsent: member.contactConsent ?? false,
+      contactConsent: Boolean(member.contactConsent && member.marketingConsent),
       membershipType: member.membershipType, contractStart: member.contractStart || '',
       contractDurationMonths: member.contractDurationMonths || '',
       restPeriodStart: member.restPeriodStart || '', restPeriodEnd: member.restPeriodEnd || '',
@@ -556,7 +556,7 @@ function ProfilePage({ member }: { member: Member }) {
         <label className="profile-field">Ruhezeit bis<input className="field" type="date" {...form.register('restPeriodEnd')} /></label>
         <label className="contact-consent profile-wide">
           <input type="checkbox" {...form.register('contactConsent')} />
-          <span>Ich bin damit einverstanden, dass mein Studio mich zu organisatorischen und vertragsbezogenen Anliegen kontaktiert. Ich kann meine Zustimmung jederzeit hier widerrufen.</span>
+          <span>Ich bin damit einverstanden, dass mein Studio mich zu organisatorischen und vertragsbezogenen Anliegen sowie mit Angeboten und Informationen per E-Mail kontaktiert. Ich kann meine Zustimmung jederzeit hier widerrufen.</span>
         </label>
       </div>
       <p className="field-help">Änderungen an Tarif und Laufzeit werden erst nach deiner Vertragsbestätigung wirksam. Bei aktiver Lastschrift gilt der neue Preis ab der nächsten Abbuchung. Bankdaten speichert Fiudia nicht.</p>

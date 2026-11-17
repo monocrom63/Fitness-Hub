@@ -48,6 +48,7 @@ export async function linkedMember(userId: string) {
     billingStatus: membersTable.billingStatus,
     waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
     contactConsent: membersTable.contactConsent,
+    marketingConsent: membersTable.marketingConsent,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
     studioLogoPath: studiosTable.logoPath,
@@ -61,6 +62,7 @@ export async function linkedMember(userId: string) {
   return {
     ...profile,
     contactConsent: profile.contactConsent === 1,
+    marketingConsent: profile.marketingConsent === 1,
     studioLogoAvailable: Boolean(studioLogoPath),
   };
 }
@@ -205,7 +207,8 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
     return;
   }
   const { contactConsent, ...profileChanges } = body.data;
-  const consentChanged = contactConsent !== undefined && contactConsent !== member.contactConsent;
+  const consentChanged = contactConsent !== undefined
+    && (contactConsent !== member.contactConsent || contactConsent !== member.marketingConsent);
   const [updated] = await db.update(membersTable).set({
     ...profileChanges,
     email: identity.email,
@@ -215,8 +218,16 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
     ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
     ...(contactConsent !== undefined ? {
       contactConsent: contactConsent ? 1 : 0,
-      ...(consentChanged && contactConsent ? { contactConsentAt: new Date(), contactConsentRevokedAt: null } : {}),
-      ...(consentChanged && !contactConsent ? { contactConsentRevokedAt: new Date() } : {}),
+      marketingConsent: contactConsent ? 1 : 0,
+      ...(consentChanged && contactConsent ? {
+        contactConsentAt: new Date(),
+        contactConsentRevokedAt: null,
+        marketingConsentAt: new Date(),
+      } : {}),
+      ...(consentChanged && !contactConsent ? {
+        contactConsentRevokedAt: new Date(),
+        marketingConsentAt: null,
+      } : {}),
     } : {}),
   }).where(eq(membersTable.id, member.id)).returning({ id: membersTable.id });
   if (!updated) { res.status(404).json({ error: "Mitgliedschaft nicht gefunden." }); return; }
