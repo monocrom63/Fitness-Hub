@@ -47,6 +47,7 @@ export async function linkedMember(userId: string) {
     stripeCheckoutSessionId: membersTable.stripeCheckoutSessionId,
     billingStatus: membersTable.billingStatus,
     waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
+    contactConsent: membersTable.contactConsent,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
     studioLogoPath: studiosTable.logoPath,
@@ -57,7 +58,11 @@ export async function linkedMember(userId: string) {
     .where(eq(membersTable.clerkUserId, userId)).limit(1);
   if (!member) return null;
   const { studioLogoPath, ...profile } = member;
-  return { ...profile, studioLogoAvailable: Boolean(studioLogoPath) };
+  return {
+    ...profile,
+    contactConsent: profile.contactConsent === 1,
+    studioLogoAvailable: Boolean(studioLogoPath),
+  };
 }
 
 type LinkedMember = NonNullable<Awaited<ReturnType<typeof linkedMember>>>;
@@ -199,13 +204,20 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Bitte bestätige zuerst deine Konto-E-Mail-Adresse." });
     return;
   }
+  const { contactConsent, ...profileChanges } = body.data;
+  const consentChanged = contactConsent !== undefined && contactConsent !== member.contactConsent;
   const [updated] = await db.update(membersTable).set({
-    ...body.data,
+    ...profileChanges,
     email: identity.email,
     ...(body.data.fullName !== undefined ? { fullName: body.data.fullName.trim() } : {}),
     ...(body.data.phone !== undefined ? { phone: body.data.phone?.trim() || null } : {}),
     ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
     ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
+    ...(contactConsent !== undefined ? {
+      contactConsent: contactConsent ? 1 : 0,
+      ...(consentChanged && contactConsent ? { contactConsentAt: new Date(), contactConsentRevokedAt: null } : {}),
+      ...(consentChanged && !contactConsent ? { contactConsentRevokedAt: new Date() } : {}),
+    } : {}),
   }).where(eq(membersTable.id, member.id)).returning({ id: membersTable.id });
   if (!updated) { res.status(404).json({ error: "Mitgliedschaft nicht gefunden." }); return; }
   res.json(GetMemberHomeResponse.parse(await memberHome(await linkedMember(userId))));

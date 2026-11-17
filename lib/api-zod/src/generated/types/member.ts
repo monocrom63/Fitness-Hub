@@ -22,6 +22,7 @@ export interface Member {
   /** @nullable */
   gender?: MemberGender;
   marketingConsent?: boolean;
+  contactConsent?: boolean;
   billingInterval: BillingInterval;
   status: MemberStatus;
   /**

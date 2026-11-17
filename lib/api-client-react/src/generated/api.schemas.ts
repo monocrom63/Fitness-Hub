@@ -713,6 +713,7 @@ export interface Member {
   /** @nullable */
   gender?: MemberGender;
   marketingConsent?: boolean;
+  contactConsent?: boolean;
   billingInterval: BillingInterval;
   status: MemberStatus;
   /**
@@ -1541,6 +1542,7 @@ export interface MemberSelfUpdate {
      * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
      */
   restPeriodEnd?: string | null;
+  contactConsent?: boolean;
 }
 
 /**

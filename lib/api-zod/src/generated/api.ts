@@ -315,6 +315,7 @@ export const ListMembersResponseItem = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(listMembersResponseBirthDateRegExp).nullish(),
@@ -393,6 +394,7 @@ export const CreateMemberResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(createMemberResponseBirthDateRegExp).nullish(),
@@ -473,6 +475,7 @@ export const UpdateMemberResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateMemberResponseBirthDateRegExp).nullish(),
@@ -1744,6 +1747,7 @@ export const GetMemberHomeResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(getMemberHomeResponseMemberOneBirthDateRegExp).nullish(),
@@ -1812,7 +1816,8 @@ export const UpdateOwnMemberProfileBody = zod.object({
   "contractStart": zod.string().regex(updateOwnMemberProfileBodyContractStartRegExp).nullish(),
   "contractDurationMonths": zod.number().int().min(1).max(updateOwnMemberProfileBodyContractDurationMonthsMax).nullish(),
   "restPeriodStart": zod.string().regex(updateOwnMemberProfileBodyRestPeriodStartRegExp).nullish(),
-  "restPeriodEnd": zod.string().regex(updateOwnMemberProfileBodyRestPeriodEndRegExp).nullish()
+  "restPeriodEnd": zod.string().regex(updateOwnMemberProfileBodyRestPeriodEndRegExp).nullish(),
+  "contactConsent": zod.boolean().optional()
 })
 
 export const updateOwnMemberProfileResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
@@ -1836,6 +1841,7 @@ export const UpdateOwnMemberProfileResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateOwnMemberProfileResponseMemberOneBirthDateRegExp).nullish(),
@@ -1934,6 +1940,7 @@ export const UpdateMemberNotificationSettingsResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(updateMemberNotificationSettingsResponseMemberOneBirthDateRegExp).nullish(),
@@ -2025,6 +2032,7 @@ export const ClaimMembershipResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(claimMembershipResponseMemberOneBirthDateRegExp).nullish(),
@@ -2095,6 +2103,7 @@ export const AcceptMemberInvitationResponse = zod.object({
   "membershipType": zod.string(),
   "gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal('diverse'),zod.literal(null)]).nullish(),
   "marketingConsent": zod.boolean().optional(),
+  "contactConsent": zod.boolean().optional(),
   "billingInterval": zod.enum(['monthly', 'semiannual', 'annual']),
   "status": zod.enum(['active', 'trial', 'paused']),
   "birthDate": zod.string().regex(acceptMemberInvitationResponseMemberOneBirthDateRegExp).nullish(),

@@ -500,6 +500,7 @@ function ProfilePage({ member }: { member: Member }) {
     defaultValues: {
       fullName: member.fullName, phone: member.phone || '', birthDate: member.birthDate || '',
       address: member.address || '', billingInterval: member.billingInterval,
+      contactConsent: member.contactConsent ?? false,
       membershipType: member.membershipType, contractStart: member.contractStart || '',
       contractDurationMonths: member.contractDurationMonths || '',
       restPeriodStart: member.restPeriodStart || '', restPeriodEnd: member.restPeriodEnd || '',
@@ -523,6 +524,7 @@ function ProfilePage({ member }: { member: Member }) {
       await update.mutateAsync({ data: {
         fullName: values.fullName.trim(), phone: values.phone || null,
         birthDate: values.birthDate || null, address: values.address.trim() || null,
+        contactConsent: values.contactConsent,
         billingInterval: values.billingInterval,
         membershipType: values.membershipType.trim(),
         contractStart: values.contractStart || null,
@@ -552,6 +554,10 @@ function ProfilePage({ member }: { member: Member }) {
         <label className="profile-field">Vertragsdauer (Monate)<input className="field" type="number" min={1} max={1200} {...form.register('contractDurationMonths')} /></label>
         <label className="profile-field">Ruhezeit von<input className="field" type="date" {...form.register('restPeriodStart')} /></label>
         <label className="profile-field">Ruhezeit bis<input className="field" type="date" {...form.register('restPeriodEnd')} /></label>
+        <label className="contact-consent profile-wide">
+          <input type="checkbox" {...form.register('contactConsent')} />
+          <span>Ich bin damit einverstanden, dass mein Studio mich zu organisatorischen und vertragsbezogenen Anliegen kontaktiert. Ich kann meine Zustimmung jederzeit hier widerrufen.</span>
+        </label>
       </div>
       <p className="field-help">Änderungen an Tarif und Laufzeit werden erst nach deiner Vertragsbestätigung wirksam. Bei aktiver Lastschrift gilt der neue Preis ab der nächsten Abbuchung. Bankdaten speichert Fiudia nicht.</p>
       {billing.isLoading && <p className="field-help" role="status">SEPA-Status wird geladen …</p>}

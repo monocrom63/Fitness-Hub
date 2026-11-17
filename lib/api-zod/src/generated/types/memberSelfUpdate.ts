@@ -55,4 +55,5 @@ export interface MemberSelfUpdate {
      * @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
      */
   restPeriodEnd?: string | null;
+  contactConsent?: boolean;
 }
