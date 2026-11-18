@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PrivacyPage from './pages/PrivacyPage';
 import {
   ArrowDown,
   ArrowRight,
@@ -15,6 +16,10 @@ import {
   X,
 } from 'lucide-react';
 import studioTraining from '@assets/download_97d4b9a2-1b0f-46ba-969e-17fe59bc8d35_1793002687604.webp';
+
+const basePath = import.meta.env.BASE_URL;
+const privacyPath = `${basePath.replace(/\/+$/, '')}/datenschutz`;
+const currentPath = window.location.pathname.replace(/\/+$/, '');
 
 const roles = [
   {
@@ -68,6 +73,14 @@ function Brand({ light = false }: { light?: boolean }) {
 }
 
 function App() {
+  if (currentPath === privacyPath) {
+    return <PrivacyPage homeHref={basePath} />;
+  }
+
+  return <LandingPage />;
+}
+
+function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
@@ -211,6 +224,7 @@ function App() {
         <span className="footer-note">Organisationen sind verschieden. Wir auch.</span>
         <div className="footer-links">
           <a href="#top">Zurück nach oben</a>
+          <a href={privacyPath}>Datenschutz</a>
           <a href="/sign-in">Anmelden</a>
         </div>
       </footer>
