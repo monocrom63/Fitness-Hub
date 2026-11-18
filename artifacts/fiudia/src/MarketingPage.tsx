@@ -49,7 +49,7 @@ function MarketingSkeleton() {
   </div>;
 }
 
-function CampaignRow({ campaign, onSend, sending }: { campaign: MarketingCampaign; onSend: (campaign: MarketingCampaign, count: number, eligibleEmailCount: number) => void; sending: boolean }) {
+function CampaignRow({ campaign, onSend, sending, checkoutPending }: { campaign: MarketingCampaign; onSend: (campaign: MarketingCampaign, count: number, eligibleEmailCount: number) => void; sending: boolean; checkoutPending: boolean }) {
   const params = {
     gender: campaign.audience.gender,
     ...(campaign.audience.ageFrom !== null ? { ageFrom: campaign.audience.ageFrom } : {}),
@@ -69,7 +69,7 @@ function CampaignRow({ campaign, onSend, sending }: { campaign: MarketingCampaig
     <div className="marketing-campaign-results">
       {campaign.status === 'sent' ? <><strong>{campaign.recipientCount}</strong><span>Empfänger</span></> : counts.isLoading ? <><strong>…</strong><span>Reichweite wird geladen</span></> : counts.isError ? <><strong>—</strong><span>Reichweite nicht verfügbar</span></> : <><strong>{counts.data?.count ?? '—'}</strong><span>passende Mitglieder</span><small>{counts.data?.eligibleEmailCount ?? '—'} mit E-Mail</small></>}
     </div>
-    {campaign.status === 'draft' && <button type="button" className="button button-outline marketing-send-button" onClick={() => onSend(campaign, counts.data?.count ?? 0, counts.data?.eligibleEmailCount ?? 0)} disabled={sending || counts.isLoading || counts.isError} data-testid={`button-send-marketing-${campaign.id}`}><Mail size={14} />{sending ? 'Wird gesendet …' : 'Senden'}</button>}
+    {campaign.status === 'draft' && <button type="button" className="button button-outline marketing-send-button" onClick={() => onSend(campaign, counts.data?.count ?? 0, counts.data?.eligibleEmailCount ?? 0)} disabled={sending || checkoutPending || counts.isLoading} data-testid={`button-send-marketing-${campaign.id}`}><Mail size={14} />{sending ? 'Wird gesendet …' : checkoutPending ? 'Checkout wird geöffnet …' : 'Senden'}</button>}
   </article>;
 }
 
@@ -119,11 +119,17 @@ export default function MarketingPage({ role }: { role: Role }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
+    if (params.get('checkout') === 'cancel') {
+      setNotice('Der Checkout wurde abgebrochen. Dein Entwurf bleibt gespeichert.');
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
     if (params.get('checkout') !== 'success' || !sessionId || checkoutConfirmed.current) return;
     checkoutConfirmed.current = true;
     confirmCheckout.mutate({ data: { sessionId } }, {
       onSuccess: () => {
         void client.invalidateQueries();
+        setNotice('Marketing ist freigeschaltet. Prüfe die Zielgruppe und klicke erneut auf „Senden“, um die Kampagne zu verschicken.');
         window.history.replaceState({}, '', window.location.pathname);
       },
       onError: () => setNotice('Die Zahlung wurde noch nicht bestätigt. Bitte lade die Seite erneut oder öffne die Abrechnung.'),
@@ -141,7 +147,7 @@ export default function MarketingPage({ role }: { role: Role }) {
   const audience = useGetMarketingAudienceCount(audienceParams, {
     query: {
       queryKey: ['marketing-audience-count', audienceParams],
-      enabled: subscription.data?.active === true,
+      enabled: true,
     },
   });
 
@@ -200,7 +206,22 @@ export default function MarketingPage({ role }: { role: Role }) {
     });
   });
 
+  const openCheckout = () => checkout.mutate(undefined, {
+    onSuccess: result => { window.location.assign(result.url); },
+  });
   const sendDraft = (campaign: MarketingCampaign, audienceCount: number, eligible: number) => {
+    if (!active || testAccess) {
+      if (!canManageBilling) {
+        setNotice('Bitte die Bezirksleitung, das Marketing-Abo für die Organisation abzuschließen.');
+        return;
+      }
+      const checkoutConfirmation = `Der E-Mail-Versand benötigt ein Marketing-Abo für 99 € pro Monat und Organisation.\n\nDein Entwurf und die Vorschau bleiben kostenlos. Nach erfolgreicher Zahlung wird Marketing freigeschaltet; anschließend kannst du den Versand ausdrücklich bestätigen.\n\nJetzt zur Zahlung?`;
+      if (!window.confirm(checkoutConfirmation)) return;
+      setNotice('');
+      openCheckout();
+      return;
+    }
+
     const confirmation = `Kampagne „${campaign.headline}“ jetzt senden?\n\n${audienceCount ?? '—'} passende Mitglieder · ${eligible ?? '—'} davon mit erreichbarer E-Mail-Adresse.\n\nEs erhalten ausschließlich Mitglieder mit dokumentierter Marketing-Einwilligung eine E-Mail.`;
     if (!window.confirm(confirmation)) return;
     setNotice('');
@@ -213,9 +234,14 @@ export default function MarketingPage({ role }: { role: Role }) {
       },
     });
   };
-
-  const openCheckout = () => checkout.mutate(undefined, {
-    onSuccess: result => { window.location.assign(result.url); },
+  const sendComposedCampaign = form.handleSubmit(fields => {
+    setNotice('');
+    createCampaign.mutate({ data: campaignInput(fields) }, {
+      onSuccess: campaign => {
+        void client.invalidateQueries({ queryKey: getListMarketingCampaignsQueryKey() });
+        sendDraft(campaign, audience.data?.count ?? 0, audience.data?.eligibleEmailCount ?? 0);
+      },
+    });
   });
   const openBillingPortal = () => billingPortal.mutate(undefined, {
     onSuccess: result => { window.location.assign(result.url); },
@@ -266,27 +292,21 @@ export default function MarketingPage({ role }: { role: Role }) {
       <Link href="/settings/api" className="button button-outline marketing-doc-link" data-testid="link-marketing-docs">REST-API-Katalog <ArrowUpRight size={15} /></Link>
     </header>
 
-    {!active ? <section className="marketing-paywall" aria-labelledby="marketing-paywall-title">
-      <div className="marketing-paywall-visual"><span className="marketing-orbit marketing-orbit-one" /><span className="marketing-orbit marketing-orbit-two" /><Megaphone size={34} strokeWidth={1.5} /></div>
-      <div className="marketing-paywall-copy">
-        <div className="eyebrow">Fiudia Marketing</div>
-        <h2 id="marketing-paywall-title">Deine Mitglieder. Deine Nachricht.</h2>
-        <p>Erreiche deine Community mit gezielten E-Mail-Kampagnen und verwalte alles direkt in Fiudia.</p>
-        <div className="marketing-price"><strong>99 €</strong><span>/ Monat<br />pro Organisation</span></div>
-        {canManageBilling ? <button type="button" className="button button-dark" onClick={openCheckout} disabled={checkout.isPending} data-testid="button-marketing-checkout">
-          {checkout.isPending ? 'Checkout wird vorbereitet …' : 'Marketing freischalten'} <ChevronRight size={16} />
-        </button> : <p className="marketing-inline-error">Bitte die Bezirksleitung, das Marketing-Abo für die Organisation abzuschließen.</p>}
-        {checkout.isError && <p className="marketing-inline-error" role="alert" data-testid="error-marketing-checkout">{errorMessage(checkout.error, 'Checkout konnte nicht gestartet werden.')}</p>}
-      </div>
-      <div className="marketing-paywall-aside"><span>01 / Reichweite</span><strong>Mitglieder direkt erreichen.</strong><span>02 / Kontrolle</span><strong>Nur mit dokumentierter Einwilligung.</strong></div>
-    </section> : <>
-      <section className="marketing-plan-bar">
-        <div className="marketing-plan-status"><span className="marketing-live-dot" /><div><strong>{testAccess ? 'Kostenlose Testfreigabe aktiv' : 'Marketing ist aktiv'}</strong><small>{testAccess ? 'Nur in der Vorschau · keine Kosten, keine Kartendaten; E-Mail-Versand deaktiviert' : <>99 € / Monat · nächste Verlängerung {dateLabel(subscription.data.currentPeriodEnd)}</>}</small></div></div>
-         {canManageBilling && !testAccess && <button type="button" className="button button-outline" onClick={openBillingPortal} disabled={billingPortal.isPending} data-testid="button-marketing-billing">
-          <CalendarClock size={15} /> {billingPortal.isPending ? 'Wird geöffnet …' : 'Abrechnung verwalten'}
-         </button>}
-        {billingPortal.isError && <span className="marketing-inline-error" role="alert">{errorMessage(billingPortal.error, 'Abrechnungsportal konnte nicht geöffnet werden.')}</span>}
-      </section>
+    <section className="marketing-plan-bar">
+      <div className="marketing-plan-status"><span className="marketing-live-dot" /><div>
+        <strong>{active && !testAccess ? 'Marketing ist aktiv' : testAccess ? 'Kostenlose Vorschau aktiv' : 'Kostenlose Marketing-Vorschau'}</strong>
+        <small>{active && !testAccess
+          ? <>99 € / Monat · nächste Verlängerung {dateLabel(subscription.data.currentPeriodEnd)}</>
+          : testAccess
+            ? 'Entwürfe, Zielgruppen und Vorschau sind kostenlos · realer E-Mail-Versand erst nach Abo-Abschluss'
+            : 'Entwürfe, Zielgruppen und Vorschau sind kostenlos · Versand: 99 € / Monat pro Organisation'}</small>
+      </div></div>
+      {canManageBilling && active && !testAccess && <button type="button" className="button button-outline" onClick={openBillingPortal} disabled={billingPortal.isPending} data-testid="button-marketing-billing">
+        <CalendarClock size={15} /> {billingPortal.isPending ? 'Wird geöffnet …' : 'Abrechnung verwalten'}
+      </button>}
+      {checkout.isError && <span className="marketing-inline-error" role="alert" data-testid="error-marketing-checkout">{errorMessage(checkout.error, 'Checkout konnte nicht gestartet werden.')}</span>}
+      {billingPortal.isError && <span className="marketing-inline-error" role="alert">{errorMessage(billingPortal.error, 'Abrechnungsportal konnte nicht geöffnet werden.')}</span>}
+    </section>
 
       <div className="marketing-workspace">
         <section className="marketing-composer" aria-labelledby="marketing-composer-title">
@@ -334,6 +354,9 @@ export default function MarketingPage({ role }: { role: Role }) {
                   <button type="submit" className="button button-dark" disabled={createCampaign.isPending || uploadBusy || !imagePath || (values.ageFrom !== '' && values.ageTo !== '' && Number(values.ageTo) < Number(values.ageFrom))} data-testid="button-save-marketing-draft">
                     {createCampaign.isPending ? 'Wird gespeichert …' : 'Entwurf speichern'} <ChevronRight size={15} />
                   </button>
+                  <button type="button" className="button button-dark" onClick={sendComposedCampaign} disabled={createCampaign.isPending || checkout.isPending || sendCampaign.isPending || uploadBusy || !imagePath || audience.isLoading || (values.ageFrom !== '' && values.ageTo !== '' && Number(values.ageTo) < Number(values.ageFrom))} data-testid="button-send-marketing-composer">
+                    <Mail size={15} />{createCampaign.isPending ? 'Wird vorbereitet …' : checkout.isPending ? 'Checkout wird geöffnet …' : sendCampaign.isPending ? 'Wird gesendet …' : 'Senden'}
+                  </button>
                 </div>
               </div>
             </form>
@@ -346,7 +369,7 @@ export default function MarketingPage({ role }: { role: Role }) {
             <span className="marketing-campaign-count">{campaigns.data?.length ?? 0} gesamt</span>
           </div>
           {campaigns.isLoading ? <MarketingSkeleton /> : campaigns.isError ? <div className="marketing-error" role="alert"><p>Kampagnen konnten nicht geladen werden.</p><button className="button button-outline" onClick={() => void campaigns.refetch()} data-testid="button-retry-marketing-campaigns">Erneut versuchen</button></div> : campaigns.data?.length ? <div className="marketing-campaign-list" data-testid="list-marketing-campaigns">
-            {campaigns.data.map(campaign => <CampaignRow campaign={campaign} key={campaign.id} onSend={sendDraft} sending={sendCampaign.isPending} />)}
+            {campaigns.data.map(campaign => <CampaignRow campaign={campaign} key={campaign.id} onSend={sendDraft} sending={sendCampaign.isPending} checkoutPending={checkout.isPending} />)}
           </div> : <div className="marketing-empty"><span><Megaphone size={22} /></span><div><strong>Noch keine Kampagne.</strong><p>Dein erster Entwurf wartet oben auf dich.</p></div></div>}
           {sendCampaign.isError && <p className="marketing-inline-error" role="alert" data-testid="error-marketing-send">{errorMessage(sendCampaign.error, 'Kampagne konnte nicht versendet werden.')}</p>}
         </section>
@@ -390,6 +413,5 @@ export default function MarketingPage({ role }: { role: Role }) {
           <p className="marketing-preview-note">Die Vorschau aktualisiert sich mit deinen Eingaben. Der tatsächliche E-Mail-Versand ist in der kostenlosen Testfreigabe deaktiviert.</p>
         </section>
       </div>}
-    </>}
   </main>;
 }

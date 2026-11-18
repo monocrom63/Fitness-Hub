@@ -279,7 +279,7 @@ router.post("/marketing/subscription/portal", async (req, res): Promise<void> =>
 });
 
 router.get("/marketing/campaigns", async (req, res): Promise<void> => {
-  const staff = await requirePaidStaff(req, res);
+  const staff = await getStaff(req, res);
   if (!staff) return;
   const rows = await db.select().from(marketingCampaignsTable)
     .where(eq(marketingCampaignsTable.organizationId, staff.organizationId))
@@ -289,7 +289,7 @@ router.get("/marketing/campaigns", async (req, res): Promise<void> => {
 });
 
 router.post("/marketing/campaigns", async (req, res): Promise<void> => {
-  const staff = await requirePaidStaff(req, res);
+  const staff = await getStaff(req, res);
   if (!staff) return;
   const body = CreateMarketingCampaignBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Bitte prüfe Headline, Text, Bild und Zielgruppe." }); return; }
@@ -318,7 +318,7 @@ router.post("/marketing/campaigns", async (req, res): Promise<void> => {
 });
 
 router.get("/marketing/audience-count", async (req, res): Promise<void> => {
-  const staff = await requirePaidStaff(req, res);
+  const staff = await getStaff(req, res);
   if (!staff) return;
   const query = GetMarketingAudienceCountQueryParams.safeParse(req.query);
   if (!query.success) { res.status(400).json({ error: "Ungültige Zielgruppenfilter." }); return; }
@@ -335,7 +335,7 @@ router.get("/marketing/audience-count", async (req, res): Promise<void> => {
 });
 
 router.post("/marketing/uploads/request-url", async (req, res): Promise<void> => {
-  const staff = await requirePaidStaff(req, res);
+  const staff = await getStaff(req, res);
   if (!staff) return;
   const body = RequestMarketingImageUploadBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Bitte ein gültiges Bild bis 5 MB auswählen." }); return; }
