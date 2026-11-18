@@ -2358,6 +2358,7 @@ components:
         membershipType: { type: string }
         gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
         marketingConsent: { type: boolean }
+        smsConsent: { type: boolean }
         contactConsent: { type: boolean }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
@@ -2384,6 +2385,7 @@ components:
         membershipType: { type: string, minLength: 2, maxLength: 80 }
         gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
         marketingConsent: { type: boolean }
+        smsConsent: { type: boolean }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -2402,6 +2404,7 @@ components:
         membershipType: { type: string, minLength: 2, maxLength: 80 }
         gender: { type: ["string", "null"], enum: [male, female, diverse, null] }
         marketingConsent: { type: boolean }
+        smsConsent: { type: boolean }
         billingInterval: { $ref: "#/components/schemas/BillingInterval" }
         status: { $ref: "#/components/schemas/MemberStatus" }
         birthDate: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
@@ -2629,14 +2632,14 @@ components:
         closureId: { type: integer }
         action: { type: string, enum: [relocate, cancel] }
         room: { type: string, minLength: 1, maxLength: 80 }
-        channel: { type: string, enum: [in_app, email, push, whatsapp] }
+        channel: { type: string, enum: [in_app, email, push, push_sms] }
         idempotencyKey: { type: string, minLength: 8, maxLength: 128 }
     ClosureNotificationOutcome:
       type: object
       required: [memberId, channel, status, detail]
       properties:
         memberId: { type: integer }
-        channel: { type: string, enum: [in_app, email, push] }
+        channel: { type: string, enum: [in_app, email, push, sms] }
         status: { type: string, enum: [created, sent, failed, pending, sending, skipped] }
         detail: { type: ["string", "null"] }
     CourseClosureResolution:
@@ -2647,7 +2650,7 @@ components:
         courseId: { type: integer }
         action: { type: string, enum: [relocate, cancel] }
         room: { type: ["string", "null"] }
-        channel: { type: string, enum: [in_app, email, push] }
+        channel: { type: string, enum: [in_app, email, push, push_sms] }
         notifications:
           type: array
           items: { $ref: "#/components/schemas/ClosureNotificationOutcome" }
@@ -2671,10 +2674,11 @@ components:
           items: { $ref: "#/components/schemas/ClosureEmailDelivery" }
     ClosurePushDelivery:
       type: object
-      required: [id, memberId, status, attemptCount, error, attemptedAt]
+      required: [id, memberId, channel, status, attemptCount, error, attemptedAt]
       properties:
         id: { type: integer }
         memberId: { type: integer }
+        channel: { type: string, enum: [push, sms] }
         status: { type: string, enum: [pending, sending, sent, failed, skipped] }
         attemptCount: { type: integer }
         error: { type: ["string", "null"] }
@@ -2711,7 +2715,7 @@ components:
         courseTitle: { type: string }
         action: { type: string, enum: [relocate, cancel] }
         room: { type: ["string", "null"] }
-        channel: { type: string, enum: [in_app, email, push] }
+        channel: { type: string, enum: [in_app, email, push, push_sms] }
         deliveryCounts: { $ref: "#/components/schemas/ClosureEmailDeliveryCounts" }
         deliveries:
           type: array

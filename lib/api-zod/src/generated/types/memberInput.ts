@@ -27,6 +27,7 @@ export interface MemberInput {
   /** @nullable */
   gender?: MemberInputGender;
   marketingConsent?: boolean;
+  smsConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**

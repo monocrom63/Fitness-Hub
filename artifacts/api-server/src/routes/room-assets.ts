@@ -49,6 +49,7 @@ import {
 import { closureEmailReadiness, getResolutionEmailStatuses, processResolutionEmails } from "../lib/closure-email";
 import {
   buildClosurePushDeliveryTargets,
+  buildClosureSmsDeliveryTargets,
   closurePushReadiness,
   getResolutionPushStatuses,
   processResolutionPushDeliveries,
@@ -425,11 +426,6 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
     return;
   }
   const request = body.data;
-  // Unsupported channels must fail before any course, booking, or notification mutation.
-  if (request.channel === "whatsapp") {
-    res.status(409).json({ error: "Der Benachrichtigungskanal whatsapp wird nicht unterstützt; es wurde nichts geändert oder versendet." });
-    return;
-  }
   if (request.action === "relocate" && !request.room?.trim()) {
     res.status(400).json({ error: "Für eine Verlegung muss ein Zielraum angegeben werden." });
     return;
@@ -442,7 +438,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
   }
   if (!(await accessibleStudio(staff, course.studioId, res))) return;
 
-  if (request.channel === "email" || request.channel === "push") {
+  if (request.channel === "email" || request.channel === "push" || request.channel === "push_sms") {
     // An idempotent replay of a completed resolution must still be readable
     // if the provider becomes unavailable after the first attempt.
     const [prior] = await db.select({ id: courseClosureResolutionsTable.id })
@@ -533,6 +529,8 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
       id: courseBookingsTable.id,
       memberId: courseBookingsTable.memberId,
       memberEmail: membersTable.email,
+      memberPhone: membersTable.phone,
+      smsConsent: membersTable.smsConsent,
     }).from(courseBookingsTable)
       .innerJoin(membersTable, eq(membersTable.id, courseBookingsTable.memberId))
       .where(and(
@@ -541,7 +539,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         eq(membersTable.studioId, lockedCourse.studioId),
       ));
     let pushTargets: ReturnType<typeof buildClosurePushDeliveryTargets> = [];
-    if (request.channel === "push" && activeBookings.length) {
+    if ((request.channel === "push" || request.channel === "push_sms") && activeBookings.length) {
       const subscriptions = await tx.select({
         memberId: memberPushSubscriptionsTable.memberId,
         subscriptionId: memberPushSubscriptionsTable.subscriptionId,
@@ -550,8 +548,17 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         activeBookings.map(({ memberId }) => memberId),
       ));
       pushTargets = buildClosurePushDeliveryTargets(activeBookings, subscriptions);
-      if (!pushTargets.some(({ subscriptionId }) => subscriptionId !== null)) {
+      if (request.channel === "push" && !pushTargets.some(({ subscriptionId }) => subscriptionId !== null)) {
         return { error: "Für diesen Kurs ist kein Browser-Push-Abonnement eingerichtet. Bitte wählen Sie In-App, damit alle gebuchten Mitglieder die Kursänderung erhalten." as const };
+      }
+      if (request.channel === "push_sms") {
+        const smsTargets = buildClosureSmsDeliveryTargets(activeBookings.map(({ id, memberId, memberPhone, smsConsent }) => ({
+          id, memberId, phone: memberPhone, smsConsent,
+        })));
+        pushTargets.push(...smsTargets);
+        if (!pushTargets.some((target) => target.status === "pending")) {
+          return { error: "Für diese Kursauflösung gibt es weder ein aktives Push-Abo noch eine Telefonnummer mit SMS-Einwilligung." as const };
+        }
       }
     }
     const title = request.action === "cancel"
@@ -589,7 +596,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
     }
     await supersedeCourseEditPushDeliveries(lockedCourse.id, tx);
 
-    if (request.channel === "in_app" || request.channel === "push") {
+    if (request.channel === "in_app" || request.channel === "push" || request.channel === "push_sms") {
       if (activeBookings.length) {
         await tx.insert(memberNotificationsTable).values(activeBookings.map((booking) => ({
           bookingId: booking.id,
@@ -607,7 +614,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         email: booking.memberEmail,
       })));
     }
-    if (request.channel === "push" && pushTargets.length) {
+    if ((request.channel === "push" || request.channel === "push_sms") && pushTargets.length) {
       await tx.insert(closurePushDeliveriesTable).values(pushTargets.map((target) => ({
         resolutionId: resolution.id,
         bookingId: target.bookingId,
@@ -639,7 +646,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
   const resolution = result.existing ?? result.resolution!;
   const action = resolution.action as "relocate" | "cancel";
   const room = resolution.targetRoom;
-  let notifications: Array<{ memberId: number; channel: "in_app" | "email" | "push"; status: "created" | "sent" | "failed" | "pending" | "sending" | "skipped"; detail: string | null }> = [];
+  let notifications: Array<{ memberId: number; channel: "in_app" | "email" | "push" | "sms"; status: "created" | "sent" | "failed" | "pending" | "sending" | "skipped"; detail: string | null }> = [];
   if (chosenChannel === "in_app") {
     const people = result.existing
       ? await db.select({ memberId: memberNotificationsTable.memberId })
@@ -666,7 +673,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
     const deliveries = await processResolutionPushDeliveries(resolution.id);
     notifications = deliveries.map((delivery) => ({
       memberId: delivery.memberId,
-      channel: "push" as const,
+      channel: delivery.channel as "push" | "sms",
       status: delivery.status as "created" | "sent" | "failed" | "pending" | "sending" | "skipped",
       detail: delivery.error,
     }));
@@ -751,7 +758,7 @@ router.get("/closure-resolutions/:resolutionId/push-deliveries", async (req, res
   }
   const resolution = await accessibleResolution(params.data.resolutionId, staff, res);
   if (!resolution) return;
-  if (resolution.channel !== "push") {
+  if (resolution.channel !== "push" && resolution.channel !== "push_sms") {
     res.status(409).json({ error: "Diese Kursauflösung verwendet keinen Push-Kanal." });
     return;
   }
@@ -772,7 +779,7 @@ router.post("/closure-resolutions/:resolutionId/push-deliveries", async (req, re
   }
   const resolution = await accessibleResolution(params.data.resolutionId, staff, res);
   if (!resolution) return;
-  if (resolution.channel !== "push") {
+  if (resolution.channel !== "push" && resolution.channel !== "push_sms") {
     res.status(409).json({ error: "Diese Kursauflösung verwendet keinen Push-Kanal." });
     return;
   }

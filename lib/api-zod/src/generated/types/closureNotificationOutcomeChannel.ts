@@ -13,4 +13,5 @@ export const ClosureNotificationOutcomeChannel = {
   in_app: 'in_app',
   email: 'email',
   push: 'push',
+  sms: 'sms',
 } as const;

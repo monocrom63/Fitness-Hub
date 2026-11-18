@@ -36,6 +36,7 @@ export * from './closureNotificationOutcome';
 export * from './closureNotificationOutcomeChannel';
 export * from './closureNotificationOutcomeStatus';
 export * from './closurePushDelivery';
+export * from './closurePushDeliveryChannel';
 export * from './closurePushDeliveryReport';
 export * from './closurePushDeliveryStatus';
 export * from './closurePushReadiness';

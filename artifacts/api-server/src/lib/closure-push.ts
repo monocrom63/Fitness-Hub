@@ -6,6 +6,7 @@ import {
   courseClosureResolutionsTable,
   coursesTable,
   db,
+  membersTable,
   memberPushSubscriptionsTable,
 } from "@workspace/db";
 
@@ -58,6 +59,22 @@ export function buildClosurePushDeliveryTargets(
     })));
   }
   return targets;
+}
+
+export function buildClosureSmsDeliveryTargets(
+  bookings: readonly { id: number; memberId: number; phone: string | null; smsConsent: number }[],
+): ClosurePushDeliveryTarget[] {
+  return bookings.map((booking) => ({
+    bookingId: booking.id,
+    memberId: booking.memberId,
+    subscriptionId: `sms:${booking.memberId}`,
+    status: booking.smsConsent === 1 && booking.phone ? "pending" : "skipped",
+    error: booking.smsConsent !== 1
+      ? "SMS nicht versendet: Es liegt keine dokumentierte SMS-Einwilligung vor."
+      : !booking.phone
+        ? "SMS nicht versendet: Für dieses Mitglied ist keine Telefonnummer hinterlegt."
+        : null,
+  }));
 }
 
 const oneSignalProxy: OneSignalProxy = (path, options) =>
@@ -148,20 +165,34 @@ async function sendOne(
   resolutionId: number,
   proxy: OneSignalProxy,
 ) {
+  const smsDelivery = delivery.subscriptionId.startsWith("sms:");
   // A member can withdraw permission after a course change has queued this
   // delivery. Do not retry an old browser address after it has been unlinked.
-  const [linkedSubscription] = await db.select({ id: memberPushSubscriptionsTable.subscriptionId })
-    .from(memberPushSubscriptionsTable)
-    .where(and(
-      eq(memberPushSubscriptionsTable.subscriptionId, delivery.subscriptionId),
-      eq(memberPushSubscriptionsTable.memberId, delivery.memberId),
-    ))
-    .limit(1);
-  if (!linkedSubscription) {
-    return {
-      status: "skipped" as const,
-      detail: "Push-Abo inzwischen abgemeldet; der In-App-Hinweis bleibt verfügbar.",
-    };
+  let phone: string | null = null;
+  if (smsDelivery) {
+    const [member] = await db.select({ phone: membersTable.phone, smsConsent: membersTable.smsConsent })
+      .from(membersTable).where(eq(membersTable.id, delivery.memberId)).limit(1);
+    if (!member || member.smsConsent !== 1 || !member.phone) {
+      return { status: "skipped" as const, detail: "SMS-Einwilligung oder Telefonnummer inzwischen entfernt." };
+    }
+    phone = member.phone.trim();
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      return { status: "failed" as const, detail: "Telefonnummer muss für SMS im internationalen E.164-Format vorliegen." };
+    }
+  } else {
+    const [linkedSubscription] = await db.select({ id: memberPushSubscriptionsTable.subscriptionId })
+      .from(memberPushSubscriptionsTable)
+      .where(and(
+        eq(memberPushSubscriptionsTable.subscriptionId, delivery.subscriptionId),
+        eq(memberPushSubscriptionsTable.memberId, delivery.memberId),
+      ))
+      .limit(1);
+    if (!linkedSubscription) {
+      return {
+        status: "skipped" as const,
+        detail: "Push-Abo inzwischen abgemeldet; der In-App-Hinweis bleibt verfügbar.",
+      };
+    }
   }
   const [resolution] = await db.select({
     action: courseClosureResolutionsTable.action,
@@ -185,7 +216,13 @@ async function sendOne(
     const response = await proxy("/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: {
+      body: smsDelivery ? {
+        app_id: APP_ID,
+        include_phone_numbers: [phone],
+        target_channel: "sms",
+        contents: { en: body },
+        idempotency_key: delivery.idempotencyKey,
+      } : {
         app_id: APP_ID,
         include_subscription_ids: [delivery.subscriptionId],
         target_channel: "push",
@@ -248,6 +285,7 @@ export async function getResolutionPushStatuses(resolutionId: number) {
   return db.select({
     id: closurePushDeliveriesTable.id,
     memberId: closurePushDeliveriesTable.memberId,
+    channel: sql<string>`CASE WHEN ${closurePushDeliveriesTable.subscriptionId} LIKE 'sms:%' THEN 'sms' ELSE 'push' END`,
     status: closurePushDeliveriesTable.status,
     attemptCount: closurePushDeliveriesTable.attemptCount,
     error: closurePushDeliveriesTable.error,

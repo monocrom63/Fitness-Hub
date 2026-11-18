@@ -191,6 +191,8 @@ export const membersTable = pgTable("fiudia_members", {
   gender: text("gender"),
   marketingConsent: integer("marketing_consent").notNull().default(0),
   marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
+  smsConsent: integer("sms_consent").notNull().default(0),
+  smsConsentAt: timestamp("sms_consent_at", { withTimezone: true }),
   contactConsent: integer("contact_consent").notNull().default(0),
   contactConsentAt: timestamp("contact_consent_at", { withTimezone: true }),
   contactConsentRevokedAt: timestamp("contact_consent_revoked_at", { withTimezone: true }),

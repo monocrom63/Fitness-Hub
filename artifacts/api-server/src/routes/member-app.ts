@@ -214,6 +214,9 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
     email: identity.email,
     ...(body.data.fullName !== undefined ? { fullName: body.data.fullName.trim() } : {}),
     ...(body.data.phone !== undefined ? { phone: body.data.phone?.trim() || null } : {}),
+    ...(body.data.phone !== undefined && (body.data.phone?.trim() || null) !== member.phone
+      ? { smsConsent: 0, smsConsentAt: null }
+      : {}),
     ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
     ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
     ...(contactConsent !== undefined ? {
@@ -227,6 +230,8 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
       ...(consentChanged && !contactConsent ? {
         contactConsentRevokedAt: new Date(),
         marketingConsentAt: null,
+        smsConsent: 0,
+        smsConsentAt: null,
       } : {}),
     } : {}),
   }).where(eq(membersTable.id, member.id)).returning({ id: membersTable.id });

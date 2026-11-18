@@ -58,7 +58,7 @@ function AffectedCourse({ course, closureId, studioId, pushReady, pushReason }: 
   const resolve = useResolveCourseRoomClosure();
   const [action, setAction] = useState<'relocate' | 'cancel' | null>(null);
   const [room, setRoom] = useState('');
-  const [channel, setChannel] = useState<'in_app' | 'email' | 'push'>('in_app');
+  const [channel, setChannel] = useState<'in_app' | 'email' | 'push' | 'push_sms'>('in_app');
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
@@ -82,7 +82,7 @@ function AffectedCourse({ course, closureId, studioId, pushReady, pushReason }: 
         client.invalidateQueries({ queryKey: getListMemberNotificationsQueryKey() });
       },
       onError: error => {
-        if (next.data.channel === 'push') client.invalidateQueries({ queryKey: getGetClosurePushReadinessQueryKey(studioId) });
+        if (next.data.channel === 'push' || next.data.channel === 'push_sms') client.invalidateQueries({ queryKey: getGetClosurePushReadinessQueryKey(studioId) });
         setRequestError(errorText(error));
       },
     });
@@ -90,7 +90,7 @@ function AffectedCourse({ course, closureId, studioId, pushReady, pushReason }: 
 
   function submit() {
     if (!action || resolve.isPending) return;
-    if (channel === 'push' && !pushReady && !attempt) {
+    if ((channel === 'push' || channel === 'push_sms') && !pushReady && !attempt) {
       setRequestError(pushReason); return;
     }
     if (action === 'relocate' && !course.alternativeRooms.includes(room)) {
@@ -128,10 +128,12 @@ function AffectedCourse({ course, closureId, studioId, pushReady, pushReason }: 
         <button type="button" aria-pressed={channel === 'in_app'} onClick={() => { setChannel('in_app'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-in-app-${course.id}`}>In-App</button>
         <button type="button" aria-pressed={channel === 'email'} onClick={() => { setChannel('email'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-email-${course.id}`}>E-Mail</button>
         <button type="button" aria-pressed={channel === 'push'} disabled={!pushReady} title={!pushReady ? pushReason : undefined} onClick={() => { setChannel('push'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-push-${course.id}`}>Push</button>
-        <button type="button" disabled title="Noch nicht eingerichtet" data-testid={`button-channel-whatsapp-${course.id}`}>WhatsApp · geplant</button>
+        <button type="button" aria-pressed={channel === 'push_sms'} disabled={!pushReady} title={!pushReady ? pushReason : undefined} onClick={() => { setChannel('push_sms'); setAttempt(null); setSubmitted(false); }} data-testid={`button-channel-onesignal-${course.id}`}>OneSignal · Push + SMS</button>
       </div></div>
       {action === 'cancel' && <p className="rooms-form-note">{channel === 'push'
         ? 'Push wird an Browser-Abonnenten versucht. Alle gebuchten Mitglieder erhalten zusätzlich eine In-App-Benachrichtigung. Ist der Push-Anbieter nicht bereit, kann die Anfrage bereits vor der Erfassung abgelehnt werden.'
+        : channel === 'push_sms'
+          ? 'OneSignal versucht Push an registrierte Geräte und SMS an Nummern mit dokumentierter SMS-Einwilligung. Alle gebuchten Mitglieder erhalten zusätzlich eine In-App-Benachrichtigung.'
         : `Gebuchte Mitglieder werden über ${channel === 'email' ? 'E-Mail' : 'In-App'} über die Kursabsage informiert.`}</p>}
       {requestError && <div className="rooms-alert" role="alert" data-testid={`error-resolution-${course.id}`}>{requestError}</div>}
       <div><button type="button" className="rooms-action primary" disabled={resolve.isPending || (action === 'relocate' && !room)} onClick={submit} data-testid={`button-submit-resolution-${course.id}`}>{resolve.isPending ? 'Entscheidung wird übermittelt …' : attempt ? 'Mit gleicher Anfrage erneut versuchen' : action === 'relocate' ? 'Raumwechsel bestätigen' : 'Absage prüfen'} <ArrowRight size={14} /></button></div>
@@ -139,7 +141,9 @@ function AffectedCourse({ course, closureId, studioId, pushReady, pushReason }: 
     {submitted && <div className="rooms-notice" role="status" data-testid={`status-resolution-outcome-${course.id}`}>Entscheidung erfasst. Den aktuellen Zustellungsstatus findest du unten bei „Getroffene Entscheidungen“.</div>}
     {confirmCancel && <ConfirmDialog title="Kurs wirklich absagen?" description={channel === 'push'
       ? `„${course.title}“ wird abgesagt. Push wird an Browser-Abonnenten versucht; alle ${course.enrolled} gebuchten Mitglieder erhalten zusätzlich eine In-App-Benachrichtigung. Ist der Push-Anbieter nicht bereit, kann die Anfrage bereits vor der Erfassung abgelehnt werden.`
-      : `„${course.title}“ wird abgesagt. ${course.enrolled} gebuchte Mitglieder werden über ${channel === 'email' ? 'E-Mail' : 'In-App'} informiert.`} confirmLabel="Kurs verbindlich absagen" busy={resolve.isPending} onClose={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); if (channel === 'push' && !pushReady) { setRequestError(pushReason); return; } const next: Attempt = { courseId: course.id, data: { closureId, action: 'cancel', channel, idempotencyKey: crypto.randomUUID() } }; setAttempt(next); sendResolution(next); }} />}
+      : channel === 'push_sms'
+        ? `„${course.title}“ wird abgesagt. OneSignal versucht Push an registrierte Geräte und SMS an Mitglieder mit dokumentierter SMS-Einwilligung. Alle ${course.enrolled} gebuchten Mitglieder erhalten zusätzlich eine In-App-Benachrichtigung.`
+      : `„${course.title}“ wird abgesagt. ${course.enrolled} gebuchte Mitglieder werden über ${channel === 'email' ? 'E-Mail' : 'In-App'} informiert.`} confirmLabel="Kurs verbindlich absagen" busy={resolve.isPending} onClose={() => setConfirmCancel(false)} onConfirm={() => { setConfirmCancel(false); if ((channel === 'push' || channel === 'push_sms') && !pushReady) { setRequestError(pushReason); return; } const next: Attempt = { courseId: course.id, data: { closureId, action: 'cancel', channel, idempotencyKey: crypto.randomUUID() } }; setAttempt(next); sendResolution(next); }} />}
   </article>;
 }
 
@@ -163,7 +167,7 @@ function ResolutionOutcome({ resolution, studioId, closureId }: { resolution: Cl
   const pushDeliveryQuery = useGetClosurePushDeliveries(resolution.resolutionId, {
     query: {
       queryKey: getGetClosurePushDeliveriesQueryKey(resolution.resolutionId),
-      enabled: resolution.channel === 'push',
+      enabled: resolution.channel === 'push' || resolution.channel === 'push_sms',
       refetchOnMount: 'always',
       refetchInterval: query => {
         const deliveries = query.state.data?.deliveries;
@@ -177,12 +181,16 @@ function ResolutionOutcome({ resolution, studioId, closureId }: { resolution: Cl
     if (delivery.status !== 'skipped') total[delivery.status] += 1;
     return total;
   }, { sent: 0, failed: 0, pending: 0, sending: 0 });
-  const pushCounts = pushDeliveries.reduce((total, delivery) => {
+  const pushCounts = pushDeliveries.filter(delivery => delivery.channel === 'push').reduce((total, delivery) => {
+    total[delivery.status] += 1;
+    return total;
+  }, { sent: 0, failed: 0, pending: 0, sending: 0, skipped: 0 });
+  const smsCounts = pushDeliveries.filter(delivery => delivery.channel === 'sms').reduce((total, delivery) => {
     total[delivery.status] += 1;
     return total;
   }, { sent: 0, failed: 0, pending: 0, sending: 0, skipped: 0 });
   const hasUnsent = counts.failed + counts.pending > 0;
-  const hasPushUnsent = pushCounts.failed + pushCounts.pending > 0;
+  const hasPushUnsent = pushCounts.failed + pushCounts.pending + smsCounts.failed + smsCounts.pending > 0;
   function retryEmail() {
     setRetryError('');
     retry.mutate({ resolutionId: resolution.resolutionId }, {
@@ -209,8 +217,8 @@ function ResolutionOutcome({ resolution, studioId, closureId }: { resolution: Cl
   }
   return <article className="rooms-outcome" data-testid={`status-resolution-${resolution.resolutionId}`}>
     <strong>{resolution.courseTitle} · {resolution.action === 'cancel' ? 'Abgesagt' : `Verlegt nach ${resolution.room ?? 'anderer Raum'}`}</strong>
-    <p>{resolution.channel === 'email' ? `E-Mail-Zustellung: ${counts.sent} gesendet · ${counts.failed} fehlgeschlagen · ${counts.pending} ausstehend · ${counts.sending} in Bearbeitung` : resolution.channel === 'push'
-      ? `Push-Zustellung pro Browser-Gerät: ${pushCounts.sent} gesendet · ${pushCounts.failed} fehlgeschlagen · ${pushCounts.pending} ausstehend · ${pushCounts.sending} in Bearbeitung · ${pushCounts.skipped} ohne Push-Abo (In-App-Hinweis erstellt).`
+    <p>{resolution.channel === 'email' ? `E-Mail-Zustellung: ${counts.sent} gesendet · ${counts.failed} fehlgeschlagen · ${counts.pending} ausstehend · ${counts.sending} in Bearbeitung` : resolution.channel === 'push' || resolution.channel === 'push_sms'
+      ? `OneSignal: Push ${pushCounts.sent} gesendet, ${pushCounts.failed} fehlgeschlagen, ${pushCounts.skipped} übersprungen · SMS ${smsCounts.sent} gesendet, ${smsCounts.failed} fehlgeschlagen, ${smsCounts.skipped} übersprungen.`
       : 'In-App-Benachrichtigung erfasst.'}</p>
     {resolution.channel === 'email' && <>
       {deliveryQuery.isLoading && <div className="rooms-skeleton" aria-label="Zustellungen werden geladen" />}
@@ -219,11 +227,11 @@ function ResolutionOutcome({ resolution, studioId, closureId }: { resolution: Cl
       {hasUnsent && <button type="button" className="rooms-action" disabled={retry.isPending} onClick={retryEmail} data-testid={`button-retry-delivery-${resolution.resolutionId}`}>{retry.isPending ? 'Zustellungen werden erneut versucht …' : 'Fehlgeschlagene / ausstehende E-Mails erneut versuchen'}</button>}
       {retryError && <div className="rooms-alert" role="alert" data-testid={`error-retry-delivery-${resolution.resolutionId}`}>{retryError}</div>}
     </>}
-    {resolution.channel === 'push' && <>
-      {pushDeliveryQuery.isLoading && <div className="rooms-skeleton" aria-label="Push-Zustellungen werden geladen" />}
-      {pushDeliveryQuery.isError && <div className="rooms-alert" role="alert" data-testid={`error-load-push-deliveries-${resolution.resolutionId}`}>Aktuelle Push-Zustellungen konnten nicht geladen werden. {errorText(pushDeliveryQuery.error)} <button type="button" className="rooms-action" onClick={() => pushDeliveryQuery.refetch()} data-testid={`button-reload-push-deliveries-${resolution.resolutionId}`}>Erneut laden</button></div>}
-      {pushDeliveries.length > 0 ? <ul>{pushDeliveries.map(delivery => <li key={delivery.id} className={delivery.status === 'failed' ? 'failed' : ''} data-testid={`status-push-delivery-${delivery.id}`}>Browser-Gerät · Mitglied #{delivery.memberId}: {delivery.status === 'skipped' ? 'Kein Push-Abo · In-App-Hinweis erstellt' : delivery.status === 'sent' ? 'Gesendet' : delivery.status === 'failed' ? 'Fehlgeschlagen' : delivery.status === 'sending' ? 'Wird gesendet' : 'Ausstehend'}{delivery.error ? ` · ${delivery.error}` : ''}</li>)}</ul> : !pushDeliveryQuery.isLoading && !pushDeliveryQuery.isError && <p>Keine Push-Geräte-Zustellungen vorhanden. Das bedeutet nicht, dass die In-App-Benachrichtigung fehlgeschlagen ist.</p>}
-      {hasPushUnsent && <button type="button" className="rooms-action" disabled={pushRetry.isPending} onClick={retryPush} data-testid={`button-retry-push-delivery-${resolution.resolutionId}`}>{pushRetry.isPending ? 'Push-Zustellungen werden erneut versucht …' : 'Fehlgeschlagene / ausstehende Push-Zustellungen erneut versuchen'}</button>}
+    {(resolution.channel === 'push' || resolution.channel === 'push_sms') && <>
+      {pushDeliveryQuery.isLoading && <div className="rooms-skeleton" aria-label="OneSignal-Zustellungen werden geladen" />}
+      {pushDeliveryQuery.isError && <div className="rooms-alert" role="alert" data-testid={`error-load-push-deliveries-${resolution.resolutionId}`}>Aktuelle OneSignal-Zustellungen konnten nicht geladen werden. {errorText(pushDeliveryQuery.error)} <button type="button" className="rooms-action" onClick={() => pushDeliveryQuery.refetch()} data-testid={`button-reload-push-deliveries-${resolution.resolutionId}`}>Erneut laden</button></div>}
+      {pushDeliveries.length > 0 ? <ul>{pushDeliveries.map(delivery => <li key={delivery.id} className={delivery.status === 'failed' ? 'failed' : ''} data-testid={`status-push-delivery-${delivery.id}`}>{delivery.channel === 'sms' ? 'SMS' : 'Push'} · Mitglied #{delivery.memberId}: {delivery.status === 'skipped' ? delivery.channel === 'sms' ? 'SMS übersprungen' : 'Kein Push-Abo' : delivery.status === 'sent' ? 'Gesendet' : delivery.status === 'failed' ? 'Fehlgeschlagen' : delivery.status === 'sending' ? 'Wird gesendet' : 'Ausstehend'}{delivery.error ? ` · ${delivery.error}` : ''}</li>)}</ul> : !pushDeliveryQuery.isLoading && !pushDeliveryQuery.isError && <p>Keine OneSignal-Zustellungen vorhanden.</p>}
+      {hasPushUnsent && <button type="button" className="rooms-action" disabled={pushRetry.isPending} onClick={retryPush} data-testid={`button-retry-push-delivery-${resolution.resolutionId}`}>{pushRetry.isPending ? 'OneSignal-Zustellungen werden erneut versucht …' : 'Fehlgeschlagene / ausstehende OneSignal-Zustellungen erneut versuchen'}</button>}
       {pushRetryError && <div className="rooms-alert" role="alert" data-testid={`error-retry-push-delivery-${resolution.resolutionId}`}>{pushRetryError}</div>}
     </>}
   </article>;

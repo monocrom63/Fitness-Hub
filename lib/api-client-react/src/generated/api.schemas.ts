@@ -720,6 +720,7 @@ export interface Member {
   /** @nullable */
   gender?: MemberGender;
   marketingConsent?: boolean;
+  smsConsent?: boolean;
   contactConsent?: boolean;
   billingInterval: BillingInterval;
   status: MemberStatus;
@@ -796,6 +797,7 @@ export interface MemberInput {
   /** @nullable */
   gender?: MemberInputGender;
   marketingConsent?: boolean;
+  smsConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
@@ -865,6 +867,7 @@ export interface MemberUpdate {
   /** @nullable */
   gender?: MemberUpdateGender;
   marketingConsent?: boolean;
+  smsConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**
@@ -1195,7 +1198,7 @@ export const CourseClosureResolutionInputChannel = {
   in_app: 'in_app',
   email: 'email',
   push: 'push',
-  whatsapp: 'whatsapp',
+  push_sms: 'push_sms',
 } as const;
 
 export interface CourseClosureResolutionInput {
@@ -1221,6 +1224,7 @@ export const ClosureNotificationOutcomeChannel = {
   in_app: 'in_app',
   email: 'email',
   push: 'push',
+  sms: 'sms',
 } as const;
 
 export type ClosureNotificationOutcomeStatus = typeof ClosureNotificationOutcomeStatus[keyof typeof ClosureNotificationOutcomeStatus];
@@ -1258,6 +1262,7 @@ export const CourseClosureResolutionChannel = {
   in_app: 'in_app',
   email: 'email',
   push: 'push',
+  push_sms: 'push_sms',
 } as const;
 
 export interface CourseClosureResolution {
@@ -1297,6 +1302,14 @@ export interface ClosureEmailDeliveryReport {
   deliveries: ClosureEmailDelivery[];
 }
 
+export type ClosurePushDeliveryChannel = typeof ClosurePushDeliveryChannel[keyof typeof ClosurePushDeliveryChannel];
+
+
+export const ClosurePushDeliveryChannel = {
+  push: 'push',
+  sms: 'sms',
+} as const;
+
 export type ClosurePushDeliveryStatus = typeof ClosurePushDeliveryStatus[keyof typeof ClosurePushDeliveryStatus];
 
 
@@ -1311,6 +1324,7 @@ export const ClosurePushDeliveryStatus = {
 export interface ClosurePushDelivery {
   id: number;
   memberId: number;
+  channel: ClosurePushDeliveryChannel;
   status: ClosurePushDeliveryStatus;
   attemptCount: number;
   /** @nullable */
@@ -1353,6 +1367,7 @@ export const ClosureCourseResolutionChannel = {
   in_app: 'in_app',
   email: 'email',
   push: 'push',
+  push_sms: 'push_sms',
 } as const;
 
 export interface ClosureCourseResolution {

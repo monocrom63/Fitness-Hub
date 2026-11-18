@@ -30,6 +30,7 @@ export interface MemberUpdate {
   /** @nullable */
   gender?: MemberUpdateGender;
   marketingConsent?: boolean;
+  smsConsent?: boolean;
   billingInterval?: BillingInterval;
   status?: MemberStatus;
   /**

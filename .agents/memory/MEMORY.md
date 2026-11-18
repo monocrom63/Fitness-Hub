@@ -24,3 +24,4 @@
 - [Pulse search indexes](pulse-search-indexes.md) — preserve literal substring search with trigram indexes; ensure the PostgreSQL extension exists before publishing indexes.
 - [Unpatched braces advisory](unpatched-braces.md) — when braces 3.x has no fix, trace all dependency paths and remove avoidable usages rather than hiding it with an override.
 - [Member contract policy](member-contract-policy.md) — keep Fiudia AGB admin-managed; signed tariff changes apply at the next Stripe invoice without proration.
+- [SMS consent policy](sms-consent-policy.md) — SMS delivery requires its own explicit consent; marketing or contact consent does not grant it.

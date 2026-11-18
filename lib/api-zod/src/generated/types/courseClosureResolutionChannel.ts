@@ -13,4 +13,5 @@ export const CourseClosureResolutionChannel = {
   in_app: 'in_app',
   email: 'email',
   push: 'push',
+  push_sms: 'push_sms',
 } as const;

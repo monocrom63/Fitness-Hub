@@ -813,6 +813,7 @@ router.get("/members", async (req, res): Promise<void> => {
       membershipType: membersTable.membershipType,
       gender: membersTable.gender,
       marketingConsent: membersTable.marketingConsent,
+      smsConsent: membersTable.smsConsent,
       billingInterval: membersTable.billingInterval,
       status: membersTable.status,
       birthDate: membersTable.birthDate,
@@ -874,9 +875,10 @@ router.get("/members", async (req, res): Promise<void> => {
         invitationEmailStatus: staff.role === "studio_employee"
           ? null : latestInvitation.get(member.id)?.emailStatus ?? null,
         ...(staff.role === "studio_employee"
-          ? { email: null, phone: null, gender: null, marketingConsent: false, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
+          ? { email: null, phone: null, gender: null, marketingConsent: false, smsConsent: false, birthDate: null, address: null, contractStart: null, contractDurationMonths: null }
           : {}),
         marketingConsent: staff.role !== "studio_employee" && member.marketingConsent === 1,
+        smsConsent: staff.role !== "studio_employee" && member.smsConsent === 1,
         joinedAt: member.joinedAt.toISOString(),
         lastCheckIn: latestCheckIn.get(member.id)?.toISOString() ?? null,
       })),
@@ -911,6 +913,8 @@ router.post("/members", async (req, res): Promise<void> => {
       membershipType: body.data.membershipType.trim(),
       marketingConsent: body.data.marketingConsent ? 1 : 0,
       marketingConsentAt: body.data.marketingConsent ? new Date() : null,
+      smsConsent: body.data.smsConsent ? 1 : 0,
+      smsConsentAt: body.data.smsConsent ? new Date() : null,
       status: body.data.status ?? "active",
       birthDate: body.data.birthDate || null,
       address: body.data.address?.trim() || null,
@@ -928,6 +932,7 @@ router.post("/members", async (req, res): Promise<void> => {
     CreateMemberResponse.parse({
       ...member,
       marketingConsent: member.marketingConsent === 1,
+      smsConsent: member.smsConsent === 1,
       contactConsent: member.contactConsent === 1,
       studioName: studio.name,
       joinedAt: member.joinedAt.toISOString(),
@@ -974,7 +979,9 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const { marketingConsent, ...memberChanges } = body.data;
+  const { marketingConsent, smsConsent, ...memberChanges } = body.data;
+  const normalizedPhone = body.data.phone?.trim() || null;
+  const phoneChanged = body.data.phone !== undefined && normalizedPhone !== existing.phone;
   const values = {
     ...memberChanges,
     ...(body.data.email !== undefined
@@ -987,7 +994,7 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
       ? { membershipType: body.data.membershipType.trim() }
       : {}),
     ...(body.data.phone !== undefined
-      ? { phone: body.data.phone?.trim() || null }
+      ? { phone: normalizedPhone }
       : {}),
     ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
     ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
@@ -996,6 +1003,12 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     ...(marketingConsent !== undefined ? {
       marketingConsent: marketingConsent ? 1 : 0,
       marketingConsentAt: marketingConsent ? new Date() : null,
+    } : {}),
+    ...(smsConsent !== undefined || phoneChanged ? {
+      smsConsent: phoneChanged ? 0 : smsConsent ? 1 : 0,
+      smsConsentAt: phoneChanged ? null : smsConsent
+        ? existing.smsConsent === 1 ? existing.smsConsentAt : new Date()
+        : null,
     } : {}),
   };
   const [updated] = await db
@@ -1019,6 +1032,7 @@ router.patch("/members/:id", async (req, res): Promise<void> => {
     UpdateMemberResponse.parse({
       ...updated,
       marketingConsent: updated.marketingConsent === 1,
+      smsConsent: updated.smsConsent === 1,
       contactConsent: updated.contactConsent === 1,
       studioName: studio.name,
       joinedAt: updated.joinedAt.toISOString(),

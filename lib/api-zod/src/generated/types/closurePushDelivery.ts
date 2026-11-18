@@ -5,11 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClosurePushDeliveryChannel } from './closurePushDeliveryChannel';
 import type { ClosurePushDeliveryStatus } from './closurePushDeliveryStatus';
 
 export interface ClosurePushDelivery {
   id: number;
   memberId: number;
+  channel: ClosurePushDeliveryChannel;
   status: ClosurePushDeliveryStatus;
   attemptCount: number;
   /** @nullable */
