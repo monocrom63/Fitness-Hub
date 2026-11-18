@@ -49,6 +49,7 @@ export async function linkedMember(userId: string) {
     waitlistEmailEnabled: membersTable.waitlistEmailEnabled,
     contactConsent: membersTable.contactConsent,
     marketingConsent: membersTable.marketingConsent,
+    smsConsent: membersTable.smsConsent,
     studioId: studiosTable.id,
     studioName: studiosTable.name,
     studioLogoPath: studiosTable.logoPath,
@@ -63,6 +64,7 @@ export async function linkedMember(userId: string) {
     ...profile,
     contactConsent: profile.contactConsent === 1,
     marketingConsent: profile.marketingConsent === 1,
+    smsConsent: profile.smsConsent === 1,
     studioLogoAvailable: Boolean(studioLogoPath),
   };
 }
@@ -206,7 +208,14 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Bitte bestätige zuerst deine Konto-E-Mail-Adresse." });
     return;
   }
-  const { contactConsent, ...profileChanges } = body.data;
+  const { contactConsent, smsConsent, ...profileChanges } = body.data;
+  const phoneChanged = body.data.phone !== undefined
+    && (body.data.phone?.trim() || null) !== member.phone;
+  const nextPhone = body.data.phone !== undefined ? body.data.phone?.trim() || null : member.phone;
+  if (smsConsent && !nextPhone) {
+    res.status(400).json({ error: "Für eine SMS-Einwilligung muss eine Telefonnummer hinterlegt sein." });
+    return;
+  }
   const consentChanged = contactConsent !== undefined
     && (contactConsent !== member.contactConsent || contactConsent !== member.marketingConsent);
   const [updated] = await db.update(membersTable).set({
@@ -214,8 +223,11 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
     email: identity.email,
     ...(body.data.fullName !== undefined ? { fullName: body.data.fullName.trim() } : {}),
     ...(body.data.phone !== undefined ? { phone: body.data.phone?.trim() || null } : {}),
-    ...(body.data.phone !== undefined && (body.data.phone?.trim() || null) !== member.phone
+    ...(phoneChanged
       ? { smsConsent: 0, smsConsentAt: null }
+      : {}),
+    ...(smsConsent !== undefined && !phoneChanged && smsConsent !== member.smsConsent
+      ? { smsConsent: smsConsent ? 1 : 0, smsConsentAt: smsConsent ? new Date() : null }
       : {}),
     ...(body.data.address !== undefined ? { address: body.data.address?.trim() || null } : {}),
     ...(body.data.birthDate !== undefined ? { birthDate: body.data.birthDate || null } : {}),
@@ -230,8 +242,6 @@ router.patch("/member/me/profile", async (req, res): Promise<void> => {
       ...(consentChanged && !contactConsent ? {
         contactConsentRevokedAt: new Date(),
         marketingConsentAt: null,
-        smsConsent: 0,
-        smsConsentAt: null,
       } : {}),
     } : {}),
   }).where(eq(membersTable.id, member.id)).returning({ id: membersTable.id });

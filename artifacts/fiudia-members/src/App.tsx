@@ -501,6 +501,7 @@ function ProfilePage({ member }: { member: Member }) {
       fullName: member.fullName, phone: member.phone || '', birthDate: member.birthDate || '',
       address: member.address || '', billingInterval: member.billingInterval,
       contactConsent: Boolean(member.contactConsent && member.marketingConsent),
+      smsConsent: member.smsConsent === true,
       membershipType: member.membershipType, contractStart: member.contractStart || '',
       contractDurationMonths: member.contractDurationMonths || '',
       restPeriodStart: member.restPeriodStart || '', restPeriodEnd: member.restPeriodEnd || '',
@@ -525,6 +526,7 @@ function ProfilePage({ member }: { member: Member }) {
         fullName: values.fullName.trim(), phone: values.phone || null,
         birthDate: values.birthDate || null, address: values.address.trim() || null,
         contactConsent: values.contactConsent,
+        smsConsent: values.smsConsent,
         billingInterval: values.billingInterval,
         membershipType: values.membershipType.trim(),
         contractStart: values.contractStart || null,
@@ -532,6 +534,7 @@ function ProfilePage({ member }: { member: Member }) {
         restPeriodStart: values.restPeriodStart || null,
         restPeriodEnd: values.restPeriodEnd || null,
       } });
+      if (values.phone !== (member.phone || '')) form.setValue('smsConsent', false);
       setMessage('Deine Angaben wurden gespeichert.');
     } catch (failure) { setError(errorMessage(failure)); }
   });
@@ -557,6 +560,13 @@ function ProfilePage({ member }: { member: Member }) {
         <label className="contact-consent profile-wide">
           <input type="checkbox" {...form.register('contactConsent')} />
           <span>Ich bin damit einverstanden, dass mein Studio mich zu organisatorischen und vertragsbezogenen Anliegen sowie mit Angeboten und Informationen per E-Mail kontaktiert. Ich kann meine Zustimmung jederzeit hier widerrufen.</span>
+        </label>
+        <label className="contact-consent profile-wide">
+          <input type="checkbox" {...form.register('smsConsent')} />
+          <span>
+            <strong>SMS-Marketing-Einwilligung (freiwillig)</strong><br />
+            Ich willige ein, von meinem Studio wiederkehrende automatische SMS mit Marketing und Angeboten zu erhalten (ca. 2 Nachrichten pro Monat). Nachrichten- und Datenkosten können anfallen. Antworte mit STOP, um dich jederzeit abzumelden. Diese Einwilligung ist keine Voraussetzung für den Vertragsabschluss. <a href="https://fitness-hub-portal-weist1.replit.app/fiudia-landing/#datenschutz" target="_blank" rel="noreferrer">Datenschutzhinweise</a>. Ich kann meine Einwilligung jederzeit hier widerrufen.
+          </span>
         </label>
       </div>
       <p className="field-help">Änderungen an Tarif und Laufzeit werden erst nach deiner Vertragsbestätigung wirksam. Bei aktiver Lastschrift gilt der neue Preis ab der nächsten Abbuchung. Bankdaten speichert Fiudia nicht.</p>

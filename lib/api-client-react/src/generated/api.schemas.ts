@@ -449,6 +449,7 @@ export interface ContractSignatureInput {
      */
   signatureName: string;
   acceptTerms: true;
+  smsConsent?: boolean;
 }
 
 export type MemberContractStatus = typeof MemberContractStatus[keyof typeof MemberContractStatus];
@@ -1632,6 +1633,7 @@ export interface MemberSelfUpdate {
      */
   restPeriodEnd?: string | null;
   contactConsent?: boolean;
+  smsConsent?: boolean;
 }
 
 /**

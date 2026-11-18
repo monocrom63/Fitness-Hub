@@ -13,4 +13,5 @@ export interface ContractSignatureInput {
      */
   signatureName: string;
   acceptTerms: true;
+  smsConsent?: boolean;
 }

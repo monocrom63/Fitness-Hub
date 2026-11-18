@@ -56,4 +56,5 @@ export interface MemberSelfUpdate {
      */
   restPeriodEnd?: string | null;
   contactConsent?: boolean;
+  smsConsent?: boolean;
 }

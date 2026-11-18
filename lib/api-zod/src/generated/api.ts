@@ -1896,7 +1896,8 @@ export const UpdateOwnMemberProfileBody = zod.object({
   "contractDurationMonths": zod.number().int().min(1).max(updateOwnMemberProfileBodyContractDurationMonthsMax).nullish(),
   "restPeriodStart": zod.string().regex(updateOwnMemberProfileBodyRestPeriodStartRegExp).nullish(),
   "restPeriodEnd": zod.string().regex(updateOwnMemberProfileBodyRestPeriodEndRegExp).nullish(),
-  "contactConsent": zod.boolean().optional()
+  "contactConsent": zod.boolean().optional(),
+  "smsConsent": zod.boolean().optional()
 })
 
 export const updateOwnMemberProfileResponseMemberOneBirthDateRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
@@ -2850,11 +2851,12 @@ export const SignMemberContractParams = zod.object({
 export const signMemberContractBodySignatureNameMin = 2;
 export const signMemberContractBodySignatureNameMax = 160;
 
-
+export const signMemberContractBodySmsConsentDefault = false;
 
 export const SignMemberContractBody = zod.object({
   "signatureName": zod.string().min(signMemberContractBodySignatureNameMin).max(signMemberContractBodySignatureNameMax),
-  "acceptTerms": zod.literal(true)
+  "acceptTerms": zod.literal(true),
+  "smsConsent": zod.boolean().default(signMemberContractBodySmsConsentDefault)
 })
 
 export const SignMemberContractResponse = zod.object({

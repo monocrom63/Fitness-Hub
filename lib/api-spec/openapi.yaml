@@ -2251,6 +2251,7 @@ components:
       properties:
         signatureName: { type: string, minLength: 2, maxLength: 160 }
         acceptTerms: { type: boolean, const: true }
+        smsConsent: { type: boolean, default: false }
     MemberContract:
       type: object
       required: [id, status, contractSnapshot, termsVersion, signatureName, signedAt, emailStatus, pdfUrl]
@@ -2895,6 +2896,7 @@ components:
         restPeriodStart: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         restPeriodEnd: { type: ["string", "null"], pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
         contactConsent: { type: boolean }
+        smsConsent: { type: boolean }
     MemberHome:
       type: object
       required: [member, checkInCount, nextCourse, upcomingBookings, coursesEnabled, checkInsEnabled, waitlistEmailEnabled]

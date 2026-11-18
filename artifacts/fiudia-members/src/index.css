@@ -247,6 +247,13 @@ button:disabled { cursor: not-allowed; }
 .profile-success { color: #26734e; font-size: 13px; font-weight: 700; }
 .contact-consent { display: flex; align-items: flex-start; gap: 10px; color: #39445a; font-size: 13px; font-weight: 500; line-height: 1.55; }
 .contact-consent input { width: 16px; height: 16px; margin: 2px 0 0; flex: 0 0 auto; accent-color: #6b53d9; }
+.contact-consent a { color: #6554c0; font-weight: 650; text-decoration: underline; }
+.sms-marketing-consent { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid #e1e3ec; border-radius: 12px; background: #fafaff; color: #39445a; font-size: 13px; line-height: 1.55; }
+.sms-marketing-consent input { width: 16px; height: 16px; margin: 2px 0 0; flex: 0 0 auto; accent-color: #6b53d9; }
+.sms-marketing-consent span { display: grid; gap: 7px; }
+.sms-marketing-consent strong { color: #263149; }
+.sms-marketing-consent small { color: #657086; font-size: 12px; }
+.sms-marketing-consent a { color: #6554c0; font-weight: 650; text-decoration: underline; }
 .account-profile { max-width: 850px; overflow: auto; }
 @media (max-width: 680px) { .profile-grid { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } }
 .form-error { color: #aa4c42; background: #faeeeb; padding: 11px 13px; border-radius: 9px; font-size: 12px; line-height: 1.5; margin: 13px 0; }

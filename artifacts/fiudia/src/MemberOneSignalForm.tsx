@@ -150,7 +150,7 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
       <div>
         <div className="eyebrow">Kundenverwaltung / OneSignal</div>
         <h2 id="onesignal-composer-title">Nachricht an Mitglieder</h2>
-        <p>Es erscheinen nur aktive Mitglieder mit dokumentierter Marketing-Einwilligung.</p>
+        <p>Es erscheinen nur aktive Mitglieder mit Einwilligung für den ausgewählten Kanal.</p>
       </div>
       <button type="button" className="button button-outline onesignal-refresh" onClick={() => void recipients.refetch()} disabled={recipients.isFetching} data-testid="button-refresh-onesignal-recipients">
         <RefreshCw size={14} /> Aktualisieren
@@ -179,7 +179,7 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
             <p>{message.trim() || "Deine Nachricht erscheint hier."}</p>
           </div>
         </details>
-        <p className="onesignal-consent-note"><ShieldCheck size={15} /> Der Server prüft die gespeicherte Marketing-Einwilligung erneut, bevor er versendet.</p>
+        <p className="onesignal-consent-note"><ShieldCheck size={15} /> Der Server prüft SMS- und Marketing-Einwilligung getrennt erneut, bevor er versendet.</p>
       </div>
 
       <div className="onesignal-recipient-panel">

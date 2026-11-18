@@ -45,7 +45,14 @@ const settingsPatchSchema = settingsSchema.partial().refine(
 const signatureSchema = z.object({
   signatureName: z.string().min(2).max(160),
   acceptTerms: z.literal(true),
+  smsConsent: z.boolean().default(false),
 });
+const SMS_MARKETING_FREQUENCY = "ca. 2 Nachrichten pro Monat";
+const SMS_MARKETING_PRIVACY_URL = "https://fitness-hub-portal-weist1.replit.app/fiudia-landing/#datenschutz";
+
+function smsMarketingDisclosure(brand: string) {
+  return `Ich willige freiwillig ein, von ${brand || "meinem Studio"} wiederkehrende automatische SMS mit Marketing und Angeboten zu erhalten. Erwartete Häufigkeit: ${SMS_MARKETING_FREQUENCY}. Nachrichten- und Datenkosten können anfallen. Antworte mit STOP, um dich jederzeit abzumelden. Die Einwilligung ist freiwillig und keine Voraussetzung für den Vertragsabschluss.`;
+}
 
 router.get("/v1/public/contract-terms", (_req, res): void => {
   res.json({
@@ -106,6 +113,11 @@ async function pdfBytes(snapshot: Record<string, unknown>, signatureName?: strin
   doc.font("Helvetica-Bold").text("Vertragsbedingungen");
   doc.moveDown(0.35);
   doc.font("Helvetica").text(String(snapshot.termsText ?? ""), { lineGap: 3 });
+  doc.moveDown(1);
+  doc.font("Helvetica-Bold").text("Freiwillige SMS-Marketing-Einwilligung");
+  doc.font("Helvetica").text(snapshot.smsMarketingConsent === true ? "Erteilt" : "Nicht erteilt");
+  doc.font("Helvetica").text(String(snapshot.smsMarketingDisclosure ?? ""));
+  doc.text(`Datenschutzhinweise: ${String(snapshot.smsMarketingPrivacyUrl ?? SMS_MARKETING_PRIVACY_URL)}`);
   doc.moveDown(1);
   if (signatureName && signedAt) {
     doc.font("Helvetica-Bold").text("Elektronisch bestätigt");
@@ -392,6 +404,9 @@ router.get("/v1/member/contracts/current", async (req, res): Promise<void> => {
       termsText: settings.termsText,
       legalName: settings.legalName, legalAddress: settings.legalAddress,
       contactEmail: settings.contactEmail, contactPhone: settings.contactPhone,
+      smsMarketingDisclosure: smsMarketingDisclosure(settings.legalName),
+      smsMarketingFrequency: SMS_MARKETING_FREQUENCY,
+      smsMarketingPrivacyUrl: SMS_MARKETING_PRIVACY_URL,
     },
   }).returning();
   res.status(201).json(jsonContract(contract));
@@ -418,6 +433,10 @@ router.post("/v1/contracts/:id/sig", async (req, res): Promise<void> => {
   if (contract.status !== "draft") { res.status(409).json({ error: "Dieser Vertrag wurde bereits bestätigt." }); return; }
   const userId = getRequestUserId(req)!;
   const member = await linkedMember(userId);
+  if (parsed.data.smsConsent && !member?.phone) {
+    res.status(400).json({ error: "Für die SMS-Einwilligung muss zuerst eine Telefonnummer im Profil hinterlegt werden." });
+    return;
+  }
   const snapshot = contract.contractSnapshot as Record<string, unknown>;
   if (member?.billingStatus === "active" && member.stripeSubscriptionId) {
     try {
@@ -460,10 +479,24 @@ router.post("/v1/contracts/:id/sig", async (req, res): Promise<void> => {
     }
   }
   const signedAt = new Date();
-  const [signed] = await db.update(memberContractsTable).set({
-    status: "signed", signatureName: parsed.data.signatureName.trim(),
-    signedEmail: member!.email, signedAt,
-  }).where(and(eq(memberContractsTable.id, id), eq(memberContractsTable.status, "draft"))).returning();
+  const signed = await db.transaction(async (tx) => {
+    const [updatedContract] = await tx.update(memberContractsTable).set({
+      status: "signed",
+      signatureName: parsed.data.signatureName.trim(),
+      signedEmail: member!.email,
+      signedAt,
+      contractSnapshot: {
+        ...snapshot,
+        smsMarketingConsent: parsed.data.smsConsent,
+      },
+    }).where(and(eq(memberContractsTable.id, id), eq(memberContractsTable.status, "draft"))).returning();
+    if (!updatedContract) return null;
+    await tx.update(membersTable).set({
+      smsConsent: parsed.data.smsConsent ? 1 : 0,
+      smsConsentAt: parsed.data.smsConsent ? signedAt : null,
+    }).where(eq(membersTable.id, member!.id));
+    return updatedContract;
+  });
   if (!signed) { res.status(409).json({ error: "Dieser Vertrag wurde bereits bestätigt." }); return; }
   try {
     const pdf = await pdfBytes(signed.contractSnapshot as Record<string, unknown>, signed.signatureName, signed.signedAt);

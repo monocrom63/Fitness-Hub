@@ -19,7 +19,15 @@ export default function MemberContractPage({ member }: { member: Member }) {
   const sign = useSignMemberContract();
   const [signatureName, setSignatureName] = useState(member.fullName);
   const [accepted, setAccepted] = useState(false);
+  const [smsConsent, setSmsConsent] = useState(member.smsConsent === true);
   const [pdfUrl, setPdfUrl] = useState("");
+  const contractSnapshot = contract.data?.contractSnapshot as Record<string, unknown> | undefined;
+  const smsDisclosure = typeof contractSnapshot?.smsMarketingDisclosure === "string"
+    ? contractSnapshot.smsMarketingDisclosure
+    : "Ich willige freiwillig ein, von meinem Studio wiederkehrende automatische SMS mit Marketing und Angeboten zu erhalten. Erwartete Häufigkeit: ca. 2 Nachrichten pro Monat. Nachrichten- und Datenkosten können anfallen. Antworte mit STOP, um dich jederzeit abzumelden.";
+  const smsPrivacyUrl = typeof contractSnapshot?.smsMarketingPrivacyUrl === "string"
+    ? contractSnapshot.smsMarketingPrivacyUrl
+    : "https://fitness-hub-portal-weist1.replit.app/fiudia-landing/#datenschutz";
   useEffect(() => {
     if (!(pdf.data instanceof Blob)) return;
     const url = URL.createObjectURL(pdf.data);
@@ -29,7 +37,7 @@ export default function MemberContractPage({ member }: { member: Member }) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!accepted || !signatureName.trim() || !contractId) return;
-    sign.mutate({ id: contractId, data: { signatureName: signatureName.trim(), acceptTerms: true } }, {
+    sign.mutate({ id: contractId, data: { signatureName: signatureName.trim(), acceptTerms: true, smsConsent } }, {
       onSuccess: () => {
         void client.invalidateQueries({ queryKey: getGetCurrentMemberContractQueryKey() });
       },
@@ -50,6 +58,7 @@ export default function MemberContractPage({ member }: { member: Member }) {
           <h2><Check size={18} /> Vertrag bestätigt</h2>
           <p>Dein Vertrag wurde am {contract.data.signedAt ? new Date(contract.data.signedAt).toLocaleDateString("de-DE") : "heute"} bestätigt.</p>
           <p>{contract.data.emailStatus === "sent" ? `Das PDF wurde an ${member.email} gesendet.` : contract.data.emailStatus === "failed" ? "Die Bestätigung ist gespeichert, aber der E-Mail-Versand ist fehlgeschlagen. Bitte wende dich an dein Studio." : "Der E-Mail-Versand wird verarbeitet."}</p>
+          <p>SMS-Marketing-Einwilligung: {contractSnapshot?.smsMarketingConsent === true ? "erteilt" : "nicht erteilt"}.</p>
         </section> : <form onSubmit={submit} className="form-stack" style={{ marginTop: 20 }}>
           <label className="profile-field">Vollständiger Name als Unterschrift
             <input className="field" required minLength={2} maxLength={160} value={signatureName} onChange={e => setSignatureName(e.target.value)} />
@@ -57,6 +66,14 @@ export default function MemberContractPage({ member }: { member: Member }) {
           <label style={{ display: "flex", alignItems: "start", gap: 10 }}>
             <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} required />
             <span>Ich habe den Vertrag und die AGB gelesen und akzeptiere sie.</span>
+          </label>
+          <label className="sms-marketing-consent">
+            <input type="checkbox" checked={smsConsent} onChange={e => setSmsConsent(e.target.checked)} />
+            <span>
+              <strong>SMS-Marketing-Einwilligung (freiwillig)</strong>
+              <small>{smsDisclosure}</small>
+              <small>Datenschutzhinweise: <a href={smsPrivacyUrl} target="_blank" rel="noreferrer">Datenschutzerklärung öffnen</a>. Die AGB stehen im Vertrags-PDF.</small>
+            </span>
           </label>
           {sign.isError && <p className="form-error" role="alert">Die Unterschrift konnte nicht gespeichert werden. Bitte erneut versuchen.</p>}
           <button className="button button-primary" type="submit" disabled={!accepted || sign.isPending}>
