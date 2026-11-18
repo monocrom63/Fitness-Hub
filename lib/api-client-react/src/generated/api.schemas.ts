@@ -102,6 +102,73 @@ export interface MarketingSendResult {
   status: MarketingSendResultStatus;
 }
 
+export interface OneSignalMarketingRecipient {
+  id: number;
+  fullName: string;
+  /** @nullable */
+  phone: string | null;
+  smsEligible: boolean;
+  /** @minimum 0 */
+  pushSubscriptionCount: number;
+}
+
+export type OneSignalMarketingMessageInputChannel = typeof OneSignalMarketingMessageInputChannel[keyof typeof OneSignalMarketingMessageInputChannel];
+
+
+export const OneSignalMarketingMessageInputChannel = {
+  sms: 'sms',
+  push: 'push',
+  both: 'both',
+} as const;
+
+export interface OneSignalMarketingMessageInput {
+  /**
+     * @minItems 1
+     * @maxItems 1000
+     * @items.minimum 1
+     */
+  memberIds: number[];
+  channel: OneSignalMarketingMessageInputChannel;
+  /**
+     * @minLength 1
+     * @maxLength 1600
+     */
+  message: string;
+  smsIdempotencyKey: string;
+  pushIdempotencyKey: string;
+}
+
+export type OneSignalMarketingMessageResultStatus = typeof OneSignalMarketingMessageResultStatus[keyof typeof OneSignalMarketingMessageResultStatus];
+
+
+export const OneSignalMarketingMessageResultStatus = {
+  sent: 'sent',
+  partial: 'partial',
+  failed: 'failed',
+} as const;
+
+export interface OneSignalMarketingMessageResult {
+  /** @minimum 0 */
+  selectedCount: number;
+  /** @minimum 0 */
+  smsTargetCount: number;
+  /** @minimum 0 */
+  pushTargetCount: number;
+  /** @minimum 0 */
+  skippedSmsCount: number;
+  /** @minimum 0 */
+  skippedPushCount: number;
+  /** @nullable */
+  smsMessageId: string | null;
+  /** @nullable */
+  pushMessageId: string | null;
+  status: OneSignalMarketingMessageResultStatus;
+  /** @nullable */
+  smsError: string | null;
+  /** @nullable */
+  pushError: string | null;
+}
+
 export type MarketingImageUploadRequestContentType = typeof MarketingImageUploadRequestContentType[keyof typeof MarketingImageUploadRequestContentType];
 
 

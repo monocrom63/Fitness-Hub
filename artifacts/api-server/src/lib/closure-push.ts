@@ -10,7 +10,7 @@ import {
   memberPushSubscriptionsTable,
 } from "@workspace/db";
 
-const APP_ID = "c1a30beb-bc79-45f6-9cdd-275e663dbcd6";
+export const ONESIGNAL_APP_ID = "c1a30beb-bc79-45f6-9cdd-275e663dbcd6";
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 const connectors = new ReplitConnectors();
 
@@ -62,22 +62,22 @@ export function buildClosurePushDeliveryTargets(
 }
 
 export function buildClosureSmsDeliveryTargets(
-  bookings: readonly { id: number; memberId: number; phone: string | null; smsConsent: number }[],
+  bookings: readonly { id: number; memberId: number; phone: string | null; marketingConsent: number }[],
 ): ClosurePushDeliveryTarget[] {
   return bookings.map((booking) => ({
     bookingId: booking.id,
     memberId: booking.memberId,
     subscriptionId: `sms:${booking.memberId}`,
-    status: booking.smsConsent === 1 && booking.phone ? "pending" : "skipped",
-    error: booking.smsConsent !== 1
-      ? "SMS nicht versendet: Es liegt keine dokumentierte SMS-Einwilligung vor."
+    status: booking.marketingConsent === 1 && booking.phone ? "pending" : "skipped",
+    error: booking.marketingConsent !== 1
+      ? "SMS nicht versendet: Es liegt keine dokumentierte Marketing-Einwilligung vor."
       : !booking.phone
         ? "SMS nicht versendet: Für dieses Mitglied ist keine Telefonnummer hinterlegt."
         : null,
   }));
 }
 
-const oneSignalProxy: OneSignalProxy = (path, options) =>
+export const oneSignalProxy: OneSignalProxy = (path, options) =>
   connectors.proxy("onesignal", path, options);
 
 export async function closurePushReadiness(
@@ -85,7 +85,7 @@ export async function closurePushReadiness(
 ): Promise<string | null> {
   try {
     const response = await proxy(
-      `/notifications?app_id=${APP_ID}&limit=1&offset=0`,
+      `/notifications?app_id=${ONESIGNAL_APP_ID}&limit=1&offset=0`,
       { method: "GET" },
     );
     if (response.status === 401) {
@@ -170,10 +170,10 @@ async function sendOne(
   // delivery. Do not retry an old browser address after it has been unlinked.
   let phone: string | null = null;
   if (smsDelivery) {
-    const [member] = await db.select({ phone: membersTable.phone, smsConsent: membersTable.smsConsent })
+    const [member] = await db.select({ phone: membersTable.phone, marketingConsent: membersTable.marketingConsent })
       .from(membersTable).where(eq(membersTable.id, delivery.memberId)).limit(1);
-    if (!member || member.smsConsent !== 1 || !member.phone) {
-      return { status: "skipped" as const, detail: "SMS-Einwilligung oder Telefonnummer inzwischen entfernt." };
+    if (!member || member.marketingConsent !== 1 || !member.phone) {
+      return { status: "skipped" as const, detail: "Marketing-Einwilligung oder Telefonnummer inzwischen entfernt." };
     }
     phone = member.phone.trim();
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
@@ -217,13 +217,13 @@ async function sendOne(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: smsDelivery ? {
-        app_id: APP_ID,
+        app_id: ONESIGNAL_APP_ID,
         include_phone_numbers: [phone],
         target_channel: "sms",
         contents: { en: body },
         idempotency_key: delivery.idempotencyKey,
       } : {
-        app_id: APP_ID,
+        app_id: ONESIGNAL_APP_ID,
         include_subscription_ids: [delivery.subscriptionId],
         target_channel: "push",
         headings: { en: title },

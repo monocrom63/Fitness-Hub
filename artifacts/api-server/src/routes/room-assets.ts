@@ -530,7 +530,7 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
       memberId: courseBookingsTable.memberId,
       memberEmail: membersTable.email,
       memberPhone: membersTable.phone,
-      smsConsent: membersTable.smsConsent,
+      marketingConsent: membersTable.marketingConsent,
     }).from(courseBookingsTable)
       .innerJoin(membersTable, eq(membersTable.id, courseBookingsTable.memberId))
       .where(and(
@@ -552,8 +552,8 @@ router.post("/courses/:id/closure-resolution", async (req, res): Promise<void> =
         return { error: "Für diesen Kurs ist kein Browser-Push-Abonnement eingerichtet. Bitte wählen Sie In-App, damit alle gebuchten Mitglieder die Kursänderung erhalten." as const };
       }
       if (request.channel === "push_sms") {
-        const smsTargets = buildClosureSmsDeliveryTargets(activeBookings.map(({ id, memberId, memberPhone, smsConsent }) => ({
-          id, memberId, phone: memberPhone, smsConsent,
+        const smsTargets = buildClosureSmsDeliveryTargets(activeBookings.map(({ id, memberId, memberPhone, marketingConsent }) => ({
+          id, memberId, phone: memberPhone, marketingConsent,
         })));
         pushTargets.push(...smsTargets);
         if (!pushTargets.some((target) => target.status === "pending")) {

@@ -985,3 +985,64 @@ button { cursor: pointer; }
 .marketing-email-footer { padding:16px 20px; border-top:1px solid #edf0f4; background:#fafbfc; color:#8a92a1; font-size:.62rem; line-height:1.55; text-align:center; }.marketing-email-footer span { color:#7567b8; text-decoration:underline; }
 .marketing-preview-note { margin:15px 0 0; color:#778195; font-size:.67rem; line-height:1.5; }
 @media (max-width:600px) { .marketing-form-actions { align-items:stretch; flex-direction:column; }.marketing-form-actions .button { width:100%; }.marketing-preview-dialog { padding:17px; }.marketing-preview-heading h2 { font-size:1.15rem; } }
+/* OneSignal messaging panel in member administration */
+.onesignal-composer {
+  margin: 28px 0 36px;
+  padding: 24px;
+  border: 1px solid #e4e7ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(31, 41, 61, .06);
+}
+.onesignal-composer-heading { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 22px; }
+.onesignal-composer-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 13px; color: #6554c0; background: #f0edff; }
+.onesignal-composer-heading h2 { margin: 3px 0 4px; font-size: 20px; color: #1e2638; }
+.onesignal-composer-heading p { margin: 0; color: #687086; font-size: 13px; }
+.onesignal-composer .eyebrow { color: #6554c0; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.onesignal-refresh { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; }
+.onesignal-composer-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, .9fr); gap: 24px; }
+.onesignal-compose-fields { display: grid; align-content: start; gap: 16px; }
+.onesignal-compose-fields .field { display: grid; gap: 7px; }
+.onesignal-compose-fields .field > span { color: #30394b; font-size: 13px; font-weight: 650; }
+.onesignal-compose-fields select, .onesignal-compose-fields textarea, .onesignal-search { width: 100%; border: 1px solid #dfe4ed; border-radius: 10px; background: #fff; color: #1e2638; font: inherit; }
+.onesignal-compose-fields select { padding: 10px 12px; }
+.onesignal-compose-fields textarea { min-height: 155px; resize: vertical; padding: 12px; line-height: 1.5; }
+.onesignal-char-count { color: #7a8293; font-size: 11px; }
+.onesignal-preview { border: 1px solid #e7eaf0; border-radius: 10px; padding: 10px 12px; }
+.onesignal-preview summary { color: #6554c0; cursor: pointer; font-size: 12px; font-weight: 650; }
+.onesignal-preview-card { margin-top: 10px; padding: 12px; border-radius: 8px; background: #f7f8fb; }
+.onesignal-preview-card small { color: #7a8293; font-size: 10px; }
+.onesignal-preview-card p { margin: 8px 0 0; color: #30394b; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.onesignal-consent-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: #52604e; font-size: 12px; line-height: 1.45; }
+.onesignal-consent-note svg { flex: 0 0 auto; color: #47845b; }
+.onesignal-recipient-panel { min-width: 0; border: 1px solid #e7eaf0; border-radius: 13px; overflow: hidden; }
+.onesignal-recipient-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 14px; background: #f8f9fc; color: #596274; font-size: 11px; }
+.onesignal-recipient-heading > div { display: flex; align-items: center; gap: 7px; color: #30394b; font-size: 13px; }
+.onesignal-recipient-actions { display: flex; justify-content: space-between; gap: 10px; padding: 8px 14px; }
+.onesignal-text-button { border: 0; padding: 3px 0; background: transparent; color: #6554c0; cursor: pointer; font: inherit; font-size: 11px; font-weight: 650; }
+.onesignal-text-button:disabled { color: #9ba2b1; cursor: default; }
+.onesignal-search { display: block; width: calc(100% - 28px); margin: 0 14px 8px; padding: 9px 10px; font-size: 12px; }
+.onesignal-recipient-list { max-height: 300px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.onesignal-recipient-list li { border-top: 1px solid #eef0f4; }
+.onesignal-recipient-list label { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; }
+.onesignal-recipient-list label > input { accent-color: #6554c0; }
+.onesignal-recipient-list label > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.onesignal-recipient-list strong { overflow: hidden; color: #30394b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.onesignal-recipient-list small { color: #7a8293; font-size: 11px; }
+.onesignal-recipient-channels { display: flex; gap: 4px; margin-left: auto; }
+.onesignal-recipient-channels i { padding: 3px 5px; border-radius: 5px; background: #eef0f5; color: #677084; font-size: 9px; font-style: normal; }
+.onesignal-list-state, .onesignal-list-error { margin: 0; padding: 18px 14px; color: #798194; font-size: 12px; }
+.onesignal-list-error, .onesignal-form-error { color: #b33d40; }
+.onesignal-form-error, .onesignal-form-success { margin: 14px 0 0; font-size: 12px; line-height: 1.5; }
+.onesignal-form-success { display: flex; gap: 7px; align-items: flex-start; color: #39734d; }
+.onesignal-composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #eef0f4; }
+.onesignal-composer-footer > span { color: #7a8293; font-size: 11px; }
+.onesignal-composer-footer .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+@media (max-width: 760px) {
+  .onesignal-composer { padding: 17px; }
+  .onesignal-composer-grid { grid-template-columns: 1fr; gap: 18px; }
+  .onesignal-composer-heading { flex-wrap: wrap; }
+  .onesignal-refresh { margin-left: auto; }
+  .onesignal-composer-footer { align-items: stretch; flex-direction: column; }
+  .onesignal-composer-footer .button { width: 100%; }
+}

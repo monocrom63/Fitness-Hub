@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
@@ -9,6 +9,8 @@ import {
   GetExternalMarketingAudienceCountResponse, GetMarketingApiKeyResponse,
   GetMarketingAudienceCountQueryParams, GetMarketingAudienceCountResponse,
   GetMarketingSubscriptionResponse, ListMarketingCampaignsResponse,
+  ListOneSignalMarketingRecipientsResponse, SendOneSignalMarketingMessageBody,
+  SendOneSignalMarketingMessageResponse,
   RequestMarketingImageUploadBody, RequestMarketingImageUploadResponse,
   RotateMarketingApiKeyResponse, SendMarketingCampaignParams, SendMarketingCampaignResponse,
   UnsubscribeFromMarketingResponse,
@@ -16,13 +18,14 @@ import {
 import {
   db, marketingApiKeysTable, marketingCampaignsTable, marketingDeliveriesTable,
   marketingSubscriptionsTable, marketingUnsubscribeTokensTable, membersTable,
-  studiosTable,
+  memberPushSubscriptionsTable, studiosTable,
 } from "@workspace/db";
 import { getRequestUserId, getRequestStaffContext, isOrganizationAdmin, type StaffContext } from "../lib/fiudia-access";
 import { createMarketingImageUpload, getMarketingImageFile, pipeMarketingImage } from "../lib/studio-logos";
 import { getStripeClient } from "../lib/stripe-client";
 import { resendRequest } from "../lib/resend-client";
 import { getApprovedApiRequest, hasCurrentApprovedApiAccess } from "../lib/api-access";
+import { closurePushReadiness, ONESIGNAL_APP_ID, oneSignalProxy } from "../lib/closure-push";
 
 const router: IRouter = Router();
 const activeCache = new Map<number, { expires: number; active: boolean; status: string; currentPeriodEnd: Date | null }>();
@@ -101,6 +104,29 @@ async function audienceCounts(organizationId: number, filters: ReturnType<typeof
       .where(and(...conditions, eq(membersTable.marketingConsent, 1))),
   ]);
   return { count: Number(all.count), eligibleEmailCount: Number(eligible.count) };
+}
+const E164_PHONE = /^\+[1-9]\d{7,14}$/;
+
+async function submitOneSignal(body: Record<string, unknown>) {
+  try {
+    const response = await oneSignalProxy("/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    const result = await response.json().catch(() => ({})) as {
+      id?: string;
+      errors?: string[];
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      return { id: null, error: (result.error?.message ?? result.errors?.[0] ?? `OneSignal antwortete mit HTTP ${response.status}.`).slice(0, 300) };
+    }
+    if (!result.id) return { id: null, error: "OneSignal hat keine Nachrichten-ID zurückgegeben; es wurde keine Zustellung bestätigt." };
+    return { id: result.id, error: null };
+  } catch (error) {
+    return { id: null, error: error instanceof Error ? error.message.slice(0, 300) : "OneSignal ist derzeit nicht erreichbar." };
+  }
 }
 async function getStaff(req: Request, res: Response) {
   const userId = getRequestUserId(req);
@@ -332,6 +358,152 @@ router.get("/marketing/audience-count", async (req, res): Promise<void> => {
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Zielgruppe konnte nicht ausgewertet werden." });
   }
+});
+
+router.get("/marketing/onesignal/recipients", async (req, res): Promise<void> => {
+  const staff = await getStaff(req, res);
+  if (!staff) return;
+  let filters: ReturnType<typeof normalizedFilters>;
+  try { filters = scopedFilters(staff, normalizedFilters({})); }
+  catch (error) {
+    res.status(403).json({ error: error instanceof Error ? error.message : "Zugriff auf diese Empfänger ist nicht erlaubt." });
+    return;
+  }
+  const conditions = [
+    ...filterConditions(staff.organizationId, filters),
+    eq(membersTable.marketingConsent, 1),
+  ];
+  const recipients = await db.select({
+    id: membersTable.id,
+    fullName: membersTable.fullName,
+    phone: membersTable.phone,
+  }).from(membersTable)
+    .innerJoin(studiosTable, eq(studiosTable.id, membersTable.studioId))
+    .where(and(...conditions))
+    .orderBy(asc(membersTable.id))
+    .limit(MAX_AUDIENCE + 1);
+  if (recipients.length > MAX_AUDIENCE) {
+    res.status(413).json({ error: `Mehr als ${MAX_AUDIENCE} eingeloggte Empfänger vorhanden. Bitte Studio oder Auswahl eingrenzen.` });
+    return;
+  }
+  const ids = recipients.map((recipient) => recipient.id);
+  const subscriptions = ids.length
+    ? await db.select({
+        memberId: memberPushSubscriptionsTable.memberId,
+        subscriptionId: memberPushSubscriptionsTable.subscriptionId,
+      }).from(memberPushSubscriptionsTable)
+        .where(inArray(memberPushSubscriptionsTable.memberId, ids))
+    : [];
+  const pushCounts = new Map<number, number>();
+  for (const subscription of subscriptions) {
+    pushCounts.set(subscription.memberId, (pushCounts.get(subscription.memberId) ?? 0) + 1);
+  }
+  res.json(ListOneSignalMarketingRecipientsResponse.parse(recipients.map((recipient) => ({
+    ...recipient,
+    smsEligible: !!recipient.phone && E164_PHONE.test(recipient.phone.trim()),
+    pushSubscriptionCount: pushCounts.get(recipient.id) ?? 0,
+  }))));
+});
+
+router.post("/marketing/onesignal/send", async (req, res): Promise<void> => {
+  const staff = await requirePaidStaff(req, res);
+  if (!staff) return;
+  const subscription = await subscriptionState(staff.organizationId);
+  if (process.env.NODE_ENV !== "production" && subscription.status === "test_access") {
+    res.status(403).json({ error: "In der kostenlosen Marketing-Vorschau sind echte OneSignal-Nachrichten deaktiviert." });
+    return;
+  }
+  const body = SendOneSignalMarketingMessageBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Bitte Empfänger, Nachricht und Versandkanal prüfen." });
+    return;
+  }
+  let filters: ReturnType<typeof normalizedFilters>;
+  try { filters = scopedFilters(staff, normalizedFilters({})); }
+  catch (error) {
+    res.status(403).json({ error: error instanceof Error ? error.message : "Zugriff auf diese Empfänger ist nicht erlaubt." });
+    return;
+  }
+  const conditions = [
+    ...filterConditions(staff.organizationId, filters),
+    eq(membersTable.marketingConsent, 1),
+    inArray(membersTable.id, body.data.memberIds),
+  ];
+  const selected = await db.select({
+    id: membersTable.id,
+    fullName: membersTable.fullName,
+    phone: membersTable.phone,
+  }).from(membersTable)
+    .innerJoin(studiosTable, eq(studiosTable.id, membersTable.studioId))
+    .where(and(...conditions));
+  if (selected.length !== body.data.memberIds.length) {
+    res.status(409).json({ error: "Die Auswahl hat sich geändert oder enthält keine aktuell eingewilligten Mitglieder. Bitte Empfängerliste aktualisieren." });
+    return;
+  }
+  const smsRequested = body.data.channel === "sms" || body.data.channel === "both";
+  const pushRequested = body.data.channel === "push" || body.data.channel === "both";
+  const smsPhones = smsRequested
+    ? selected.map((recipient) => recipient.phone?.trim() ?? "").filter((phone) => E164_PHONE.test(phone))
+    : [];
+  const selectedIds = selected.map((recipient) => recipient.id);
+  const pushSubscriptions = pushRequested
+    ? await db.select({
+        memberId: memberPushSubscriptionsTable.memberId,
+        subscriptionId: memberPushSubscriptionsTable.subscriptionId,
+      }).from(memberPushSubscriptionsTable)
+        .where(inArray(memberPushSubscriptionsTable.memberId, selectedIds))
+    : [];
+  const pushSubscriptionIds = [...new Set(pushSubscriptions.map((item) => item.subscriptionId))];
+  if (!smsPhones.length && !pushSubscriptionIds.length) {
+    res.status(409).json({ error: "Für die Auswahl gibt es keine gültige SMS-Nummer und kein registriertes Push-Gerät." });
+    return;
+  }
+  const readiness = await closurePushReadiness();
+  if (readiness) {
+    res.status(502).json({ error: readiness });
+    return;
+  }
+  const smsResult = smsRequested
+    ? smsPhones.length
+      ? await submitOneSignal({
+          app_id: ONESIGNAL_APP_ID,
+          include_phone_numbers: smsPhones,
+          target_channel: "sms",
+          contents: { en: body.data.message.trim() },
+          idempotency_key: body.data.smsIdempotencyKey,
+        })
+      : { id: null, error: "Keine ausgewählte Telefonnummer ist im internationalen E.164-Format gespeichert." }
+    : { id: null, error: null };
+  const pushResult = pushRequested
+    ? pushSubscriptionIds.length
+      ? await submitOneSignal({
+          app_id: ONESIGNAL_APP_ID,
+          include_subscription_ids: pushSubscriptionIds,
+          target_channel: "push",
+          headings: { en: "Nachricht von deinem Studio" },
+          contents: { en: body.data.message.trim() },
+          idempotency_key: body.data.pushIdempotencyKey,
+        })
+      : { id: null, error: "Für die Auswahl sind keine OneSignal-Push-Geräte registriert." }
+    : { id: null, error: null };
+  const smsSucceeded = !smsRequested || !!smsResult.id;
+  const pushSucceeded = !pushRequested || !!pushResult.id;
+  const anySent = !!smsResult.id || !!pushResult.id;
+  const status = !anySent ? "failed" : smsSucceeded && pushSucceeded ? "sent" : "partial";
+  res.json(SendOneSignalMarketingMessageResponse.parse({
+    selectedCount: selected.length,
+    smsTargetCount: smsPhones.length,
+    pushTargetCount: pushSubscriptionIds.length,
+    skippedSmsCount: smsRequested ? selected.length - smsPhones.length : 0,
+    skippedPushCount: pushRequested
+      ? selected.length - new Set(pushSubscriptions.map((item) => item.memberId)).size
+      : 0,
+    smsMessageId: smsResult.id,
+    pushMessageId: pushResult.id,
+    status,
+    smsError: smsResult.error,
+    pushError: pushResult.error,
+  }));
 });
 
 router.post("/marketing/uploads/request-url", async (req, res): Promise<void> => {

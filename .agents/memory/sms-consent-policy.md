@@ -3,8 +3,8 @@ name: SMS consent policy
 description: Product rule for consent, phone changes, and SMS delivery in Fiudia.
 ---
 
-OneSignal SMS may be sent only when the member has a separately recorded SMS consent. Marketing consent or general contact consent is not enough. Revoke SMS consent when the stored phone number changes or the member withdraws general contact consent.
+For OneSignal marketing messages, reuse Fiudia's existing documented marketing consent; do not ask members for a duplicate SMS-only checkbox. The user confirmed that this existing consent is recorded with membership/contract information. Push and SMS marketing audiences must be limited to members with this consent.
 
-**Why:** SMS is a distinct communication channel and must not inherit permission from email marketing or a general contact preference.
+**Why:** The user wants the existing contract-area consent to remain the source of truth across marketing channels.
 
-**How to apply:** Keep SMS opt-in independent in staff forms and delivery checks; verify current consent again before sending or retrying.
+**How to apply:** Recheck current marketing consent on the server at send time and never rely only on client-selected member IDs.

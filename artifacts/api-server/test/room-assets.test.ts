@@ -247,9 +247,9 @@ test("room asset scope is studio-specific and concurrent resolution writes are i
     assert.equal(pushTargets.filter(({ status }) => status === "skipped").length, 1);
     assert.deepEqual(buildClosurePushDeliveryTargets([], []), [], "a course with no bookings has no push deliveries");
     const smsTargets = buildClosureSmsDeliveryTargets([
-      { id: booking.id, memberId: member.id, phone: "+491701234567", smsConsent: 1 },
-      { id: bookingWithoutPush.id, memberId: memberWithoutPush.id, phone: "+491701234568", smsConsent: 0 },
-      { id: bookingWithoutPush.id, memberId: memberWithoutPush.id, phone: null, smsConsent: 1 },
+      { id: booking.id, memberId: member.id, phone: "+491701234567", marketingConsent: 1 },
+      { id: bookingWithoutPush.id, memberId: memberWithoutPush.id, phone: "+491701234568", marketingConsent: 0 },
+      { id: bookingWithoutPush.id, memberId: memberWithoutPush.id, phone: null, marketingConsent: 1 },
     ]);
     assert.deepEqual(smsTargets.map(({ status }) => status), ["pending", "skipped", "skipped"]);
     assert.equal(smsTargets[1].error?.includes("Einwilligung"), true);

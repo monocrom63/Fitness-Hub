@@ -98,6 +98,9 @@ import type {
   ModuleSetting,
   ModuleUpdate,
   OnboardingInput,
+  OneSignalMarketingMessageInput,
+  OneSignalMarketingMessageResult,
+  OneSignalMarketingRecipient,
   PublicContractTerms,
   PulseCorrection,
   PulseHistoryEntry,
@@ -4924,6 +4927,171 @@ export const useSendMarketingCampaign = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSendMarketingCampaignMutationOptions(options));
+    }
+
+export const getListOneSignalMarketingRecipientsUrl = () => {
+
+
+
+
+  return `/api/marketing/onesignal/recipients`
+}
+
+/**
+ * @summary List active members with documented marketing consent
+ */
+export const listOneSignalMarketingRecipients = async ( options?: Parameters<typeof customFetch>[1]): Promise<OneSignalMarketingRecipient[]> => {
+
+  return customFetch<OneSignalMarketingRecipient[]>(getListOneSignalMarketingRecipientsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOneSignalMarketingRecipientsQueryKey = () => {
+    return [
+    `/api/marketing/onesignal/recipients`
+    ] as const;
+    }
+
+
+export const getListOneSignalMarketingRecipientsQueryOptions = <TData = Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOneSignalMarketingRecipientsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>> = ({ signal }) => listOneSignalMarketingRecipients({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListOneSignalMarketingRecipientsQueryResult = NonNullable<Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>>
+export type ListOneSignalMarketingRecipientsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List active members with documented marketing consent
+ */
+
+export function useListOneSignalMarketingRecipients<TData = Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listOneSignalMarketingRecipients>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListOneSignalMarketingRecipientsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendOneSignalMarketingMessageUrl = () => {
+
+
+
+
+  return `/api/marketing/onesignal/send`
+}
+
+/**
+ * @summary Send an SMS, push, or both to selected opted-in members
+ */
+export const sendOneSignalMarketingMessage = async (oneSignalMarketingMessageInput: OneSignalMarketingMessageInput, options?: Parameters<typeof customFetch>[1]): Promise<OneSignalMarketingMessageResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OneSignalMarketingMessageResult>(getSendOneSignalMarketingMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(oneSignalMarketingMessageInput)
+  }
+);}
+
+
+
+
+
+export const getSendOneSignalMarketingMessageMutationKey = () => ['sendOneSignalMarketingMessage'] as const;
+
+export const getSendOneSignalMarketingMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendOneSignalMarketingMessage>>, TError,SendOneSignalMarketingMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendOneSignalMarketingMessage>>, TError,SendOneSignalMarketingMessageMutationVariables, TContext> => {
+
+const mutationKey = getSendOneSignalMarketingMessageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendOneSignalMarketingMessage>>, SendOneSignalMarketingMessageMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendOneSignalMarketingMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendOneSignalMarketingMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendOneSignalMarketingMessage>>>
+    export type SendOneSignalMarketingMessageMutationBody = BodyType<OneSignalMarketingMessageInput>
+    export type SendOneSignalMarketingMessageMutationError = ErrorType<void>
+    export type SendOneSignalMarketingMessageMutationVariables = {data: BodyType<OneSignalMarketingMessageInput>}
+
+    /**
+ * @summary Send an SMS, push, or both to selected opted-in members
+ */
+export const useSendOneSignalMarketingMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendOneSignalMarketingMessage>>, TError,SendOneSignalMarketingMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendOneSignalMarketingMessage>>,
+        TError,
+        SendOneSignalMarketingMessageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendOneSignalMarketingMessageMutationOptions(options));
     }
 
 export const getRequestMarketingImageUploadUrl = () => {

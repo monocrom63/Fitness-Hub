@@ -1603,6 +1603,67 @@ export const SendMarketingCampaignResponse = zod.object({
 
 
 /**
+ * @summary List active members with documented marketing consent
+ */
+export const listOneSignalMarketingRecipientsResponsePushSubscriptionCountMin = 0;
+
+
+
+export const ListOneSignalMarketingRecipientsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "fullName": zod.string(),
+  "phone": zod.string().nullable(),
+  "smsEligible": zod.boolean(),
+  "pushSubscriptionCount": zod.number().int().min(listOneSignalMarketingRecipientsResponsePushSubscriptionCountMin)
+})
+export const ListOneSignalMarketingRecipientsResponse = zod.array(ListOneSignalMarketingRecipientsResponseItem)
+
+
+/**
+ * @summary Send an SMS, push, or both to selected opted-in members
+ */
+
+export const sendOneSignalMarketingMessageBodyMemberIdsMax = 1000;
+
+export const sendOneSignalMarketingMessageBodyMessageMax = 1600;
+
+
+
+export const SendOneSignalMarketingMessageBody = zod.object({
+  "memberIds": zod.array(zod.number().int().min(1)).min(1).max(sendOneSignalMarketingMessageBodyMemberIdsMax),
+  "channel": zod.enum(['sms', 'push', 'both']),
+  "message": zod.string().min(1).max(sendOneSignalMarketingMessageBodyMessageMax),
+  "smsIdempotencyKey": zod.string().uuid(),
+  "pushIdempotencyKey": zod.string().uuid()
+})
+
+export const sendOneSignalMarketingMessageResponseSelectedCountMin = 0;
+
+export const sendOneSignalMarketingMessageResponseSmsTargetCountMin = 0;
+
+export const sendOneSignalMarketingMessageResponsePushTargetCountMin = 0;
+
+export const sendOneSignalMarketingMessageResponseSkippedSmsCountMin = 0;
+
+export const sendOneSignalMarketingMessageResponseSkippedPushCountMin = 0;
+
+
+
+export const SendOneSignalMarketingMessageResponse = zod.object({
+  "selectedCount": zod.number().int().min(sendOneSignalMarketingMessageResponseSelectedCountMin),
+  "smsTargetCount": zod.number().int().min(sendOneSignalMarketingMessageResponseSmsTargetCountMin),
+  "pushTargetCount": zod.number().int().min(sendOneSignalMarketingMessageResponsePushTargetCountMin),
+  "skippedSmsCount": zod.number().int().min(sendOneSignalMarketingMessageResponseSkippedSmsCountMin),
+  "skippedPushCount": zod.number().int().min(sendOneSignalMarketingMessageResponseSkippedPushCountMin),
+  "smsMessageId": zod.string().nullable(),
+  "pushMessageId": zod.string().nullable(),
+  "status": zod.enum(['sent', 'partial', 'failed']),
+  "smsError": zod.string().nullable(),
+  "pushError": zod.string().nullable()
+})
+
+
+/**
  * @summary Request a secure campaign image upload URL
  */
 export const requestMarketingImageUploadBodySizeMax = 5242880;
