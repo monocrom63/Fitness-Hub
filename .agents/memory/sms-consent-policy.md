@@ -14,3 +14,9 @@ The chosen provider for Fiudia marketing SMS is Twilio connected through the exi
 **Why:** The user selected Twilio after confirming their OneSignal app currently has email configured but no SMS provider.
 
 **How to apply:** Configure the Twilio sender inside OneSignal and keep Fiudia's SMS delivery routed through OneSignal. Never request or expose Twilio credentials in chat.
+
+OneSignal push-only marketing sends do not require Fiudia's paid marketing subscription; SMS and mixed SMS-plus-push sends still do.
+
+**Why:** The user chose to keep OneSignal's free push capability available without Fiudia's monthly charge.
+
+**How to apply:** Keep the checkout gate channel-specific on both client and server; do not gate push-only sends when adjusting marketing billing.

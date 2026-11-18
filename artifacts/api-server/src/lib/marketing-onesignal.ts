@@ -5,7 +5,13 @@ export type MarketingChannelRecipient = {
   smsConsent: number;
 };
 
+export type OneSignalMarketingChannel = "sms" | "push" | "both";
+
 const E164_PHONE = /^\+[1-9]\d{7,14}$/;
+
+export function requiresPaidMarketingPlan(channel: OneSignalMarketingChannel) {
+  return channel !== "push";
+}
 
 export function isSmsMarketingEligible(recipient: Pick<MarketingChannelRecipient, "phone" | "smsConsent">) {
   return recipient.smsConsent === 1 && !!recipient.phone && E164_PHONE.test(recipient.phone.trim());

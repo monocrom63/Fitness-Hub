@@ -26,7 +26,7 @@ import { getStripeClient } from "../lib/stripe-client";
 import { resendRequest } from "../lib/resend-client";
 import { getApprovedApiRequest, hasCurrentApprovedApiAccess } from "../lib/api-access";
 import { closurePushReadiness, ONESIGNAL_APP_ID, oneSignalProxy } from "../lib/closure-push";
-import { buildPushMarketingMemberIds, buildSmsMarketingPhoneNumbers, isSmsMarketingEligible } from "../lib/marketing-onesignal";
+import { buildPushMarketingMemberIds, buildSmsMarketingPhoneNumbers, isSmsMarketingEligible, requiresPaidMarketingPlan } from "../lib/marketing-onesignal";
 
 const router: IRouter = Router();
 const activeCache = new Map<number, { expires: number; active: boolean; status: string; currentPeriodEnd: Date | null }>();
@@ -413,17 +413,21 @@ router.get("/marketing/onesignal/recipients", async (req, res): Promise<void> =>
 });
 
 router.post("/marketing/onesignal/send", async (req, res): Promise<void> => {
-  const staff = await requirePaidStaff(req, res);
-  if (!staff) return;
-  const subscription = await subscriptionState(staff.organizationId);
-  if (process.env.NODE_ENV !== "production" && subscription.status === "test_access") {
-    res.status(403).json({ error: "In der kostenlosen Marketing-Vorschau sind echte OneSignal-Nachrichten deaktiviert." });
-    return;
-  }
   const body = SendOneSignalMarketingMessageBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Bitte Empfänger, Nachricht und Versandkanal prüfen." });
     return;
+  }
+  const smsRequested = body.data.channel === "sms" || body.data.channel === "both";
+  const paidPlanRequired = requiresPaidMarketingPlan(body.data.channel);
+  const staff = paidPlanRequired ? await requirePaidStaff(req, res) : await getStaff(req, res);
+  if (!staff) return;
+  if (smsRequested) {
+    const subscription = await subscriptionState(staff.organizationId);
+    if (process.env.NODE_ENV !== "production" && subscription.status === "test_access") {
+      res.status(403).json({ error: "Im kostenlosen Marketing-Testzugang sind SMS-Versand und echte Testnachrichten deaktiviert." });
+      return;
+    }
   }
   let filters: ReturnType<typeof normalizedFilters>;
   try { filters = scopedFilters(staff, normalizedFilters({})); }
@@ -448,7 +452,6 @@ router.post("/marketing/onesignal/send", async (req, res): Promise<void> => {
     res.status(409).json({ error: "Die Auswahl hat sich geändert oder enthält keine aktuell eingewilligten Mitglieder. Bitte Empfängerliste aktualisieren." });
     return;
   }
-  const smsRequested = body.data.channel === "sms" || body.data.channel === "both";
   const pushRequested = body.data.channel === "push" || body.data.channel === "both";
   const smsConsentedMembers = selected.filter((recipient) => recipient.smsConsent === 1);
   const pushConsentedMembers = selected.filter((recipient) => recipient.marketingConsent === 1);

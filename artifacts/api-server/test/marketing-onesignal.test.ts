@@ -4,8 +4,15 @@ import {
   buildPushMarketingMemberIds,
   buildSmsMarketingPhoneNumbers,
   isSmsMarketingEligible,
+  requiresPaidMarketingPlan,
   type MarketingChannelRecipient,
 } from "../src/lib/marketing-onesignal";
+
+test("only SMS-bearing sends require the Fiudia marketing subscription", () => {
+  assert.equal(requiresPaidMarketingPlan("push"), false);
+  assert.equal(requiresPaidMarketingPlan("sms"), true);
+  assert.equal(requiresPaidMarketingPlan("both"), true);
+});
 
 test("SMS marketing needs its own consent and a valid international number", () => {
   const recipients: MarketingChannelRecipient[] = [

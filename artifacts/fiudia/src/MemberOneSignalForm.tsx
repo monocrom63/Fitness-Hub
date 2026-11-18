@@ -58,6 +58,7 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
   }, [eligible, search]);
   const selected = eligible.filter(member => selectedIds.includes(member.id));
   const activeSubscription = subscription.data?.active === true && subscription.data.status !== "test_access";
+  const requiresPaidPlan = channel !== "push";
 
   function changeChannel(next: Channel) {
     setChannel(next);
@@ -89,7 +90,7 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
 
   function beginCheckout() {
     if (role !== "district_manager") {
-      setError("Für den Versand muss die Bezirksleitung das Marketing-Abo freischalten.");
+      setError("Für SMS-Versand muss die Bezirksleitung das Marketing-Abo freischalten.");
       return;
     }
     if (!window.confirm("Der Versand benötigt ein Marketing-Abo für 99 € pro Monat und Organisation. Der Entwurf wird nicht automatisch gesendet. Jetzt zum Checkout?")) return;
@@ -102,11 +103,11 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
   function sendMessage() {
     setError("");
     setNotice("");
-    if (subscription.isError) {
+    if (requiresPaidPlan && subscription.isError) {
       setError("Marketingstatus konnte nicht geprüft werden. Bitte aktualisieren und erneut versuchen.");
       return;
     }
-    if (!activeSubscription) {
+    if (requiresPaidPlan && !activeSubscription) {
       beginCheckout();
       return;
     }
@@ -212,12 +213,12 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
       </div>
     </div>
 
-    {subscription.isError && <p className="onesignal-form-error" role="alert">Marketingstatus konnte nicht geprüft werden. Bitte erneut laden.</p>}
+    {requiresPaidPlan && subscription.isError && <p className="onesignal-form-error" role="alert">Marketingstatus konnte nicht geprüft werden. Bitte erneut laden.</p>}
     {error && <p className="onesignal-form-error" role="alert" data-testid="error-onesignal-send">{error}</p>}
     {notice && <p className="onesignal-form-success" role="status" data-testid="status-onesignal-send"><Check size={15} /> {notice}</p>}
     <footer className="onesignal-composer-footer">
-      <span>{channel === "both" ? "SMS und Push werden getrennt über OneSignal übergeben." : channel === "sms" ? "SMS nur an gültige internationale Telefonnummern." : "Push nur an registrierte OneSignal-Geräte."}</span>
-      <button type="button" className="button button-dark" onClick={sendMessage} disabled={!selected.length || !message.trim() || recipients.isLoading || recipients.isError || send.isPending || checkout.isPending || subscription.isLoading || subscription.isError} data-testid="button-send-onesignal-message">
+      <span>{channel === "both" ? "SMS und Push getrennt; für SMS sind Abo und Twilio-Kosten möglich." : channel === "sms" ? "SMS nur an gültige Nummern; Fiudia-Abo und Twilio-Kosten können anfallen." : "Push ohne Fiudia-Abo; OneSignal-Limits gelten."}</span>
+      <button type="button" className="button button-dark" onClick={sendMessage} disabled={!selected.length || !message.trim() || recipients.isLoading || recipients.isError || send.isPending || checkout.isPending || (requiresPaidPlan && (subscription.isLoading || subscription.isError))} data-testid="button-send-onesignal-message">
         <Send size={15} />{send.isPending ? "Wird gesendet …" : checkout.isPending ? "Checkout wird geöffnet …" : "Senden"}
       </button>
     </footer>
