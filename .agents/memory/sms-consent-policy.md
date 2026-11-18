@@ -8,3 +8,9 @@ For OneSignal marketing SMS, require a separate, affirmative SMS consent; never 
 **Why:** The user chose a separate SMS opt-in after OneSignal rejected a number as never subscribed; OneSignal requires SMS consent to be separately collected from email marketing consent.
 
 **How to apply:** Keep the SMS opt-in unchecked by default, store its timestamp, reset it when the phone number changes, and recheck it on the server at send time.
+
+The chosen provider for Fiudia marketing SMS is Twilio connected through the existing OneSignal app, not OneSignal-managed SMS.
+
+**Why:** The user selected Twilio after confirming their OneSignal app currently has email configured but no SMS provider.
+
+**How to apply:** Configure the Twilio sender inside OneSignal and keep Fiudia's SMS delivery routed through OneSignal. Never request or expose Twilio credentials in chat.
