@@ -38,7 +38,7 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
   const subscription = useGetMarketingSubscription();
   const checkout = useCreateMarketingCheckout();
   const send = useSendOneSignalMarketingMessage();
-  const [channel, setChannel] = useState<Channel>("sms");
+  const [channel, setChannel] = useState<Channel>("push");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
