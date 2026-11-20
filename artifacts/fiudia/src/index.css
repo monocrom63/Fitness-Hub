@@ -1046,3 +1046,12 @@ button { cursor: pointer; }
   .onesignal-composer-footer { align-items: stretch; flex-direction: column; }
   .onesignal-composer-footer .button { width: 100%; }
 }
+
+/* Long forms must remain scrollable inside the dialog on short mobile screens. */
+.modal {
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
