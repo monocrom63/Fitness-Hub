@@ -2029,11 +2029,12 @@ components:
         status: { type: string, enum: [sent] }
     OneSignalMarketingRecipient:
       type: object
-      required: [id, fullName, phone, smsEligible, pushSubscriptionCount]
+      required: [id, fullName, phone, marketingConsent, smsEligible, pushSubscriptionCount]
       properties:
         id: { type: integer }
         fullName: { type: string }
         phone: { type: ["string", "null"] }
+        marketingConsent: { type: boolean }
         smsEligible: { type: boolean }
         pushSubscriptionCount: { type: integer, minimum: 0 }
     OneSignalMarketingMessageInput:

@@ -11,6 +11,7 @@ export interface OneSignalMarketingRecipient {
   fullName: string;
   /** @nullable */
   phone: string | null;
+  marketingConsent: boolean;
   smsEligible: boolean;
   /** @minimum 0 */
   pushSubscriptionCount: number;

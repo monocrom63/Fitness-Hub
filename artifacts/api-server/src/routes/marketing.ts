@@ -407,6 +407,7 @@ router.get("/marketing/onesignal/recipients", async (req, res): Promise<void> =>
   }
   res.json(ListOneSignalMarketingRecipientsResponse.parse(recipients.map((recipient) => ({
     ...recipient,
+    marketingConsent: recipient.marketingConsent === 1,
     smsEligible: isSmsMarketingEligible(recipient),
     pushSubscriptionCount: recipient.marketingConsent === 1 ? pushCounts.get(recipient.id) ?? 0 : 0,
   }))));

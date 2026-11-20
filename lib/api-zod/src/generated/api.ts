@@ -1613,6 +1613,7 @@ export const ListOneSignalMarketingRecipientsResponseItem = zod.object({
   "id": zod.number().int(),
   "fullName": zod.string(),
   "phone": zod.string().nullable(),
+  "marketingConsent": zod.boolean(),
   "smsEligible": zod.boolean(),
   "pushSubscriptionCount": zod.number().int().min(listOneSignalMarketingRecipientsResponsePushSubscriptionCountMin)
 })

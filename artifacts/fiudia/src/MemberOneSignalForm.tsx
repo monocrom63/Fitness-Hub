@@ -50,12 +50,19 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
     () => allRecipients.filter(member => canReceive(member, channel)),
     [allRecipients, channel],
   );
-  const visible = useMemo(() => {
+  const channelCandidates = useMemo(
+    () => channel === "push"
+      ? allRecipients.filter(member => member.marketingConsent)
+      : eligible,
+    [allRecipients, channel, eligible],
+  );
+  const visibleCandidates = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("de-DE");
-    return eligible.filter(member =>
+    return channelCandidates.filter(member =>
       !query || member.fullName.toLocaleLowerCase("de-DE").includes(query) || (member.phone ?? "").includes(query),
     );
-  }, [eligible, search]);
+  }, [channelCandidates, search]);
+  const visible = visibleCandidates.filter(member => canReceive(member, channel));
   const selected = eligible.filter(member => selectedIds.includes(member.id));
   const activeSubscription = subscription.data?.active === true && subscription.data.status !== "test_access";
   const requiresPaidPlan = channel !== "push";
@@ -197,19 +204,23 @@ export default function MemberOneSignalForm({ role }: { role: Role }) {
         <input className="onesignal-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Name oder Telefonnummer suchen" aria-label="Empfänger suchen" data-testid="input-onesignal-recipient-search" />
         {recipients.isLoading ? <p className="onesignal-list-state" role="status">Empfänger werden geladen …</p>
           : recipients.isError ? <div className="onesignal-list-error" role="alert">{errorMessage(recipients.error)}</div>
-            : visible.length ? <ul className="onesignal-recipient-list">
-              {visible.map(member => <li key={member.id}>
+            : visibleCandidates.length ? <ul className="onesignal-recipient-list">
+              {visibleCandidates.map(member => {
+                const reachable = canReceive(member, channel);
+                return <li key={member.id} className={!reachable ? "onesignal-recipient-unavailable" : undefined}>
                 <label>
-                  <input type="checkbox" checked={selectedIds.includes(member.id)} onChange={() => toggleRecipient(member.id)} data-testid={`checkbox-onesignal-member-${member.id}`} />
-                  <span><strong>{member.fullName}</strong><small>{member.phone || "Keine Telefonnummer"}</small></span>
+                  <input type="checkbox" checked={selectedIds.includes(member.id)} disabled={!reachable} onChange={() => toggleRecipient(member.id)} data-testid={`checkbox-onesignal-member-${member.id}`} />
+                  <span><strong>{member.fullName}</strong><small>{!reachable && channel === "push" ? "Push-Gerät fehlt – im Mitgliederportal unter „Hinweise“ aktivieren." : member.phone || "Keine Telefonnummer"}</small></span>
                   <span className="onesignal-recipient-channels">
                     {member.smsEligible && <i>SMS</i>}
                     {member.pushSubscriptionCount > 0 && <i>Push</i>}
+                    {!reachable && channel === "push" && <i>Gerät fehlt</i>}
                   </span>
                 </label>
-              </li>)}
+              </li>;
+              })}
             </ul>
-            : <p className="onesignal-list-state">{eligible.length ? "Keine passenden Namen gefunden." : "Keine aktiven, eingewilligten Empfänger für diesen Kanal."}</p>}
+            : <p className="onesignal-list-state">{eligible.length ? "Keine passenden Namen gefunden." : channel === "push" ? "Keine Mitglieder mit Marketing-Einwilligung gefunden." : "Keine aktiven, eingewilligten Empfänger für diesen Kanal."}</p>}
       </div>
     </div>
 
