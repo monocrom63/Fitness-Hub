@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 type PrivacyPageProps = {
   homeHref: string;
+  impressumHref: string;
 };
 
 const processors = [
@@ -37,7 +38,7 @@ const processors = [
   },
 ];
 
-function PrivacyPage({ homeHref }: PrivacyPageProps) {
+function PrivacyPage({ homeHref, impressumHref }: PrivacyPageProps) {
   useEffect(() => {
     document.title = 'Datenschutz | Fiudia';
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
@@ -68,12 +69,6 @@ function PrivacyPage({ homeHref }: PrivacyPageProps) {
         <p className="privacy-kicker">Fiudia Fitness Hub GmbH</p>
         <h1>Datenschutzerklärung</h1>
         <p className="privacy-updated">Stand: 18. November 2026</p>
-
-        <aside className="privacy-disclaimer" role="note">
-          <strong>Hinweis:</strong> Diese Datenschutzerklärung ist ein Informationsentwurf und
-          keine Rechtsberatung. Bitte vor Veröffentlichung die tatsächlichen Datenflüsse,
-          Anbietervereinbarungen und Pflichtangaben rechtlich prüfen lassen.
-        </aside>
 
         <section>
           <h2>1. Verantwortlicher</h2>
@@ -257,6 +252,7 @@ function PrivacyPage({ homeHref }: PrivacyPageProps) {
 
       <footer className="privacy-footer">
         <a href={homeHref}>Zur Fiudia-Landingpage</a>
+        <a href={impressumHref}>Impressum</a>
         <a href="mailto:info@fiudia.de">Datenschutzkontakt</a>
       </footer>
     </main>

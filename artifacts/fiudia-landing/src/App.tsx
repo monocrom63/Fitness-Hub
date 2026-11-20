@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ImpressumPage from './pages/ImpressumPage';
 import PrivacyPage from './pages/PrivacyPage';
 import {
   ArrowDown,
@@ -19,6 +20,7 @@ import studioTraining from '@assets/download_97d4b9a2-1b0f-46ba-969e-17fe59bc8d3
 
 const basePath = import.meta.env.BASE_URL;
 const privacyPath = `${basePath.replace(/\/+$/, '')}/datenschutz`;
+const impressumPath = `${basePath.replace(/\/+$/, '')}/impressum`;
 const currentPath = window.location.pathname.replace(/\/+$/, '');
 
 const roles = [
@@ -74,7 +76,11 @@ function Brand({ light = false }: { light?: boolean }) {
 
 function App() {
   if (currentPath === privacyPath) {
-    return <PrivacyPage homeHref={basePath} />;
+    return <PrivacyPage homeHref={basePath} impressumHref={impressumPath} />;
+  }
+
+  if (currentPath === impressumPath) {
+    return <ImpressumPage homeHref={basePath} privacyHref={privacyPath} />;
   }
 
   return <LandingPage />;
@@ -225,6 +231,7 @@ function LandingPage() {
         <div className="footer-links">
           <a href="#top">Zurück nach oben</a>
           <a href={privacyPath}>Datenschutz</a>
+          <a href={impressumPath}>Impressum</a>
           <a href="/sign-in">Anmelden</a>
         </div>
       </footer>
